@@ -18,8 +18,9 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Worker scheduling now filters odds polling to sports active in the current season
 - Minimal sport-stat schema is now live: team tables for MLB/NBA/NHL/NFL plus MLB pitcher, NHL goalie, and NFL QB foundations
 - MLB stats ETL now has a live MLB Stats API provider, explicit River enqueue path, and sqlc-backed team and pitcher upserts
-- NBA stats ETL now has a first-pass River worker, explicit enqueue helper, and idempotent nba_team_stats upserts
+- NBA stats ETL now has a live stats.nba.com provider path, explicit River enqueue helper, and idempotent nba_team_stats upserts
 - Phase 1 integration coverage now includes insert/dedup behavior and Postgres 17 boot smoke
+- NHL stats ETL now has a first-pass live team path via the official NHL web API; goalie writes remain deferred pending a date-consistent goalie source
 - Documentation is now aligned to the four-sport direction: `MLB`, `NBA`, `NHL`, `NFL`
 
 The current implementation target is intentionally narrower than the full product architecture. Phase 2 is now extending that ingestion slice into tightly scoped sport-specific ETL foundations before broader modeling breadth.
@@ -84,8 +85,8 @@ Goal: add the shared four-sport substrate required before serious baseline model
 | P2-002 | Add sport-aware scheduler behavior | ✅ DONE | P0 | Worker now enqueues odds poll jobs with active sport keys only |
 | P2-003 | Design and migrate sport-specific stat tables | ✅ DONE | P0 | Added minimal team foundations for all four sports plus MLB pitcher, NHL goalie, and NFL QB tables |
 | P2-004 | Implement `MLBStatsETLJob` | ✅ DONE | P0 | Real MLB Stats API provider plus explicit enqueue path now back the MLB team and pitcher ETL |
-| P2-005 | Implement `NBAStatsETLJob` | ✅ DONE | P0 | First-pass NBA ETL now upserts `nba_team_stats` with worker, enqueue helper, and idempotent integration coverage |
-| P2-006 | Implement `NHLStatsETLJob` | ⬜ TODO | P1 | NHL analytics and goalie data |
+| P2-005 | Implement `NBAStatsETLJob` | ✅ DONE | P0 | NBA ETL now uses a live stats.nba.com provider for `nba_team_stats`, plus worker, enqueue helper, and idempotent integration coverage |
+| P2-006 | Implement `NHLStatsETLJob` | ✅ DONE | P1 | First-pass NHL ETL now writes `nhl_team_stats` from the official NHL web API; goalie writes are deferred until a date-consistent source is selected |
 | P2-007 | Implement `NFLStatsETLJob` | ⬜ TODO | P1 | nflverse and supporting sources |
 | P2-008 | Implement injury and lineup ingestion | ⬜ TODO | P0 | Rotowire, Daily Faceoff, confirmations |
 | P2-009 | Implement weather ingestion for outdoor sports | ⬜ TODO | P1 | MLB and NFL first |

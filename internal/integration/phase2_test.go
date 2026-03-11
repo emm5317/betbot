@@ -33,7 +33,7 @@ func TestSportStatTablesMigration(t *testing.T) {
 		table := table
 		columns := columns
 		t.Run(table+" columns", func(t *testing.T) {
-			actual := columnNamesForTable(t, ctx, pool, table)
+			actual := columnNamesForTable(ctx, t, pool, table)
 			for _, column := range columns {
 				if _, ok := actual[column]; !ok {
 					t.Fatalf("expected column %q on table %s, got columns %v", column, table, sortedKeys(actual))
@@ -102,7 +102,7 @@ func TestSportStatTablesMigration(t *testing.T) {
 	}
 }
 
-func columnNamesForTable(t *testing.T, ctx context.Context, pool *pgxpool.Pool, table string) map[string]struct{} {
+func columnNamesForTable(ctx context.Context, t *testing.T, pool *pgxpool.Pool, table string) map[string]struct{} {
 	t.Helper()
 
 	rows, err := pool.Query(ctx, `

@@ -43,14 +43,14 @@ func TestMLBStatsETLIdempotentUpserts(t *testing.T) {
 		t.Fatalf("first etl run: %v", err)
 	}
 
-	teamCount := countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_team_stats")
-	pitcherCount := countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats")
+	teamCount := countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_team_stats")
+	pitcherCount := countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats")
 	if teamCount != 1 || pitcherCount != 1 {
 		t.Fatalf("unexpected row counts after first run: teams=%d pitchers=%d", teamCount, pitcherCount)
 	}
 
-	teamGamesPlayed, teamUpdatedAt := loadMLBTeamState(t, ctx, pool)
-	pitcherEra, pitcherUpdatedAt := loadMLBPitcherState(t, ctx, pool)
+	teamGamesPlayed, teamUpdatedAt := loadMLBTeamState(ctx, t, pool)
+	pitcherEra, pitcherUpdatedAt := loadMLBPitcherState(ctx, t, pool)
 	if teamGamesPlayed != 11 {
 		t.Fatalf("expected games_played 11 after first run, got %d", teamGamesPlayed)
 	}
@@ -63,15 +63,15 @@ func TestMLBStatsETLIdempotentUpserts(t *testing.T) {
 		t.Fatalf("second identical etl run: %v", err)
 	}
 
-	if countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_team_stats") != 1 {
+	if countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_team_stats") != 1 {
 		t.Fatal("expected team row count to remain 1 after identical rerun")
 	}
-	if countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats") != 1 {
+	if countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats") != 1 {
 		t.Fatal("expected pitcher row count to remain 1 after identical rerun")
 	}
 
-	repeatedTeamGamesPlayed, repeatedTeamUpdatedAt := loadMLBTeamState(t, ctx, pool)
-	repeatedPitcherEra, repeatedPitcherUpdatedAt := loadMLBPitcherState(t, ctx, pool)
+	repeatedTeamGamesPlayed, repeatedTeamUpdatedAt := loadMLBTeamState(ctx, t, pool)
+	repeatedPitcherEra, repeatedPitcherUpdatedAt := loadMLBPitcherState(ctx, t, pool)
 	if repeatedTeamGamesPlayed != teamGamesPlayed || repeatedPitcherEra != pitcherEra {
 		t.Fatal("expected identical rerun to preserve stored values")
 	}
@@ -88,15 +88,15 @@ func TestMLBStatsETLIdempotentUpserts(t *testing.T) {
 		t.Fatalf("third changed etl run: %v", err)
 	}
 
-	if countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_team_stats") != 1 {
+	if countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_team_stats") != 1 {
 		t.Fatal("expected team row count to stay 1 after changed rerun")
 	}
-	if countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats") != 1 {
+	if countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats") != 1 {
 		t.Fatal("expected pitcher row count to stay 1 after changed rerun")
 	}
 
-	updatedGamesPlayed, updatedTeamUpdatedAt := loadMLBTeamState(t, ctx, pool)
-	updatedPitcherEra, updatedPitcherUpdatedAt := loadMLBPitcherState(t, ctx, pool)
+	updatedGamesPlayed, updatedTeamUpdatedAt := loadMLBTeamState(ctx, t, pool)
+	updatedPitcherEra, updatedPitcherUpdatedAt := loadMLBPitcherState(ctx, t, pool)
 	if updatedGamesPlayed != 12 {
 		t.Fatalf("expected updated games_played 12, got %d", updatedGamesPlayed)
 	}
@@ -137,10 +137,10 @@ func TestMLBStatsETLWorkerWork(t *testing.T) {
 		t.Fatalf("worker run: %v", err)
 	}
 
-	if got := countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_team_stats"); got != 1 {
+	if got := countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_team_stats"); got != 1 {
 		t.Fatalf("expected 1 mlb team stat row, got %d", got)
 	}
-	if got := countRows(t, ctx, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats"); got != 1 {
+	if got := countRows(ctx, t, pool, "SELECT COUNT(*) FROM mlb_pitcher_stats"); got != 1 {
 		t.Fatalf("expected 1 mlb pitcher stat row, got %d", got)
 	}
 }
@@ -178,7 +178,7 @@ func mlbSnapshotForIntegration(gamesPlayed int32, teamERA float64, pitcherERA fl
 	}
 }
 
-func loadMLBTeamState(t *testing.T, ctx context.Context, pool *pgxpool.Pool) (int32, time.Time) {
+func loadMLBTeamState(ctx context.Context, t *testing.T, pool *pgxpool.Pool) (int32, time.Time) {
 	t.Helper()
 
 	var gamesPlayed int32
@@ -189,7 +189,7 @@ func loadMLBTeamState(t *testing.T, ctx context.Context, pool *pgxpool.Pool) (in
 	return gamesPlayed, updatedAt.UTC()
 }
 
-func loadMLBPitcherState(t *testing.T, ctx context.Context, pool *pgxpool.Pool) (float64, time.Time) {
+func loadMLBPitcherState(ctx context.Context, t *testing.T, pool *pgxpool.Pool) (float64, time.Time) {
 	t.Helper()
 
 	var era float64
@@ -200,7 +200,7 @@ func loadMLBPitcherState(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	return era, updatedAt.UTC()
 }
 
-func countRows(t *testing.T, ctx context.Context, pool *pgxpool.Pool, sql string) int64 {
+func countRows(ctx context.Context, t *testing.T, pool *pgxpool.Pool, sql string) int64 {
 	t.Helper()
 
 	var count int64

@@ -24,6 +24,7 @@ type Querier interface {
 	UpsertMLBPitcherStats(ctx context.Context, arg UpsertMLBPitcherStatsParams) error
 	UpsertMLBTeamStats(ctx context.Context, arg UpsertMLBTeamStatsParams) error
 	UpsertNBATeamStats(ctx context.Context, arg UpsertNBATeamStatsParams) error
+	UpsertNHLTeamStats(ctx context.Context, arg UpsertNHLTeamStatsParams) error
 }
 
 var _ Querier = (*Queries)(nil)

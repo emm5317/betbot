@@ -98,7 +98,8 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &OddsPollWorker{poller: oddspoller.NewPoller(cfg, logger, pool), logger: logger})
 	river.AddWorker(workers, NewMLBStatsETLWorker(pool, logger, statsetl.NewMLBStatsAPIProvider("", 0)))
-	river.AddWorker(workers, NewNBAStatsETLWorker(pool, logger, statsetl.UnconfiguredNBAProvider{}))
+	river.AddWorker(workers, NewNBAStatsETLWorker(pool, logger, statsetl.NewNBAStatsAPIProvider("", 0)))
+	river.AddWorker(workers, NewNHLStatsETLWorker(pool, logger, statsetl.NewNHLStatsAPIProvider("", 0)))
 
 	client, err := river.NewClient(driver, &river.Config{
 		Logger: logger,
@@ -137,6 +138,14 @@ func activeOddsPollArgs(at time.Time, registry domain.SportRegistry, configuredS
 
 func (a *App) EnqueueMLBStatsETL(ctx context.Context, req statsetl.MLBRequest) (*rivertype.JobInsertResult, error) {
 	return EnqueueMLBStatsETL(ctx, a.client, req)
+}
+
+func (a *App) EnqueueNBAStatsETL(ctx context.Context, req statsetl.NBARequest) (*rivertype.JobInsertResult, error) {
+	return EnqueueNBAStatsETL(ctx, a.client, req)
+}
+
+func (a *App) EnqueueNHLStatsETL(ctx context.Context, req statsetl.NHLRequest) (*rivertype.JobInsertResult, error) {
+	return EnqueueNHLStatsETL(ctx, a.client, req)
 }
 
 func (a *App) Close() {

@@ -43,11 +43,11 @@ func TestNBAStatsETLIdempotentUpserts(t *testing.T) {
 		t.Fatalf("first etl run: %v", err)
 	}
 
-	if got := countRows(t, ctx, pool, "SELECT COUNT(*) FROM nba_team_stats"); got != 1 {
+	if got := countRows(ctx, t, pool, "SELECT COUNT(*) FROM nba_team_stats"); got != 1 {
 		t.Fatalf("expected 1 nba team stat row after first run, got %d", got)
 	}
 
-	offensiveRating, updatedAt := loadNBAState(t, ctx, pool)
+	offensiveRating, updatedAt := loadNBAState(ctx, t, pool)
 	if offensiveRating != 119.2 {
 		t.Fatalf("expected offensive rating 119.2 after first run, got %.1f", offensiveRating)
 	}
@@ -57,11 +57,11 @@ func TestNBAStatsETLIdempotentUpserts(t *testing.T) {
 		t.Fatalf("second identical etl run: %v", err)
 	}
 
-	if got := countRows(t, ctx, pool, "SELECT COUNT(*) FROM nba_team_stats"); got != 1 {
+	if got := countRows(ctx, t, pool, "SELECT COUNT(*) FROM nba_team_stats"); got != 1 {
 		t.Fatalf("expected row count to remain 1 after identical rerun, got %d", got)
 	}
 
-	repeatedOffensiveRating, repeatedUpdatedAt := loadNBAState(t, ctx, pool)
+	repeatedOffensiveRating, repeatedUpdatedAt := loadNBAState(ctx, t, pool)
 	if repeatedOffensiveRating != offensiveRating {
 		t.Fatalf("expected identical rerun to preserve offensive rating %.1f, got %.1f", offensiveRating, repeatedOffensiveRating)
 	}
@@ -75,7 +75,7 @@ func TestNBAStatsETLIdempotentUpserts(t *testing.T) {
 		t.Fatalf("third changed etl run: %v", err)
 	}
 
-	updatedOffensiveRating, updatedUpdatedAt := loadNBAState(t, ctx, pool)
+	updatedOffensiveRating, updatedUpdatedAt := loadNBAState(ctx, t, pool)
 	if updatedOffensiveRating != 120.4 {
 		t.Fatalf("expected updated offensive rating 120.4, got %.1f", updatedOffensiveRating)
 	}
@@ -110,7 +110,7 @@ func TestNBAStatsETLWorkerWork(t *testing.T) {
 		t.Fatalf("worker run: %v", err)
 	}
 
-	if got := countRows(t, ctx, pool, "SELECT COUNT(*) FROM nba_team_stats"); got != 1 {
+	if got := countRows(ctx, t, pool, "SELECT COUNT(*) FROM nba_team_stats"); got != 1 {
 		t.Fatalf("expected 1 nba team stat row, got %d", got)
 	}
 }
@@ -135,7 +135,7 @@ func nbaSnapshotForIntegration(gamesPlayed int32, offensiveRating float64, defen
 	}
 }
 
-func loadNBAState(t *testing.T, ctx context.Context, pool *pgxpool.Pool) (float64, time.Time) {
+func loadNBAState(ctx context.Context, t *testing.T, pool *pgxpool.Pool) (float64, time.Time) {
 	t.Helper()
 
 	var offensiveRating float64
