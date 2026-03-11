@@ -1,3 +1,28 @@
-run:
-  timeout: 5m
+version: "2"
 
+run:
+  go: "1.25"
+  timeout: 5m
+  relative-path-mode: gomod
+  modules-download-mode: readonly
+  allow-parallel-runners: true
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - revive
+  settings:
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

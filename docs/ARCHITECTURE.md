@@ -203,16 +203,18 @@ Documented operational expectations:
 | `clv_log` | closing-line attribution | later |
 | `situational_factors` | normalized cross-sport context and updates | later |
 
-### 6.4 Sport-Specific Planned Tables
+### 6.4 Sport-Specific Stat Foundation
 
-The four-sport direction adds dedicated stat tables after the ingestion slice is stable. Examples include:
+Phase 2 now includes a first-pass sport-specific schema sized for ETL bootstrapping rather than full downstream modeling breadth:
 
-- `mlb_pitcher_stats`, `mlb_batter_stats`, `mlb_park_factors`
-- `nba_team_ratings`, `nba_player_impact`
-- `nhl_team_analytics`, `nhl_goalie_stats`
-- `nfl_team_epa`, `nfl_qb_metrics`
+- `mlb_team_stats` and `mlb_pitcher_stats`
+- `nba_team_stats`
+- `nhl_team_stats` and `nhl_goalie_stats`
+- `nfl_team_stats` and `nfl_qb_stats`
 
-These are planned schema surfaces, not Phase 1 implementation requirements.
+The shape is intentionally minimal. Each table stores `source`, source-facing `external_id`, `season`, `season_type`, `stat_date`, identity fields, a small set of core metrics, and `created_at` / `updated_at`. Natural-key uniqueness is enforced on `source + season + season_type + stat_date + external_id` so ETL jobs can upsert daily snapshots safely.
+
+Later phases can still add richer player, park, lineup, or play-by-play tables without rewriting this foundation.
 
 ### 6.5 Partitioning and Read Models
 
@@ -364,5 +366,6 @@ Phase 1 route surface:
 - [TRACKER.md](TRACKER.md): executable work queue
 - [SPORT_OPTIMIZATION.md](SPORT_OPTIMIZATION.md): sport-by-sport specialization details
 - [REPO_STRUCTURE.md](REPO_STRUCTURE.md): checked-in layout and target package responsibilities
+
 
 

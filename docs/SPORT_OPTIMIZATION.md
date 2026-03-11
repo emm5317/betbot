@@ -212,19 +212,22 @@ The system should treat these as sport policy, not one global constant forever.
 
 ---
 
-## 9. Planned Schema Additions After the Ingestion Slice
+## 9. Schema Additions After the Ingestion Slice
 
-Later phases should introduce sport-specific data tables such as:
+Phase 2 now starts with a deliberately small stat-table set:
 
-- MLB pitcher, batter, and park-factor tables
-- NBA team-rating and player-impact tables
-- NHL team-analytics and goalie tables
-- NFL team-efficiency and QB-metric tables
+- MLB team and pitcher tables
+- NBA team table
+- NHL team and goalie tables
+- NFL team and quarterback tables
 
-The important sequencing rule is:
+This keeps the first ETL pass anchored on the entities that matter most for each sport without prematurely locking the repo into exhaustive player modeling.
+
+The sequencing rule remains:
 
 - Phase 1 must not be blocked on these tables
-- Phase 2 should add the schema only when the ingestion slice is already stable
+- Phase 2 should add the smallest schema that supports ETL and later model features
+- Later phases can add richer batter, skater, lineup, park, and play-level tables once real ingestion needs justify them
 
 ---
 
@@ -242,3 +245,4 @@ That means:
 - Phase 3 becomes the first serious modeling and backtesting phase
 
 This sequencing is intentional. A broad sports architecture without a trustworthy odds archive is the wrong order of operations.
+
