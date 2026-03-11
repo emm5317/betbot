@@ -1,1 +1,24 @@
-<!-- betbot stub -->
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Odds Archive</p>
+        <h2>Latest persisted market view</h2>
+        <p class="page-header__lede">
+            This page should reflect the most recent stored rows from the append-only archive, not a best-effort frontend cache.
+        </p>
+    </div>
+    <div class="page-header__meta">
+        <span class="runtime-chip">stored data only</span>
+        <span class="runtime-chip">dedup aware</span>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel__header">
+        <div>
+            <p class="eyebrow">Operational Read</p>
+            <h3>Book and market rows</h3>
+        </div>
+        <span class="panel__caption">Most recent snapshots by market identity</span>
+    </div>
+    {{template "partials/odds_table" .}}
+</section>

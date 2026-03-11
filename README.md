@@ -46,7 +46,7 @@ This is not a generic all-sports repo. The architecture is reusable, but the pro
 
 ## Tech Stack
 
-- `Go 1.24`
+- `Go 1.25`
 - `PostgreSQL 17` target baseline
 - `pgxpool` for database pooling
 - `sqlc` for typed SQL access
@@ -61,7 +61,7 @@ The repository is still early-stage. What exists today:
 
 - Go module and project scaffold
 - local Docker Compose runtime
-- minimal health-checked server bootstrap
+- Fiber operational server, River worker wiring, and PostgreSQL-backed Phase 1 slice
 - documentation set aligned to the four-sport roadmap
 
 What is being built first:
@@ -275,3 +275,4 @@ This repository is for infrastructure, analytics, and research. Sports betting l
 ## Keywords
 
 Open-source sports betting bot, sports betting analytics, sports betting tracker, odds tracking, closing line value, CLV tracker, expected value betting, Kelly Criterion bankroll management, sportsbook odds history, line shopping, sports betting backtesting, MLB betting model, NBA betting model, NHL betting model, NFL betting model, Go sports betting project, PostgreSQL odds database.
+

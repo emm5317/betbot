@@ -1,1 +1,38 @@
-<!-- betbot stub -->
+{{$pipeline := .Pipeline}}
+<div class="status-grid">
+    <article class="status-card">
+        <span class="status-card__label">Overall</span>
+        <strong class="status-card__value">{{or $pipeline.Status .Status .OverallStatus "warming"}}</strong>
+        <p class="status-card__hint">Readiness should include both DB access and worker health.</p>
+    </article>
+    <article class="status-card">
+        <span class="status-card__label">Last Success</span>
+        <strong class="status-card__value timestamp" data-timestamp="{{or $pipeline.LastSuccessAt .LastSuccessAt .LastPollAt}}">{{or $pipeline.LastSuccessAt .LastSuccessAt .LastPollAt "pending"}}</strong>
+        <p class="status-card__hint">Most recent successful odds poll committed to storage.</p>
+    </article>
+    <article class="status-card">
+        <span class="status-card__label">Inserted Rows</span>
+        <strong class="status-card__value">{{or $pipeline.InsertCount .InsertCount .LastInsertCount "0"}}</strong>
+        <p class="status-card__hint">Rows written during the latest completed run.</p>
+    </article>
+    <article class="status-card">
+        <span class="status-card__label">Dedup Skips</span>
+        <strong class="status-card__value">{{or $pipeline.DedupCount .DedupCount .DedupSkips "0"}}</strong>
+        <p class="status-card__hint">Unchanged market rows prevented from bloating the archive.</p>
+    </article>
+</div>
+
+<div class="detail-strip">
+    <div>
+        <span class="detail-strip__label">Last Poll Started</span>
+        <strong class="timestamp" data-timestamp="{{or $pipeline.LastStartedAt .LastStartedAt .StartedAt}}">{{or $pipeline.LastStartedAt .LastStartedAt .StartedAt "pending"}}</strong>
+    </div>
+    <div>
+        <span class="detail-strip__label">Duration</span>
+        <strong>{{or $pipeline.Duration .Duration "n/a"}}</strong>
+    </div>
+    <div>
+        <span class="detail-strip__label">Last Error</span>
+        <strong>{{or $pipeline.LastError .LastError "none"}}</strong>
+    </div>
+</div>

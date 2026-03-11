@@ -1,1 +1,1 @@
--- betbot migration stub: drop games.
+DROP TABLE IF EXISTS games;

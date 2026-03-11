@@ -1,1 +1,1 @@
--- betbot migration stub: create River tables.
+SELECT 1;

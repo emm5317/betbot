@@ -1,0 +1,23 @@
+<section class="page-header">
+    <div>
+        <p class="eyebrow">Pipeline Health</p>
+        <h2>Last poll status and ingestion pressure</h2>
+        <p class="page-header__lede">
+            Operators should be able to see success, staleness, and the shape of the last run without reading worker logs first.
+        </p>
+    </div>
+    <div class="page-header__meta">
+        <span class="runtime-chip">worker diagnostics</span>
+        <span class="runtime-chip">db-backed visibility</span>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel__header">
+        <div>
+            <p class="eyebrow">Latest Run</p>
+            <h3>Ingestion status</h3>
+        </div>
+    </div>
+    {{template "partials/pipeline_status" .}}
+</section>

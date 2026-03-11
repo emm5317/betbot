@@ -28,4 +28,20 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.DBConnectTimeout != defaultDBConnectTimeout {
 		t.Fatalf("DBConnectTimeout = %s, want %s", cfg.DBConnectTimeout, defaultDBConnectTimeout)
 	}
+
+	if cfg.DBMaxConns != defaultDBMaxConns {
+		t.Fatalf("DBMaxConns = %d, want %d", cfg.DBMaxConns, defaultDBMaxConns)
+	}
+
+	if cfg.DBMinConns != defaultDBMinConns {
+		t.Fatalf("DBMinConns = %d, want %d", cfg.DBMinConns, defaultDBMinConns)
+	}
+
+	if cfg.OddsAPIPollInterval != defaultOddsPollInterval {
+		t.Fatalf("OddsAPIPollInterval = %s, want %s", cfg.OddsAPIPollInterval, defaultOddsPollInterval)
+	}
+
+	if len(cfg.OddsAPISports) != 4 {
+		t.Fatalf("OddsAPISports len = %d, want 4", len(cfg.OddsAPISports))
+	}
 }

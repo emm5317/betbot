@@ -1,1 +1,14 @@
-{}
+[
+  {
+    "name": "unchanged snapshot",
+    "previous_hash": "same",
+    "current_hash": "same",
+    "should_insert": false
+  },
+  {
+    "name": "new snapshot",
+    "previous_hash": "before",
+    "current_hash": "after",
+    "should_insert": true
+  }
+]

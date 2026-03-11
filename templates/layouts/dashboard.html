@@ -1,1 +1,28 @@
-<!-- betbot stub -->
+<div class="chrome">
+    <header class="topbar">
+        <div class="topbar__brand">
+            <a class="brand-mark" href="/">bb</a>
+            <div>
+                <p class="eyebrow">Phase 1 Operational UI</p>
+                <h1 class="brand-title">betbot</h1>
+            </div>
+        </div>
+
+        <nav class="topbar__nav" aria-label="Primary">
+            <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/">Overview</a>
+            <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds">Odds</a>
+            <a class="nav-link {{if eq .ActiveNav "pipeline"}}is-active{{end}}" href="/pipeline/health">Pipeline</a>
+        </nav>
+
+        <div class="topbar__meta">
+            <span class="status-pill status-pill--{{if eq (or .Status .OverallStatus) "ok"}}good{{else}}warn{{end}}">
+                {{or .Status .OverallStatus "warming"}}
+            </span>
+            <span class="runtime-chip">{{or .Environment .Env "development"}}</span>
+        </div>
+    </header>
+
+    <main class="workspace">
+        {{embed}}
+    </main>
+</div>

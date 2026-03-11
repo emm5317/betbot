@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"betbot/internal/config"
+	"betbot/internal/logging"
 	"betbot/internal/server"
 )
 
@@ -19,7 +20,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	app := server.New(cfg)
+	app, err := server.New(ctx, cfg, logging.New(cfg.Env))
+	if err != nil {
+		log.Fatalf("new server: %v", err)
+	}
+
 	if err := app.Run(ctx); err != nil {
 		log.Fatalf("run server: %v", err)
 	}

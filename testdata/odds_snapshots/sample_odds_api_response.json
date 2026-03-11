@@ -1,1 +1,35 @@
-{}
+[
+  {
+    "id": "game-1",
+    "sport_key": "basketball_nba",
+    "sport_title": "NBA",
+    "commence_time": "2026-03-12T00:30:00Z",
+    "home_team": "Boston Celtics",
+    "away_team": "Miami Heat",
+    "bookmakers": [
+      {
+        "key": "draftkings",
+        "title": "DraftKings",
+        "last_update": "2026-03-11T23:58:00Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-03-11T23:58:00Z",
+            "outcomes": [
+              {"name": "Boston Celtics", "price": -150},
+              {"name": "Miami Heat", "price": 130}
+            ]
+          },
+          {
+            "key": "totals",
+            "last_update": "2026-03-11T23:58:00Z",
+            "outcomes": [
+              {"name": "Over", "price": -110, "point": 221.5},
+              {"name": "Under", "price": -110, "point": 221.5}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

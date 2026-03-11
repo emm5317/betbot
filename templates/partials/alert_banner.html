@@ -1,1 +1,6 @@
-<!-- betbot stub -->
+{{with .Alert}}
+    <div class="alert-banner">
+        <strong>{{or .Title "Operator note"}}</strong>
+        <p>{{or .Message "No additional alerts."}}</p>
+    </div>
+{{end}}

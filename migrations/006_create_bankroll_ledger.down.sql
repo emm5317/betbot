@@ -1,1 +1,1 @@
--- betbot migration stub: drop bankroll_ledger.
+DROP TABLE IF EXISTS bankroll_ledger;

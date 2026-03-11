@@ -1,1 +1,90 @@
-<!-- betbot stub -->
+<section class="hero-panel">
+    <div class="hero-panel__copy">
+        <p class="eyebrow">Data Foundation Vertical Slice</p>
+        <h2>Operational visibility before model complexity.</h2>
+        <p class="hero-panel__lede">
+            Phase 1 keeps the surface narrow: ingest odds, persist snapshots, expose readiness, and make pipeline drift obvious.
+        </p>
+    </div>
+
+    <div class="hero-panel__stack">
+        <div class="stat-card stat-card--accent">
+            <span class="stat-card__label">Runtime</span>
+            <strong class="stat-card__value">{{or .Environment .Env "development"}}</strong>
+            <span class="stat-card__hint">Go 1.25 baseline</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-card__label">Data Source</span>
+            <strong class="stat-card__value">The Odds API</strong>
+            <span class="stat-card__hint">append-only odds archive</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-card__label">Worker Posture</span>
+            <strong class="stat-card__value">{{or .WorkerStatus .Status "warming"}}</strong>
+            <span class="stat-card__hint">River-backed polling</span>
+        </div>
+    </div>
+</section>
+
+<section class="content-grid">
+    <article class="panel">
+        <div class="panel__header">
+            <div>
+                <p class="eyebrow">Mission</p>
+                <h3>What this UI should answer quickly</h3>
+            </div>
+        </div>
+        <div class="checklist">
+            <div class="checklist__item">
+                <strong>Is the service actually ready?</strong>
+                <p>Database reachability and worker health need to be visible on one screen.</p>
+            </div>
+            <div class="checklist__item">
+                <strong>Are odds being captured right now?</strong>
+                <p>Current book, market, and timestamp should show up without scanning logs.</p>
+            </div>
+            <div class="checklist__item">
+                <strong>Did the last poll succeed cleanly?</strong>
+                <p>Insert counts, dedup skips, and the most recent error must stay obvious.</p>
+            </div>
+        </div>
+    </article>
+
+    <article class="panel panel--tall">
+        <div class="panel__header">
+            <div>
+                <p class="eyebrow">Pipeline Snapshot</p>
+                <h3>Current ingestion posture</h3>
+            </div>
+            <a class="text-link" href="/pipeline/health">Open full pipeline view</a>
+        </div>
+        {{template "partials/pipeline_status" .}}
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel__header">
+        <div>
+            <p class="eyebrow">Phase 1 Surface</p>
+            <h3>Minimal operator routes</h3>
+        </div>
+    </div>
+
+    <div class="route-grid">
+        <a class="route-card" href="/">
+            <span class="route-card__path">GET /</span>
+            <strong>Overview</strong>
+            <p>High-signal summary of environment, status, and pipeline posture.</p>
+        </a>
+        <a class="route-card" href="/odds">
+            <span class="route-card__path">GET /odds</span>
+            <strong>Latest odds</strong>
+            <p>Persisted latest-market view for operators, not a live scraped widget.</p>
+        </a>
+        <a class="route-card" href="/pipeline/health">
+            <span class="route-card__path">GET /pipeline/health</span>
+            <strong>Pipeline health</strong>
+            <p>Last successful poll, insert counts, and error visibility from stored data.</p>
+        </a>
+    </div>
+</section>
