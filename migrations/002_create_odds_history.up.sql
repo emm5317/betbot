@@ -1,0 +1,1 @@
+-- betbot migration stub: create odds_history.

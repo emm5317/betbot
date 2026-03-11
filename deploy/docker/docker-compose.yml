@@ -1,0 +1,45 @@
+services:
+  betbot:
+    container_name: betbot
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BETBOT_ENV: development
+      BETBOT_HTTP_ADDR: :8080
+      BETBOT_DATABASE_URL: postgres://betbot:betbot-dev-password@postgres:5432/betbot?sslmode=disable
+      BETBOT_KELLY_FRACTION: "0.25"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "18080:8080"
+    restart: unless-stopped
+
+  postgres:
+    container_name: betbot-postgres
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: betbot
+      POSTGRES_USER: betbot
+      POSTGRES_PASSWORD: betbot-dev-password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    volumes:
+      - betbot-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  betbot-postgres-data:

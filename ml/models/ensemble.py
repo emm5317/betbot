@@ -1,0 +1,1 @@
+"""betbot ensemble model stub."""

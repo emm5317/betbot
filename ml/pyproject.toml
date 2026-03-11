@@ -1,0 +1,4 @@
+[project]
+name = "betbot-ml"
+version = "0.1.0"
+description = "betbot ML sidecar stubs"

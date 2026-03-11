@@ -1,0 +1,1 @@
+-- betbot migration stub: create situational_factors.

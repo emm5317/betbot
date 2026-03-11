@@ -1,0 +1,1 @@
+-- betbot migration stub: drop model_predictions.

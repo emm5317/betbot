@@ -1,0 +1,1 @@
+-- betbot migration stub: create clv_log.

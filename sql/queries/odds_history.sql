@@ -1,0 +1,1 @@
+-- betbot query stub for odds_history.

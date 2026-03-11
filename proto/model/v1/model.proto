@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package betbot.model.v1;
+
+option go_package = "betbot/proto/model/v1";
+
+service ModelService {
+  rpc Predict(PredictRequest) returns (PredictResponse);
+}
+
+message PredictRequest {}
+
+message PredictResponse {}

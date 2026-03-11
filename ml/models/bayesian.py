@@ -1,0 +1,1 @@
+"""betbot Bayesian model stub."""

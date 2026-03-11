@@ -1,0 +1,5 @@
+[Unit]
+Description=betbot stub service
+
+[Service]
+ExecStart=/usr/bin/true

@@ -1,0 +1,10 @@
+/bin/
+/.env
+/.idea/
+.vscode/
+__pycache__/
+*.pyc
+*.log
+/.gocache/
+/.gomodcache/
+*.exe

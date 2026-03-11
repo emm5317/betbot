@@ -1,0 +1,1 @@
+-- betbot migration stub: drop team_ratings.

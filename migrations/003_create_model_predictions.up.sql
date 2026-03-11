@@ -1,0 +1,1 @@
+-- betbot migration stub: create model_predictions.
