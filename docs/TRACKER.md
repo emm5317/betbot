@@ -21,6 +21,8 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - NBA stats ETL now has a live stats.nba.com provider path, explicit River enqueue helper, and idempotent nba_team_stats upserts
 - Phase 1 integration coverage now includes insert/dedup behavior and Postgres 17 boot smoke
 - NHL stats ETL now has a first-pass live team path via the official NHL web API; goalie writes remain deferred pending a date-consistent goalie source
+- NFL stats ETL now has a live merged provider path using nflverse team stats plus official NFL standings, explicit River enqueue wiring, and idempotent nfl_team_stats upserts; nfl_qb_stats remain deferred in this phase
+- First-pass injury ingestion now persists Rotowire NFL injury availability records via an explicit worker and sqlc-backed upserts; lineup confirmations remain deferred in this phase
 - Documentation is now aligned to the four-sport direction: `MLB`, `NBA`, `NHL`, `NFL`
 
 The current implementation target is intentionally narrower than the full product architecture. Phase 2 is now extending that ingestion slice into tightly scoped sport-specific ETL foundations before broader modeling breadth.
@@ -87,8 +89,8 @@ Goal: add the shared four-sport substrate required before serious baseline model
 | P2-004 | Implement `MLBStatsETLJob` | ✅ DONE | P0 | Real MLB Stats API provider plus explicit enqueue path now back the MLB team and pitcher ETL |
 | P2-005 | Implement `NBAStatsETLJob` | ✅ DONE | P0 | NBA ETL now uses a live stats.nba.com provider for `nba_team_stats`, plus worker, enqueue helper, and idempotent integration coverage |
 | P2-006 | Implement `NHLStatsETLJob` | ✅ DONE | P1 | First-pass NHL ETL now writes `nhl_team_stats` from the official NHL web API; goalie writes are deferred until a date-consistent source is selected |
-| P2-007 | Implement `NFLStatsETLJob` | ⬜ TODO | P1 | nflverse and supporting sources |
-| P2-008 | Implement injury and lineup ingestion | ⬜ TODO | P0 | Rotowire, Daily Faceoff, confirmations |
+| P2-007 | Implement `NFLStatsETLJob` | ✅ DONE | P1 | Live first-pass NFL ETL now writes `nfl_team_stats` from nflverse team stats merged with official NFL standings; `nfl_qb_stats` remain deferred pending a clean success-rate-capable source |
+| P2-008 | Implement injury and lineup ingestion | ✅ DONE | P0 | First pass now persists Rotowire NFL injury availability records; broad lineup-confirmation coverage remains deferred until a credible machine-readable source is selected |
 | P2-009 | Implement weather ingestion for outdoor sports | ⬜ TODO | P1 | MLB and NFL first |
 | P2-010 | Add operator-facing sport filters to read views | ⬜ TODO | P2 | Keep views usable as breadth grows |
 
@@ -167,6 +169,8 @@ Goal: validate edge with constrained capital and iterate safely.
 | P6-003 | Add sharper odds sources where justified | ⬜ TODO | P1 | Pinnacle, OddsJam, OpticOdds evaluation |
 | P6-004 | Introduce ML sidecar where baseline models plateau | ⬜ TODO | P1 | Only after measurement is solid |
 | P6-005 | Expand sport-specific prop models | ⬜ TODO | P2 | After game-market process is stable |
+
+
 
 
 

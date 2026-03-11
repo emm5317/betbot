@@ -194,6 +194,24 @@ type OddsHistory struct {
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 }
 
+type PlayerInjuryReport struct {
+	ID              int64              `json:"id"`
+	Source          string             `json:"source"`
+	Sport           string             `json:"sport"`
+	ReportDate      pgtype.Date        `json:"report_date"`
+	ExternalID      string             `json:"external_id"`
+	PlayerName      string             `json:"player_name"`
+	TeamExternalID  string             `json:"team_external_id"`
+	Position        string             `json:"position"`
+	Injury          string             `json:"injury"`
+	Status          string             `json:"status"`
+	EstimatedReturn *string            `json:"estimated_return"`
+	PlayerUrl       string             `json:"player_url"`
+	RawJson         json.RawMessage    `json:"raw_json"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type PollRun struct {
 	ID            int64              `json:"id"`
 	Source        string             `json:"source"`

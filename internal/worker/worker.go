@@ -8,6 +8,7 @@ import (
 
 	"betbot/internal/config"
 	"betbot/internal/domain"
+	"betbot/internal/ingestion/injuries"
 	"betbot/internal/ingestion/oddspoller"
 	"betbot/internal/ingestion/statsetl"
 	"betbot/internal/store"
@@ -100,6 +101,8 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	river.AddWorker(workers, NewMLBStatsETLWorker(pool, logger, statsetl.NewMLBStatsAPIProvider("", 0)))
 	river.AddWorker(workers, NewNBAStatsETLWorker(pool, logger, statsetl.NewNBAStatsAPIProvider("", 0)))
 	river.AddWorker(workers, NewNHLStatsETLWorker(pool, logger, statsetl.NewNHLStatsAPIProvider("", 0)))
+	river.AddWorker(workers, NewNFLStatsETLWorker(pool, logger, statsetl.NewNFLverseProvider("", "", 0)))
+	river.AddWorker(workers, NewInjurySyncWorker(pool, logger, injuries.NewRotowireProvider("", 0)))
 
 	client, err := river.NewClient(driver, &river.Config{
 		Logger: logger,
@@ -146,6 +149,14 @@ func (a *App) EnqueueNBAStatsETL(ctx context.Context, req statsetl.NBARequest) (
 
 func (a *App) EnqueueNHLStatsETL(ctx context.Context, req statsetl.NHLRequest) (*rivertype.JobInsertResult, error) {
 	return EnqueueNHLStatsETL(ctx, a.client, req)
+}
+
+func (a *App) EnqueueNFLStatsETL(ctx context.Context, req statsetl.NFLRequest) (*rivertype.JobInsertResult, error) {
+	return EnqueueNFLStatsETL(ctx, a.client, req)
+}
+
+func (a *App) EnqueueInjurySync(ctx context.Context, req injuries.Request) (*rivertype.JobInsertResult, error) {
+	return EnqueueInjurySync(ctx, a.client, req)
 }
 
 func (a *App) Close() {

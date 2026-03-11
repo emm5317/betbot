@@ -20,13 +20,14 @@ func TestSportStatTablesMigration(t *testing.T) {
 	defer pool.Close()
 
 	expectedColumns := map[string][]string{
-		"mlb_team_stats":    {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"mlb_pitcher_stats": {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
-		"nba_team_stats":    {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"nhl_team_stats":    {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"nhl_goalie_stats":  {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
-		"nfl_team_stats":    {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"nfl_qb_stats":      {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
+		"mlb_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"mlb_pitcher_stats":     {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
+		"nba_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"nhl_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"nhl_goalie_stats":      {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
+		"nfl_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"nfl_qb_stats":          {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
+		"player_injury_reports": {"source", "sport", "report_date", "external_id", "player_name", "team_external_id", "position", "injury", "status", "raw_json", "created_at", "updated_at"},
 	}
 
 	for table, columns := range expectedColumns {
@@ -81,6 +82,11 @@ func TestSportStatTablesMigration(t *testing.T) {
 			name: "nfl_qb_stats",
 			sql:  "INSERT INTO nfl_qb_stats (source, external_id, season, stat_date, player_name, team_external_id, team_name) VALUES ($1, $2, $3, $4, $5, $6, $7)",
 			args: []any{"nflverse", "allen", 2026, time.Date(2026, time.September, 10, 0, 0, 0, 0, time.UTC), "Josh Allen", "buf", "Buffalo Bills"},
+		},
+		{
+			name: "player_injury_reports",
+			sql:  "INSERT INTO player_injury_reports (source, sport, report_date, external_id, player_name, team_external_id, position, injury, status, player_url, raw_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+			args: []any{"rotowire", "nfl", time.Date(2026, time.March, 11, 0, 0, 0, 0, time.UTC), "12483", "Josh Allen", "buf", "QB", "Foot", "Questionable", "https://www.rotowire.com/football/player/josh-allen-12483", []byte(`{"ID":"12483"}`)},
 		},
 	}
 
