@@ -13,7 +13,7 @@ The repository is still at scaffold stage. Many directories and files exist, but
 | Concern | Current repo baseline | Target state |
 |--------|------------------------|--------------|
 | HTTP server | Minimal `net/http` bootstrap | Fiber v3 server with operational HTML and API routes |
-| Worker runtime | Placeholder `cmd/worker` | River-backed worker process |
+| Worker runtime | River-backed worker with periodic odds polling | River-backed worker process |
 | Database | Local Docker Postgres with stub migrations | PostgreSQL 17 with real migrations, partitions, and sqlc-backed access |
 | DB access | Reachability check only | `pgxpool` and `sqlc` as the standard path |
 | Odds ingestion | Not wired | scheduled external polling, normalization, dedup, persistence |
@@ -364,3 +364,4 @@ Phase 1 route surface:
 - [TRACKER.md](TRACKER.md): executable work queue
 - [SPORT_OPTIMIZATION.md](SPORT_OPTIMIZATION.md): sport-by-sport specialization details
 - [REPO_STRUCTURE.md](REPO_STRUCTURE.md): checked-in layout and target package responsibilities
+

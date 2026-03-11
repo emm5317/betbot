@@ -32,7 +32,7 @@ func NewPoller(cfg config.Config, logger *slog.Logger, pool *pgxpool.Pool) *Poll
 	}
 }
 
-func (p *Poller) Run(ctx context.Context) (PollMetrics, error) {
+func (p *Poller) Run(ctx context.Context, sports []string) (PollMetrics, error) {
 	queries := store.New(p.pool)
 	startedAt := time.Now().UTC()
 	run, err := queries.InsertPollRun(ctx, store.InsertPollRunParams{
@@ -43,7 +43,7 @@ func (p *Poller) Run(ctx context.Context) (PollMetrics, error) {
 		return PollMetrics{}, fmt.Errorf("insert poll run: %w", err)
 	}
 
-	metrics, runErr := p.run(ctx)
+	metrics, runErr := p.run(ctx, sports)
 	status := "success"
 	errText := ""
 	if runErr != nil {
@@ -69,9 +69,14 @@ func (p *Poller) Run(ctx context.Context) (PollMetrics, error) {
 	return metrics, runErr
 }
 
-func (p *Poller) run(ctx context.Context) (PollMetrics, error) {
+func (p *Poller) run(ctx context.Context, sports []string) (PollMetrics, error) {
+	sportsToPoll := sports
+	if len(sportsToPoll) == 0 {
+		sportsToPoll = p.cfg.OddsAPISports
+	}
+
 	var allGames []APIGame
-	for _, sport := range p.cfg.OddsAPISports {
+	for _, sport := range sportsToPoll {
 		games, err := p.client.FetchSport(ctx, sport)
 		if err != nil {
 			return PollMetrics{}, err
@@ -160,6 +165,7 @@ func (p *Poller) run(ctx context.Context) (PollMetrics, error) {
 	}
 
 	p.logger.InfoContext(ctx, "odds poll completed",
+		slog.Any("sports", sportsToPoll),
 		slog.Int("games_seen", metrics.GamesSeen),
 		slog.Int("snapshots_seen", metrics.SnapshotsSeen),
 		slog.Int("inserts", metrics.Inserts),

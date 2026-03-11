@@ -65,7 +65,7 @@ No business logic should live in `cmd/`; only wiring and startup.
 - `internal/domain`
 - pure business types
 - should remain infrastructure-light
-- includes sport identity and later `SportConfig` policy
+- includes sport identity and the live `SportConfig` policy registry
 
 ### Ingestion
 
@@ -209,4 +209,5 @@ The old `tradebot` naming in documentation is retired.
 - generic or soccer-oriented language is out of near-term scope
 - package presence does not imply implementation completeness
 - docs should distinguish current baseline from target architecture whenever that distinction matters
+
 

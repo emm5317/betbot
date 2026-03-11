@@ -14,6 +14,8 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - `cmd/server` now runs a Fiber operational surface backed by pgxpool reads
 - `cmd/worker`, core migrations, odds polling, and operational views are now wired for the completed Phase 1 slice
 - `internal/store` is now generated from `sqlc` query sources and used by the app surface
+- `internal/domain` now exposes a concrete `SportConfig` registry for MLB/NBA/NHL/NFL
+- Worker scheduling now filters odds polling to sports active in the current season
 - Phase 1 integration coverage now includes insert/dedup behavior and Postgres 17 boot smoke
 - Documentation is now aligned to the four-sport direction: `MLB`, `NBA`, `NHL`, `NFL`
 
@@ -75,8 +77,8 @@ Goal: add the shared four-sport substrate required before serious baseline model
 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
-| P2-001 | Create `SportConfig` registry | ⬜ TODO | P0 | Seasons, cadence, key numbers, HFA |
-| P2-002 | Add sport-aware scheduler behavior | ⬜ TODO | P0 | Only active sports poll and run downstream work |
+| P2-001 | Create `SportConfig` registry | ✅ DONE | P0 | Registry now captures seasons, cadence, market anchors, HFA, and model posture |
+| P2-002 | Add sport-aware scheduler behavior | ✅ DONE | P0 | Worker now enqueues odds poll jobs with active sport keys only |
 | P2-003 | Design and migrate sport-specific stat tables | ⬜ TODO | P0 | MLB, NBA, NHL, NFL tables |
 | P2-004 | Implement `MLBStatsETLJob` | ⬜ TODO | P0 | Baseball Savant and supporting sources |
 | P2-005 | Implement `NBAStatsETLJob` | ⬜ TODO | P0 | NBA Stats API and player impact sources |
@@ -161,6 +163,8 @@ Goal: validate edge with constrained capital and iterate safely.
 | P6-003 | Add sharper odds sources where justified | ⬜ TODO | P1 | Pinnacle, OddsJam, OpticOdds evaluation |
 | P6-004 | Introduce ML sidecar where baseline models plateau | ⬜ TODO | P1 | Only after measurement is solid |
 | P6-005 | Expand sport-specific prop models | ⬜ TODO | P2 | After game-market process is stable |
+
+
 
 
 
