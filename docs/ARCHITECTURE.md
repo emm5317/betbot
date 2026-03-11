@@ -6,17 +6,17 @@ Technical architecture for the four-sport `MLB` / `NBA` / `NHL` / `NFL` betbot s
 
 ## 1. Baseline and Scope
 
-The repository is still at scaffold stage. Many directories and files exist, but most of the system described here is target architecture, not shipped implementation.
+The repository is still early-stage, but it is no longer just a scaffold. Phase 1 shipped the data-foundation slice, and early Phase 2 sport-foundation work is now live. Many parts of the system described here remain target architecture rather than shipped implementation.
 
 ### Runtime Baseline vs Target
 
 | Concern | Current repo baseline | Target state |
 |--------|------------------------|--------------|
-| HTTP server | Minimal `net/http` bootstrap | Fiber v3 server with operational HTML and API routes |
+| HTTP server | Fiber v3 operational server | Fiber v3 server with broader operational HTML and API routes |
 | Worker runtime | River-backed worker with periodic odds polling | River-backed worker process |
-| Database | Local Docker Postgres with stub migrations | PostgreSQL 17 with real migrations, partitions, and sqlc-backed access |
-| DB access | Reachability check only | `pgxpool` and `sqlc` as the standard path |
-| Odds ingestion | Not wired | scheduled external polling, normalization, dedup, persistence |
+| Database | PostgreSQL 17 with live Phase 1 migrations and partitions | PostgreSQL 17 with broader sport-specific schema |
+| DB access | `pgxpool` + `sqlc` store layer | `pgxpool` and `sqlc` as the standard path |
+| Odds ingestion | scheduled external polling, normalization, dedup, persistence | broader source coverage and downstream ETL |
 | Modeling | Placeholder packages | sport-specific model registry and feature builders |
 
 ### Architectural Invariants
@@ -62,7 +62,7 @@ The repository is still at scaffold stage. Many directories and files exist, but
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Phase 1 implements only the left edge of this diagram: DB foundation, odds ingestion, queue bootstrap, and Fiber operational reads.
+The shipped implementation covers the left edge of this diagram: DB foundation, odds ingestion, queue bootstrap, Fiber operational reads, and the first sport-aware scheduler policy. Sport-specific ETL, modeling, and execution layers remain later work.
 
 ---
 
@@ -364,4 +364,5 @@ Phase 1 route surface:
 - [TRACKER.md](TRACKER.md): executable work queue
 - [SPORT_OPTIMIZATION.md](SPORT_OPTIMIZATION.md): sport-by-sport specialization details
 - [REPO_STRUCTURE.md](REPO_STRUCTURE.md): checked-in layout and target package responsibilities
+
 

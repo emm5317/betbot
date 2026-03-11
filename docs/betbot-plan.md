@@ -9,7 +9,7 @@ March 2026
 
 betbot is a quantitative sports betting trading system specialized for `MLB`, `NBA`, `NHL`, and `NFL`. The product direction is no longer "generic multi-sport." Every major planning decision now assumes these four leagues are the core operating surface for data ingestion, modeling, scheduling, and execution.
 
-The immediate implementation goal is still narrow: ship a production-shaped data foundation before broad sport-specific modeling work. The repository today is an early scaffold with a minimal health server, Docker Compose, and placeholder package layout. The roadmap below separates that current baseline from the target system so implementation work can proceed without doc drift.
+The immediate implementation goal is still narrow: finish the sport-foundation substrate after shipping the production-shaped Phase 1 data foundation. The repository now has a real Fiber operational surface, River-backed worker, `sqlc` store layer, and active-sport scheduling baseline. The roadmap below separates that current baseline from the target system so implementation work can proceed without doc drift.
 
 ### Why These Four Sports
 
@@ -32,12 +32,12 @@ The immediate implementation goal is still narrow: ship a production-shaped data
 
 | Concern | Current repo baseline | Target state |
 |--------|------------------------|--------------|
-| HTTP stack | Minimal `net/http` bootstrap with `/health` | Fiber v3 server with operational views and APIs |
-| Database runtime | Local Docker Postgres | Local and target runtime standardized on PostgreSQL 17 |
-| DB access | No real pool-backed store wiring yet | `pgxpool` + `sqlc` everywhere |
-| Queue | No live queue wiring | River-backed workers and periodic jobs |
-| Odds ingestion | Not implemented | Continuous polling, normalization, dedup, append-only storage |
-| Sport support | Planned in docs only | Explicitly specialized for MLB/NBA/NHL/NFL |
+| HTTP stack | Fiber v3 server with operational views and readiness checks | Fiber v3 server with broader operational views and APIs |
+| Database runtime | Local/runtime baseline standardized on PostgreSQL 17 | Local and target runtime standardized on PostgreSQL 17 |
+| DB access | `pgxpool` + `sqlc` are live | `pgxpool` + `sqlc` everywhere |
+| Queue | River-backed worker and periodic odds polling are live | River-backed workers and periodic jobs |
+| Odds ingestion | Continuous polling, normalization, dedup, and append-only storage are live | Broader source coverage and downstream ETL |
+| Sport support | `SportConfig` registry and season-aware odds polling are live | Explicitly specialized end-to-end for MLB/NBA/NHL/NFL |
 | Modeling | Placeholder packages | Sport-specific baseline models, then ML sidecar expansion |
 
 This document is canonical for product direction and phase order. [ARCHITECTURE.md](ARCHITECTURE.md) carries the technical details, and [TRACKER.md](TRACKER.md) carries the executable work queue.
@@ -216,3 +216,4 @@ Sport-specific interpretation matters:
 - [SPORT_OPTIMIZATION.md](SPORT_OPTIMIZATION.md): sport-by-sport modeling and data-source deep dive
 - [007-four-sport-specialization.md](decisions/007-four-sport-specialization.md): why the product is specialized to these leagues
 - [008-phase-1-vertical-slice-first.md](decisions/008-phase-1-vertical-slice-first.md): why the first implementation phase stays narrow
+

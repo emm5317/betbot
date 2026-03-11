@@ -50,8 +50,8 @@ Canonical planning references:
 
 | Path | Responsibility | Notes |
 |------|----------------|-------|
-| `cmd/server` | HTTP service entrypoint | current code is bootstrap-level |
-| `cmd/worker` | background jobs entrypoint | target runtime is River |
+| `cmd/server` | HTTP service entrypoint | current code runs the Fiber operational surface |
+| `cmd/worker` | background jobs entrypoint | current code runs River-backed odds polling with active-sport scheduling |
 | `cmd/backtest` | offline replay engine | intentionally separate binary |
 
 No business logic should live in `cmd/`; only wiring and startup.
@@ -209,5 +209,6 @@ The old `tradebot` naming in documentation is retired.
 - generic or soccer-oriented language is out of near-term scope
 - package presence does not imply implementation completeness
 - docs should distinguish current baseline from target architecture whenever that distinction matters
+
 
 

@@ -64,9 +64,11 @@ The repository is still early-stage. What exists today:
 - Fiber operational server, River worker wiring, and PostgreSQL-backed Phase 1 slice
 - sqlc-generated store layer backing the current app code
 - Postgres-backed integration tests for dedup behavior and Phase 1 boot smoke
+- live `SportConfig` registry for MLB/NBA/NHL/NFL
+- worker scheduling that filters odds polling to sports active in the current season
 - documentation set aligned to the four-sport roadmap
 
-What is being built first:
+What is built now:
 
 - PostgreSQL 17 baseline
 - `pgxpool` and `sqlc`
@@ -74,8 +76,9 @@ What is being built first:
 - append-only `odds_history`
 - deduplicated market snapshots
 - minimal Fiber operational views for health and current odds
+- sport-aware registry and active-season polling policy
 
-The first build phase is a vertical slice, not a full production betting engine.
+The current open build step is Phase 2 schema work for sport-specific stat tables.
 
 ## Roadmap
 
@@ -285,6 +288,7 @@ This repository is for infrastructure, analytics, and research. Sports betting l
 ## Keywords
 
 Open-source sports betting bot, sports betting analytics, sports betting tracker, odds tracking, closing line value, CLV tracker, expected value betting, Kelly Criterion bankroll management, sportsbook odds history, line shopping, sports betting backtesting, MLB betting model, NBA betting model, NHL betting model, NFL betting model, Go sports betting project, PostgreSQL odds database.
+
 
 
 
