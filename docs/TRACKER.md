@@ -3,7 +3,7 @@
 Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸️ DEFERRED`
 
 **Last updated:** 2026-03-11
-**Current phase:** Phase 1 — Data Foundation Vertical Slice
+**Current phase:** Phase 2 — Sport Foundation
 
 ---
 
@@ -12,7 +12,9 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Project scaffold and package layout exist
 - Local Docker Compose exists for `betbot` and `betbot-postgres`
 - `cmd/server` now runs a Fiber operational surface backed by pgxpool reads
-- `cmd/worker`, core migrations, odds polling, and operational views are now wired for the Phase 1 slice
+- `cmd/worker`, core migrations, odds polling, and operational views are now wired for the completed Phase 1 slice
+- `internal/store` is now generated from `sqlc` query sources and used by the app surface
+- Phase 1 integration coverage now includes insert/dedup behavior and Postgres 17 boot smoke
 - Documentation is now aligned to the four-sport direction: `MLB`, `NBA`, `NHL`, `NFL`
 
 The current implementation target is intentionally narrower than the full product architecture. Phase 1 focuses on one end-to-end ingestion slice before sport-specific ETL and modeling breadth.
@@ -31,7 +33,7 @@ Goal: ship a working ingestion slice with PostgreSQL 17, `pgxpool`, `sqlc`, Rive
 | P1-004 | Implement `games` migration | ✅ DONE | P0 | Includes sport and external ID |
 | P1-005 | Implement `odds_history` migration with partitions | ✅ DONE | P0 | Append-only with `raw_json` and `snapshot_hash` |
 | P1-006 | Implement `bankroll_ledger` migration | ✅ DONE | P1 | Foundation only in this phase |
-| P1-007 | Configure `sqlc` for PostgreSQL + `pgx/v5` | 🔵 IN PROGRESS | P0 | Query sources are ready; generation is still pending local sqlc fetch |
+| P1-007 | Configure `sqlc` for PostgreSQL + `pgx/v5` | ✅ DONE | P0 | Generated store layer is live and replaces the handwritten fallback |
 | P1-008 | Write `games`, `odds_history`, `bankroll`, and dashboard queries | ✅ DONE | P0 | Minimal Phase 1 query set is live |
 | P1-009 | Wire River client and worker registration | ✅ DONE | P0 | Queues: ingestion and maintenance |
 | P1-010 | Implement The Odds API client | ✅ DONE | P0 | Timeout, API key config, rate limiting |
@@ -45,8 +47,8 @@ Goal: ship a working ingestion slice with PostgreSQL 17, `pgxpool`, `sqlc`, Rive
 | P1-018 | Build minimal `/pipeline/health` view | ✅ DONE | P1 | Last successful poll, insert count, and errors |
 | P1-019 | Add structured logging for server and worker | ✅ DONE | P1 | Poll metrics, dedup skips, and latencies are logged |
 | P1-020 | Add unit tests for normalization and implied probability | ✅ DONE | P0 | Core normalization and implied probability coverage added |
-| P1-021 | Add integration tests for insert and dedup behavior | ⬜ TODO | P1 | Duplicate snapshots should not bloat storage |
-| P1-022 | Add migration/boot smoke test against Postgres 17 | ⬜ TODO | P1 | Catch schema and startup regressions early |
+| P1-021 | Add integration tests for insert and dedup behavior | ✅ DONE | P1 | `internal/integration` covers duplicate-skip and changed-snapshot insert flow |
+| P1-022 | Add migration/boot smoke test against Postgres 17 | ✅ DONE | P1 | Smoke test provisions a clean Postgres 17 database and boots server + worker |
 | P1-023 | Documentation refresh for four-sport direction | ✅ DONE | P1 | Done 2026-03-11 |
 
 Phase 1 exit criteria:
@@ -159,5 +161,7 @@ Goal: validate edge with constrained capital and iterate safely.
 | P6-003 | Add sharper odds sources where justified | ⬜ TODO | P1 | Pinnacle, OddsJam, OpticOdds evaluation |
 | P6-004 | Introduce ML sidecar where baseline models plateau | ⬜ TODO | P1 | Only after measurement is solid |
 | P6-005 | Expand sport-specific prop models | ⬜ TODO | P2 | After game-market process is stable |
+
+
 
 

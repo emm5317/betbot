@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	html "github.com/gofiber/template/html/v2"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type App struct {
@@ -53,12 +53,16 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 	return instance, nil
 }
 
+func (a *App) Close() {
+	a.pool.Close()
+}
+
 func (a *App) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 
 	go func() {
 		a.logger.Info("betbot server listening", slog.String("addr", a.cfg.HTTPAddr))
-		if err := a.app.Listen(a.cfg.HTTPAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := a.app.Listen(a.cfg.HTTPAddr); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 			return
 		}
@@ -69,10 +73,10 @@ func (a *App) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		defer a.pool.Close()
+		defer a.Close()
 		return a.app.ShutdownWithContext(shutdownCtx)
 	case err := <-errCh:
-		a.pool.Close()
+		a.Close()
 		return err
 	}
 }
@@ -126,7 +130,7 @@ func (a *App) handleOdds(c fiber.Ctx) error {
 			"Side":          row.OutcomeSide,
 			"Point":         row.Point,
 			"PriceAmerican": row.PriceAmerican,
-			"CapturedAt":    row.CapturedAt.Format(time.RFC3339),
+			"CapturedAt":    formatTimestamp(row.CapturedAt, "pending"),
 		})
 	}
 
@@ -180,14 +184,14 @@ func (a *App) handleHealth(c fiber.Ctx) error {
 		return fmt.Errorf("latest poll run: %w", err)
 	}
 
-	if run.FinishedAt != nil {
-		response["last_poll_at"] = run.FinishedAt.Format(time.RFC3339)
+	if run.FinishedAt.Valid {
+		response["last_poll_at"] = run.FinishedAt.Time.UTC().Format(time.RFC3339)
 	}
-	if run.Status != "success" || run.FinishedAt == nil || time.Since(run.FinishedAt.UTC()) > a.cfg.RecentPollWindow {
+	if run.Status != "success" || !run.FinishedAt.Valid || time.Since(run.FinishedAt.Time.UTC()) > a.cfg.RecentPollWindow {
 		statusCode = fiber.StatusServiceUnavailable
 		response["status"] = "degraded"
 		response["worker"] = run.Status
-		if run.FinishedAt == nil || time.Since(run.FinishedAt.UTC()) > a.cfg.RecentPollWindow {
+		if !run.FinishedAt.Valid || time.Since(run.FinishedAt.Time.UTC()) > a.cfg.RecentPollWindow {
 			response["worker"] = "stale"
 		}
 	}
@@ -225,12 +229,17 @@ func (a *App) pipelineView(ctx context.Context) (map[string]any, string) {
 	overall := run.Status
 	lastSuccess := "pending"
 	duration := "n/a"
-	if run.FinishedAt != nil {
-		lastSuccess = run.FinishedAt.Format(time.RFC3339)
-		duration = run.FinishedAt.Sub(run.StartedAt).Round(time.Second).String()
-		if time.Since(run.FinishedAt.UTC()) > a.cfg.RecentPollWindow {
+	if run.FinishedAt.Valid {
+		lastSuccess = run.FinishedAt.Time.UTC().Format(time.RFC3339)
+		duration = run.FinishedAt.Time.Sub(run.StartedAt.Time).Round(time.Second).String()
+		if time.Since(run.FinishedAt.Time.UTC()) > a.cfg.RecentPollWindow {
 			overall = "stale"
 		}
+	}
+
+	lastStartedAt := "pending"
+	if run.StartedAt.Valid {
+		lastStartedAt = run.StartedAt.Time.UTC().Format(time.RFC3339)
 	}
 
 	return map[string]any{
@@ -238,7 +247,7 @@ func (a *App) pipelineView(ctx context.Context) (map[string]any, string) {
 		"LastSuccessAt": lastSuccess,
 		"InsertCount":   fmt.Sprintf("%d", run.InsertsCount),
 		"DedupCount":    fmt.Sprintf("%d", run.DedupSkips),
-		"LastStartedAt": run.StartedAt.Format(time.RFC3339),
+		"LastStartedAt": lastStartedAt,
 		"Duration":      duration,
 		"LastError":     emptyAsNone(run.ErrorText),
 	}, overall
@@ -253,4 +262,11 @@ func emptyAsNone(value string) string {
 
 func first(value map[string]any, _ string) map[string]any {
 	return value
+}
+
+func formatTimestamp(value pgtype.Timestamptz, empty string) string {
+	if !value.Valid {
+		return empty
+	}
+	return value.Time.UTC().Format(time.RFC3339)
 }

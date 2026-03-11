@@ -83,7 +83,7 @@ betbot/
 ### SQL / sqlc
 
 - All SQL queries are defined in `sql/` directory as `.sql` files with sqlc annotations.
-- Run `sqlc generate` to regenerate `internal/store/`. **Never hand-edit generated files.**
+- Run `sqlc generate -f sql/sqlc.yaml` to regenerate `internal/store/`. **Never hand-edit generated files.**
 - Migrations in `migrations/` are sequential and append-only. Never modify a deployed migration.
 - Use `pgx` named parameters, not positional. Include explicit column lists — no `SELECT *`.
 
@@ -145,7 +145,7 @@ Run with race detector: `go test -race ./...`
 
 ```bash
 # Generate sqlc code after editing sql/ files
-sqlc generate
+sqlc generate -f sql/sqlc.yaml
 
 # Run migrations
 migrate -path migrations -database "$BETBOT_DATABASE_URL" up
@@ -226,3 +226,5 @@ When starting a Claude Code session on betbot:
 - Do not use `time.Now()` for financial timestamps. Use Postgres `NOW()`.
 - Do not deploy a model without backtesting. Period.
 - Do not log sensitive credentials. zerolog fields are reviewed for PII.
+
+

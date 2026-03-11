@@ -16,10 +16,10 @@ SET
     away_team = EXCLUDED.away_team,
     commence_time = EXCLUDED.commence_time,
     updated_at = NOW()
-RETURNING *;
+RETURNING id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at;
 
 -- name: ListUpcomingGames :many
-SELECT *
+SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
 FROM games
 WHERE commence_time >= NOW() - INTERVAL '12 hours'
 ORDER BY commence_time ASC

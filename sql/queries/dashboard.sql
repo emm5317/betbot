@@ -6,7 +6,7 @@ INSERT INTO poll_runs (
     $1,
     $2
 )
-RETURNING *;
+RETURNING id, source, started_at, finished_at, status, games_seen, snapshots_seen, inserts_count, dedup_skips, error_text;
 
 -- name: CompletePollRun :exec
 UPDATE poll_runs
@@ -21,7 +21,7 @@ SET
 WHERE id = $1;
 
 -- name: GetLatestPollRun :one
-SELECT *
+SELECT id, source, started_at, finished_at, status, games_seen, snapshots_seen, inserts_count, dedup_skips, error_text
 FROM poll_runs
 ORDER BY started_at DESC
 LIMIT 1;
@@ -30,4 +30,4 @@ LIMIT 1;
 SELECT
     (SELECT COUNT(*)::BIGINT FROM games WHERE commence_time >= NOW() - INTERVAL '7 days') AS games_count,
     (SELECT COUNT(*)::BIGINT FROM odds_history) AS snapshots_count,
-    (SELECT MAX(captured_at) FROM odds_history) AS last_snapshot_at;
+    (SELECT MAX(captured_at)::timestamptz FROM odds_history) AS last_snapshot_at;

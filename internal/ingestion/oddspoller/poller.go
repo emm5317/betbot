@@ -37,7 +37,7 @@ func (p *Poller) Run(ctx context.Context) (PollMetrics, error) {
 	startedAt := time.Now().UTC()
 	run, err := queries.InsertPollRun(ctx, store.InsertPollRunParams{
 		Source:    p.cfg.OddsAPISource,
-		StartedAt: startedAt,
+		StartedAt: store.Timestamptz(startedAt),
 	})
 	if err != nil {
 		return PollMetrics{}, fmt.Errorf("insert poll run: %w", err)
@@ -54,7 +54,7 @@ func (p *Poller) Run(ctx context.Context) (PollMetrics, error) {
 	finishedAt := time.Now().UTC()
 	completeErr := queries.CompletePollRun(ctx, store.CompletePollRunParams{
 		ID:            run.ID,
-		FinishedAt:    &finishedAt,
+		FinishedAt:    store.Timestamptz(finishedAt),
 		Status:        status,
 		GamesSeen:     int32(metrics.GamesSeen),
 		SnapshotsSeen: int32(metrics.SnapshotsSeen),
@@ -103,7 +103,7 @@ func (p *Poller) run(ctx context.Context) (PollMetrics, error) {
 			Sport:        game.Sport,
 			HomeTeam:     game.HomeTeam,
 			AwayTeam:     game.AwayTeam,
-			CommenceTime: game.CommenceTime,
+			CommenceTime: store.Timestamptz(game.CommenceTime),
 		})
 		if err != nil {
 			return metrics, fmt.Errorf("upsert game %s: %w", game.ExternalID, err)
@@ -147,8 +147,8 @@ func (p *Poller) run(ctx context.Context) (PollMetrics, error) {
 			Point:              snapshot.Point,
 			ImpliedProbability: snapshot.ImpliedProbability,
 			SnapshotHash:       snapshot.SnapshotHash,
-			RawJSON:            snapshot.RawJSON,
-			CapturedAt:         snapshot.CapturedAt,
+			RawJson:            snapshot.RawJSON,
+			CapturedAt:         store.Timestamptz(snapshot.CapturedAt),
 		}); err != nil {
 			return metrics, fmt.Errorf("insert odds snapshot: %w", err)
 		}

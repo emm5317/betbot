@@ -14,7 +14,7 @@ lint:
 	golangci-lint run ./...
 
 sqlc:
-	sqlc generate
+	sqlc generate -f sql/sqlc.yaml
 
 migrate-up:
 	migrate -path migrations -database "$$BETBOT_DATABASE_URL" up
@@ -36,3 +36,4 @@ dev-logs:
 
 clean:
 	rm -rf bin/
+

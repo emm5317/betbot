@@ -30,9 +30,9 @@ betbot/
 
 | Area | Current truth | Intended shape |
 |------|---------------|----------------|
-| `cmd/server` | minimal bootstrap server | Fiber app with health and operational views |
-| `cmd/worker` | placeholder | River-backed worker process |
-| `internal/store` | generated/stub structure present | `sqlc`-generated access layer used by all app code |
+| `cmd/server` | Fiber operational server with health and read views | Fiber app with health and operational views |
+| `cmd/worker` | River-backed worker with scheduled odds polling | River-backed worker process |
+| `internal/store` | `sqlc`-generated access layer used by app code | `sqlc`-generated access layer used by all app code |
 | `internal/ingestion/*` | mostly placeholders | odds poller plus sport-specific ETL workers |
 | `internal/modeling/*` | placeholders | sport-specific feature builders and baseline models |
 | `templates/` and `static/` | layout exists | minimal Phase 1 operational views, later richer dashboard |
@@ -209,3 +209,4 @@ The old `tradebot` naming in documentation is retired.
 - generic or soccer-oriented language is out of near-term scope
 - package presence does not imply implementation completeness
 - docs should distinguish current baseline from target architecture whenever that distinction matters
+

@@ -62,6 +62,8 @@ The repository is still early-stage. What exists today:
 - Go module and project scaffold
 - local Docker Compose runtime
 - Fiber operational server, River worker wiring, and PostgreSQL-backed Phase 1 slice
+- sqlc-generated store layer backing the current app code
+- Postgres-backed integration tests for dedup behavior and Phase 1 boot smoke
 - documentation set aligned to the four-sport roadmap
 
 What is being built first:
@@ -180,6 +182,14 @@ docker compose -f deploy/docker/docker-compose.yml up -d --build
 go test ./...
 ```
 
+If you are upgrading an older local Docker volume from PostgreSQL 16, recreate that local database volume before starting the PostgreSQL 17 container. The old data directory is not compatible with PostgreSQL 17.
+
+To run the Postgres-backed integration package explicitly:
+
+```bash
+BETBOT_TEST_DATABASE_URL=postgres://betbot:betbot-dev-password@localhost:5432/betbot?sslmode=disable go test ./internal/integration -v
+```
+
 Current entrypoints:
 
 - `cmd/server`
@@ -275,4 +285,6 @@ This repository is for infrastructure, analytics, and research. Sports betting l
 ## Keywords
 
 Open-source sports betting bot, sports betting analytics, sports betting tracker, odds tracking, closing line value, CLV tracker, expected value betting, Kelly Criterion bankroll management, sportsbook odds history, line shopping, sports betting backtesting, MLB betting model, NBA betting model, NHL betting model, NFL betting model, Go sports betting project, PostgreSQL odds database.
+
+
 

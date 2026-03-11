@@ -110,9 +110,13 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	return &App{cfg: cfg, logger: logger, pool: pool, client: client}, nil
 }
 
+func (a *App) Close() {
+	a.pool.Close()
+}
+
 func (a *App) Run(ctx context.Context) error {
 	if err := a.client.Start(context.Background()); err != nil {
-		a.pool.Close()
+		a.Close()
 		return err
 	}
 
@@ -123,6 +127,6 @@ func (a *App) Run(ctx context.Context) error {
 	defer cancel()
 
 	err := a.client.Stop(stopCtx)
-	a.pool.Close()
+	a.Close()
 	return err
 }

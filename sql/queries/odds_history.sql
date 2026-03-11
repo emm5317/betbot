@@ -30,7 +30,7 @@ INSERT INTO odds_history (
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 )
-RETURNING *;
+RETURNING id, game_id, source, book_key, book_name, market_key, market_name, outcome_name, outcome_side, price_american, point, implied_probability, snapshot_hash, raw_json, captured_at, created_at;
 
 -- name: ListLatestOdds :many
 WITH latest AS (
