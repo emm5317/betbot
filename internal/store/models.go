@@ -33,6 +33,148 @@ type Game struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type MlbPitcherStat struct {
+	ID             int64              `json:"id"`
+	Source         string             `json:"source"`
+	ExternalID     string             `json:"external_id"`
+	Season         int32              `json:"season"`
+	SeasonType     string             `json:"season_type"`
+	StatDate       pgtype.Date        `json:"stat_date"`
+	PlayerName     string             `json:"player_name"`
+	TeamExternalID string             `json:"team_external_id"`
+	TeamName       string             `json:"team_name"`
+	GamesStarted   int32              `json:"games_started"`
+	InningsPitched *float64           `json:"innings_pitched"`
+	Era            *float64           `json:"era"`
+	Fip            *float64           `json:"fip"`
+	Whip           *float64           `json:"whip"`
+	StrikeoutRate  *float64           `json:"strikeout_rate"`
+	WalkRate       *float64           `json:"walk_rate"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type MlbTeamStat struct {
+	ID          int64              `json:"id"`
+	Source      string             `json:"source"`
+	ExternalID  string             `json:"external_id"`
+	Season      int32              `json:"season"`
+	SeasonType  string             `json:"season_type"`
+	StatDate    pgtype.Date        `json:"stat_date"`
+	TeamName    string             `json:"team_name"`
+	GamesPlayed int32              `json:"games_played"`
+	Wins        int32              `json:"wins"`
+	Losses      int32              `json:"losses"`
+	RunsScored  int32              `json:"runs_scored"`
+	RunsAllowed int32              `json:"runs_allowed"`
+	BattingOps  *float64           `json:"batting_ops"`
+	TeamEra     *float64           `json:"team_era"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type NbaTeamStat struct {
+	ID              int64              `json:"id"`
+	Source          string             `json:"source"`
+	ExternalID      string             `json:"external_id"`
+	Season          int32              `json:"season"`
+	SeasonType      string             `json:"season_type"`
+	StatDate        pgtype.Date        `json:"stat_date"`
+	TeamName        string             `json:"team_name"`
+	GamesPlayed     int32              `json:"games_played"`
+	Wins            int32              `json:"wins"`
+	Losses          int32              `json:"losses"`
+	OffensiveRating *float64           `json:"offensive_rating"`
+	DefensiveRating *float64           `json:"defensive_rating"`
+	NetRating       *float64           `json:"net_rating"`
+	Pace            *float64           `json:"pace"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type NflQbStat struct {
+	ID                   int64              `json:"id"`
+	Source               string             `json:"source"`
+	ExternalID           string             `json:"external_id"`
+	Season               int32              `json:"season"`
+	SeasonType           string             `json:"season_type"`
+	StatDate             pgtype.Date        `json:"stat_date"`
+	PlayerName           string             `json:"player_name"`
+	TeamExternalID       string             `json:"team_external_id"`
+	TeamName             string             `json:"team_name"`
+	GamesPlayed          int32              `json:"games_played"`
+	PassAttempts         int32              `json:"pass_attempts"`
+	CompletionPercentage *float64           `json:"completion_percentage"`
+	YardsPerAttempt      *float64           `json:"yards_per_attempt"`
+	EpaPerPlay           *float64           `json:"epa_per_play"`
+	SuccessRate          *float64           `json:"success_rate"`
+	Cpoe                 *float64           `json:"cpoe"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+}
+
+type NflTeamStat struct {
+	ID                   int64              `json:"id"`
+	Source               string             `json:"source"`
+	ExternalID           string             `json:"external_id"`
+	Season               int32              `json:"season"`
+	SeasonType           string             `json:"season_type"`
+	StatDate             pgtype.Date        `json:"stat_date"`
+	TeamName             string             `json:"team_name"`
+	GamesPlayed          int32              `json:"games_played"`
+	Wins                 int32              `json:"wins"`
+	Losses               int32              `json:"losses"`
+	Ties                 int32              `json:"ties"`
+	PointsFor            int32              `json:"points_for"`
+	PointsAgainst        int32              `json:"points_against"`
+	OffensiveEpaPerPlay  *float64           `json:"offensive_epa_per_play"`
+	DefensiveEpaPerPlay  *float64           `json:"defensive_epa_per_play"`
+	OffensiveSuccessRate *float64           `json:"offensive_success_rate"`
+	DefensiveSuccessRate *float64           `json:"defensive_success_rate"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+}
+
+type NhlGoalieStat struct {
+	ID                      int64              `json:"id"`
+	Source                  string             `json:"source"`
+	ExternalID              string             `json:"external_id"`
+	Season                  int32              `json:"season"`
+	SeasonType              string             `json:"season_type"`
+	StatDate                pgtype.Date        `json:"stat_date"`
+	PlayerName              string             `json:"player_name"`
+	TeamExternalID          string             `json:"team_external_id"`
+	TeamName                string             `json:"team_name"`
+	GamesPlayed             int32              `json:"games_played"`
+	Starts                  int32              `json:"starts"`
+	MinutesPlayed           *int32             `json:"minutes_played"`
+	SavePercentage          *float64           `json:"save_percentage"`
+	GoalsAgainstAverage     *float64           `json:"goals_against_average"`
+	GoalsSavedAboveExpected *float64           `json:"goals_saved_above_expected"`
+	CreatedAt               pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
+}
+
+type NhlTeamStat struct {
+	ID                  int64              `json:"id"`
+	Source              string             `json:"source"`
+	ExternalID          string             `json:"external_id"`
+	Season              int32              `json:"season"`
+	SeasonType          string             `json:"season_type"`
+	StatDate            pgtype.Date        `json:"stat_date"`
+	TeamName            string             `json:"team_name"`
+	GamesPlayed         int32              `json:"games_played"`
+	Wins                int32              `json:"wins"`
+	Losses              int32              `json:"losses"`
+	OtLosses            int32              `json:"ot_losses"`
+	GoalsForPerGame     *float64           `json:"goals_for_per_game"`
+	GoalsAgainstPerGame *float64           `json:"goals_against_per_game"`
+	ExpectedGoalsShare  *float64           `json:"expected_goals_share"`
+	SavePercentage      *float64           `json:"save_percentage"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OddsHistory struct {
 	ID                 int64              `json:"id"`
 	GameID             int64              `json:"game_id"`

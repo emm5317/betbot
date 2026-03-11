@@ -21,6 +21,9 @@ type Querier interface {
 	ListLatestOdds(ctx context.Context, limit int32) ([]ListLatestOddsRow, error)
 	ListUpcomingGames(ctx context.Context, limit int32) ([]Game, error)
 	UpsertGame(ctx context.Context, arg UpsertGameParams) (Game, error)
+	UpsertMLBPitcherStats(ctx context.Context, arg UpsertMLBPitcherStatsParams) error
+	UpsertMLBTeamStats(ctx context.Context, arg UpsertMLBTeamStatsParams) error
+	UpsertNBATeamStats(ctx context.Context, arg UpsertNBATeamStatsParams) error
 }
 
 var _ Querier = (*Queries)(nil)

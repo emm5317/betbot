@@ -9,12 +9,14 @@ import (
 	"betbot/internal/config"
 	"betbot/internal/domain"
 	"betbot/internal/ingestion/oddspoller"
+	"betbot/internal/ingestion/statsetl"
 	"betbot/internal/store"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
+	"github.com/riverqueue/river/rivertype"
 )
 
 const (
@@ -95,6 +97,8 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	sportRegistry := domain.DefaultSportRegistry()
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &OddsPollWorker{poller: oddspoller.NewPoller(cfg, logger, pool), logger: logger})
+	river.AddWorker(workers, NewMLBStatsETLWorker(pool, logger, statsetl.NewMLBStatsAPIProvider("", 0)))
+	river.AddWorker(workers, NewNBAStatsETLWorker(pool, logger, statsetl.UnconfiguredNBAProvider{}))
 
 	client, err := river.NewClient(driver, &river.Config{
 		Logger: logger,
@@ -129,6 +133,10 @@ func activeOddsPollArgs(at time.Time, registry domain.SportRegistry, configuredS
 		RequestedAt: at.UTC(),
 		Sports:      registry.ActiveOddsAPISports(at, configuredSports),
 	}
+}
+
+func (a *App) EnqueueMLBStatsETL(ctx context.Context, req statsetl.MLBRequest) (*rivertype.JobInsertResult, error) {
+	return EnqueueMLBStatsETL(ctx, a.client, req)
 }
 
 func (a *App) Close() {
