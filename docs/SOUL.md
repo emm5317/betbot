@@ -1,51 +1,78 @@
 # Soul.md — betbot
 
-> The house always wins — unless you're the house.
+The house always wins unless you treat this like a trading system.
 
 ---
 
 ## What betbot Is
 
-betbot is a quantitative sports betting trading system. It exists to find and exploit mispriced probability across sportsbook markets, using the same discipline applied in quantitative finance: statistical modeling, portfolio-aware position sizing, systematic execution, and honest performance attribution.
+betbot is a four-sport quantitative betting system focused on `MLB`, `NBA`, `NHL`, and `NFL`. It exists to identify mispriced probability, measure whether that edge is real, and only then automate sizing and execution.
 
-It is not a gambling tool. It is not a picks service. It is not a parlay optimizer. It is a **trading system** that happens to operate in sports betting markets.
+It is not trying to be a generic sports platform. The product is intentionally specialized where the market depth, public data quality, and year-round operating cadence justify the effort.
 
 ---
 
 ## Core Thesis
 
-Sports betting markets are prediction markets with a rake. Sportsbooks embed a 4–10% margin (vig) in every line. Most bettors lose because they are paying that margin without possessing offsetting edge.
-
-betbot's thesis:
-
-1. **The closing line is truth.** The final odds before game start represent the market's best estimate of true probability. This is the benchmark — not game outcomes.
-2. **Edge is mispriced probability.** A team that wins 80% of the time is a bad bet if the market prices them at 95%. A team that wins 30% is a great bet at +400. betbot finds the gap.
-3. **CLV is the only honest metric.** Closing Line Value — whether you beat the final market price — is the only performance measure that separates skill from noise over meaningful sample sizes.
-4. **Variance is the cost of doing business.** Even a +3% EV strategy has losing months. The system is designed to survive variance, not avoid it.
+1. **The market is the prior.** The current line already reflects most public information. Start there.
+2. **Edge is residual mispricing.** Update the market with sport-specific information the books or the public underweight.
+3. **CLV is the honest metric.** If the system is not beating the close, it does not have proven edge.
+4. **Data quality is model quality.** Broken ingestion invalidates every downstream conclusion.
+5. **Variance is not a bug.** The job is to survive it, not pretend it disappears.
 
 ---
 
-## Identity & Voice
+## Personality
 
-### Name: betbot
+- Clinical, not emotional
+- Probability-first, not outcome-first
+- Patient, not action-addicted
+- Skeptical of its own models
+- More interested in edge persistence than bet count
 
-The repository name is `betbot`, but the operating posture is still trading-first, not gambling-first. The mental model is a trading desk, not a ticket window.
+The operator mindset is closer to a small trading desk than a sportsbook content brand.
 
-### Personality
+---
 
-- **Clinical, not emotional.** Decisions are made by math. The system does not have "gut feelings" or "locks of the week."
-- **Honest about uncertainty.** Probabilities are probabilities, not certainties. The system expresses confidence in ranges, not absolutes.
-- **Patient.** The system waits for edge. No edge, no bet. An idle day is a successful day.
-- **Self-critical.** Calibration monitoring, backtest regression, and CLV tracking exist because the system assumes its own models are wrong until proven otherwise.
+## Product Boundaries
 
-### Design Language
+betbot is not:
 
-betbot's interfaces (dashboard, reports, CLI output) follow these principles:
+- a picks app
+- a parlay toy
+- a social betting product
+- a generic sports-data platform
+- a "hot hand" recommendation engine
 
-- **Data density over decoration.** Every pixel earns its place. No decorative charts. No gamification.
-- **Monospace for numbers.** Financial data and odds are displayed in monospace. Alignment matters.
-- **Color is semantic.** Green = positive EV / positive CLV. Red = negative. Amber = caution / near threshold. No arbitrary palette — color encodes meaning.
-- **Dark mode default.** Trading terminals are dark. So is this.
+betbot is:
+
+- a measurement system for odds and closing-line behavior
+- a modeling and validation pipeline
+- a bankroll and risk engine
+- an execution system only after the data and model layers are credible
+
+---
+
+## Four-Sport Posture
+
+Why these leagues:
+
+- `MLB`: unmatched public analytics depth and starter-driven markets
+- `NBA`: player availability and schedule stress are large, measurable inputs
+- `NHL`: goalie timing and xG divergence create distinct inefficiency windows
+- `NFL`: the most efficient major market, but still exploitable through situational rigor
+
+This focus should show up in the product language. betbot is not "sport agnostic." It is reusable in architecture and specialized in strategy.
+
+---
+
+## Design Language
+
+- Data density over decoration
+- Monospace for numbers and odds
+- Color used semantically, not decoratively
+- Interfaces that feel like tooling, not entertainment
+- Dark mode default remains appropriate for the product posture
 
 ### Typography
 
@@ -59,67 +86,56 @@ betbot's interfaces (dashboard, reports, CLI output) follow these principles:
 
 | Token | Hex | Use |
 |-------|-----|-----|
-| `--tb-bg` | `#0F1419` | Background (dark) |
+| `--tb-bg` | `#0F1419` | Background |
 | `--tb-surface` | `#1A2332` | Cards, panels |
 | `--tb-border` | `#2A3A4A` | Dividers, borders |
 | `--tb-text` | `#E1E8ED` | Primary text |
-| `--tb-muted` | `#8899A6` | Secondary text, labels |
-| `--tb-positive` | `#17BF63` | Positive EV, wins, +CLV |
-| `--tb-negative` | `#E0245E` | Negative EV, losses, −CLV |
-| `--tb-caution` | `#FFAD1F` | Warnings, near-threshold |
-| `--tb-accent` | `#1DA1F2` | Interactive elements, links |
-| `--tb-accent-dim` | `#1A8CD8` | Hover states |
-
----
-
-## What betbot Is NOT
-
-- **Not a gambling app.** There are no "hot picks," no streaks, no leaderboards. If it feels like a casino, something is wrong.
-- **Not a tips service.** betbot does not produce human-readable recommendations. It produces bet tickets with quantified edge, confidence intervals, and position sizes.
-- **Not a parlay builder.** Parlays create correlated exposure that the Kelly framework penalizes. The system may place them only when the correlation is explicitly modeled and the EV justifies the structure.
-- **Not infallible.** The system will have losing streaks. The architecture exists to survive them — circuit breakers, loss stops, drawdown halts. Losing is expected. Blowing up is not.
+| `--tb-muted` | `#8899A6` | Secondary text |
+| `--tb-positive` | `#17BF63` | Positive EV / CLV |
+| `--tb-negative` | `#E0245E` | Negative EV / CLV |
+| `--tb-caution` | `#FFAD1F` | Warning states |
+| `--tb-accent` | `#1DA1F2` | Interactive elements |
 
 ---
 
 ## Operator Mindset
 
-The person running betbot is an **operator**, not a gambler. The operator's job:
+The operator:
 
-1. **Maintain the data pipeline.** Data quality is model quality. A missed odds snapshot is a missed opportunity — or worse, a stale-data bet.
-2. **Monitor calibration.** If the model says 60% and the actual rate drifts to 52%, the model is broken. Disable it. Investigate. Fix. Redeploy after backtesting.
-3. **Respect the circuit breakers.** When the system halts, it halted for a reason. Do not override without understanding why.
-4. **Think in samples, not bets.** A single bet outcome carries near-zero information. 100 bets start to tell a story. 500 bets reveal whether you have edge. Act accordingly.
-5. **Protect account longevity.** The best model in the world is worthless if every book has limited your account. Manage volume, timing, and bet patterns to extend useful life.
+1. Maintains the data pipeline before touching model complexity.
+2. Treats calibration drift as a production incident.
+3. Respects circuit breakers and audit trails.
+4. Thinks in samples, not anecdotes.
+5. Scales only when CLV and process quality justify it.
 
----
-
-## Decision Framework
-
-When making product or engineering decisions for betbot, apply this hierarchy:
-
-1. **Financial safety first.** If a feature could cause a double-placed bet, a bankroll error, or a missing audit record, it does not ship until the safety case is airtight.
-2. **Data integrity second.** If a schema change could corrupt the odds history or break backtest replay, it requires explicit migration and validation.
-3. **Measurement third.** If you can't measure whether a change improves CLV or calibration, the change is speculative. Ship the measurement first.
-4. **Model sophistication last.** A simple Elo model with excellent data infrastructure beats an XGBoost ensemble with broken data every time.
+The correct emotional tone of the system is restraint.
 
 ---
 
-## Relationship to Clientsite
+## Decision Hierarchy
 
-betbot is a **separate product** from Clientsite. It shares technical DNA — Go, PostgreSQL, River, Fiber, HTMX — but has its own repository, its own deployment, and its own domain logic. The shared stack is a pragmatic choice that reduces cognitive overhead, not a coupling decision.
+1. Financial safety
+2. Data integrity
+3. Measurement quality
+4. Operational simplicity
+5. Model sophistication
 
-betbot does not share a database, codebase, or deployment pipeline with Clientsite. They are sibling projects with a common operator and a common technical philosophy.
+If a new idea conflicts with this order, the idea loses.
 
 ---
 
-## Long-Term Vision
+## Roadmap Mood
 
-**Phase 1 (current):** Single-sport value betting with CLV-validated edge. Prove the thesis works with real capital over a statistically significant sample.
+**Phase 1:** ingestion vertical slice, operational visibility, no false precision
 
-**Phase 2:** Multi-sport expansion. Each sport gets its own modeling pipeline but shares common infrastructure (odds ingestion, decision engine, execution layer, bankroll management).
+**Phase 2:** sport foundation, schedules, ETL, and situational inputs
 
-**Phase 3:** Market-making behavior — identifying structural inefficiencies across books and systematically capturing the spread between them.
+**Phase 3:** baseline models and backtesting
 
-**Phase 4:** If the thesis is proven and capital efficiency justifies it, evaluate whether betbot's edge framework generalizes to other prediction markets (politics, crypto, weather derivatives).
+**Phase 4:** decision engine and bankroll control
 
-The North Star is **compounding edge over time** — not maximum excitement, not maximum volume, not maximum complexity. Simplicity that works beats complexity that might work.
+**Phase 5:** execution and paper validation
+
+**Phase 6:** constrained live deployment and iterative expansion
+
+The north star is not "maximum automation." It is durable edge with controlled risk.
