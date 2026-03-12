@@ -27,7 +27,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
-    command: ["/usr/local/bin/betbot-worker"]
+    entrypoint: ["/usr/local/bin/betbot-worker"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,3 +58,4 @@ services:
 
 volumes:
   betbot-postgres-data:
+
