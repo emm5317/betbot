@@ -190,13 +190,21 @@ SELECT
     latest.captured_at
 FROM latest
 JOIN games AS g ON g.id = latest.game_id
+WHERE
+    $1::text IS NULL
+    OR g.sport = $1::text
 ORDER BY
     g.commence_time ASC,
     latest.book_key ASC,
     latest.market_key ASC,
     latest.outcome_name ASC
-LIMIT $1
+LIMIT $2
 `
+
+type ListLatestOddsParams struct {
+	Sport    *string `json:"sport"`
+	RowLimit int32   `json:"row_limit"`
+}
 
 type ListLatestOddsRow struct {
 	GameID             int64              `json:"game_id"`
@@ -216,8 +224,8 @@ type ListLatestOddsRow struct {
 	CapturedAt         pgtype.Timestamptz `json:"captured_at"`
 }
 
-func (q *Queries) ListLatestOdds(ctx context.Context, limit int32) ([]ListLatestOddsRow, error) {
-	rows, err := q.db.Query(ctx, listLatestOdds, limit)
+func (q *Queries) ListLatestOdds(ctx context.Context, arg ListLatestOddsParams) ([]ListLatestOddsRow, error) {
+	rows, err := q.db.Query(ctx, listLatestOdds, arg.Sport, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}

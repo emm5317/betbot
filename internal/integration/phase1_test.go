@@ -135,7 +135,7 @@ func TestOddsSnapshotInsertDedupIntegration(t *testing.T) {
 		t.Fatalf("expected latest hash hash-2, got %q", latestHash)
 	}
 
-	rows, err := queries.ListLatestOdds(ctx, 10)
+	rows, err := queries.ListLatestOdds(ctx, store.ListLatestOddsParams{RowLimit: 10})
 	if err != nil {
 		t.Fatalf("list latest odds: %v", err)
 	}
@@ -147,6 +147,24 @@ func TestOddsSnapshotInsertDedupIntegration(t *testing.T) {
 	}
 	if !rows[0].CapturedAt.Valid || !rows[0].CapturedAt.Time.UTC().Equal(snapshot.CapturedAt) {
 		t.Fatalf("expected latest captured_at %s, got %+v", snapshot.CapturedAt.Format(time.RFC3339), rows[0].CapturedAt)
+	}
+
+	nba := "NBA"
+	nbaRows, err := queries.ListLatestOdds(ctx, store.ListLatestOddsParams{Sport: &nba, RowLimit: 10})
+	if err != nil {
+		t.Fatalf("list latest odds by sport: %v", err)
+	}
+	if len(nbaRows) != 1 {
+		t.Fatalf("expected 1 NBA odds row, got %d", len(nbaRows))
+	}
+
+	nhl := "NHL"
+	nhlRows, err := queries.ListLatestOdds(ctx, store.ListLatestOddsParams{Sport: &nhl, RowLimit: 10})
+	if err != nil {
+		t.Fatalf("list latest odds by non-matching sport: %v", err)
+	}
+	if len(nhlRows) != 0 {
+		t.Fatalf("expected 0 NHL odds rows, got %d", len(nhlRows))
 	}
 }
 

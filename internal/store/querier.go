@@ -15,12 +15,15 @@ type Querier interface {
 	GetDashboardSummary(ctx context.Context) (GetDashboardSummaryRow, error)
 	GetLatestPollRun(ctx context.Context) (PollRun, error)
 	GetLatestSnapshotHash(ctx context.Context, arg GetLatestSnapshotHashParams) (string, error)
+	GetOddsArchiveSummary(ctx context.Context, sport *string) (GetOddsArchiveSummaryRow, error)
 	InsertBankrollEntry(ctx context.Context, arg InsertBankrollEntryParams) (BankrollLedger, error)
 	InsertOddsSnapshot(ctx context.Context, arg InsertOddsSnapshotParams) (OddsHistory, error)
 	InsertPollRun(ctx context.Context, arg InsertPollRunParams) (PollRun, error)
-	ListLatestOdds(ctx context.Context, limit int32) ([]ListLatestOddsRow, error)
+	ListLatestOdds(ctx context.Context, arg ListLatestOddsParams) ([]ListLatestOddsRow, error)
 	ListUpcomingGames(ctx context.Context, limit int32) ([]Game, error)
+	ListUpcomingWeatherGames(ctx context.Context, arg ListUpcomingWeatherGamesParams) ([]Game, error)
 	UpsertGame(ctx context.Context, arg UpsertGameParams) (Game, error)
+	UpsertGameWeatherSnapshot(ctx context.Context, arg UpsertGameWeatherSnapshotParams) error
 	UpsertMLBPitcherStats(ctx context.Context, arg UpsertMLBPitcherStatsParams) error
 	UpsertMLBTeamStats(ctx context.Context, arg UpsertMLBTeamStatsParams) error
 	UpsertNBATeamStats(ctx context.Context, arg UpsertNBATeamStatsParams) error

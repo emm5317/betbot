@@ -11,6 +11,7 @@ import (
 	"betbot/internal/ingestion/injuries"
 	"betbot/internal/ingestion/oddspoller"
 	"betbot/internal/ingestion/statsetl"
+	"betbot/internal/ingestion/weather"
 	"betbot/internal/store"
 
 	"github.com/jackc/pgx/v5"
@@ -34,11 +35,25 @@ func (OddsPollArgs) Kind() string { return "odds_poll" }
 
 type OddsPollWorker struct {
 	river.WorkerDefaults[OddsPollArgs]
-	poller *oddspoller.Poller
-	logger *slog.Logger
+	poller         *oddspoller.Poller
+	logger         *slog.Logger
+	enabled        bool
+	disabledReason string
 }
 
 func (w *OddsPollWorker) Work(ctx context.Context, job *river.Job[OddsPollArgs]) error {
+	if !w.enabled {
+		reason := w.disabledReason
+		if reason == "" {
+			reason = "disabled"
+		}
+		w.logger.InfoContext(ctx, "odds poll job skipped",
+			slog.Time("requested_at", job.Args.RequestedAt),
+			slog.String("reason", reason),
+		)
+		return nil
+	}
+
 	if len(job.Args.Sports) == 0 {
 		w.logger.InfoContext(ctx, "odds poll job skipped",
 			slog.Time("requested_at", job.Args.RequestedAt),
@@ -72,10 +87,12 @@ func (w *OddsPollWorker) Work(ctx context.Context, job *river.Job[OddsPollArgs])
 }
 
 type App struct {
-	cfg    config.Config
-	logger *slog.Logger
-	pool   interface{ Close() }
-	client *river.Client[pgx.Tx]
+	cfg                      config.Config
+	logger                   *slog.Logger
+	pool                     interface{ Close() }
+	client                   *river.Client[pgx.Tx]
+	oddsPollingEnabled       bool
+	oddsPollingDisableReason string
 }
 
 func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -96,23 +113,24 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	}
 
 	sportRegistry := domain.DefaultSportRegistry()
+	oddsPollingEnabled, oddsPollingDisableReason := cfg.OddsPollingRuntime()
 	workers := river.NewWorkers()
-	river.AddWorker(workers, &OddsPollWorker{poller: oddspoller.NewPoller(cfg, logger, pool), logger: logger})
+	river.AddWorker(workers, &OddsPollWorker{
+		poller:         oddspoller.NewPoller(cfg, logger, pool),
+		logger:         logger,
+		enabled:        oddsPollingEnabled,
+		disabledReason: oddsPollingDisableReason,
+	})
 	river.AddWorker(workers, NewMLBStatsETLWorker(pool, logger, statsetl.NewMLBStatsAPIProvider("", 0)))
 	river.AddWorker(workers, NewNBAStatsETLWorker(pool, logger, statsetl.NewNBAStatsAPIProvider("", 0)))
 	river.AddWorker(workers, NewNHLStatsETLWorker(pool, logger, statsetl.NewNHLStatsAPIProvider("", 0)))
 	river.AddWorker(workers, NewNFLStatsETLWorker(pool, logger, statsetl.NewNFLverseProvider("", "", 0)))
 	river.AddWorker(workers, NewInjurySyncWorker(pool, logger, injuries.NewRotowireProvider("", 0)))
+	river.AddWorker(workers, NewWeatherSyncWorker(pool, logger, weather.NewOpenMeteoProvider("", 0)))
 
-	client, err := river.NewClient(driver, &river.Config{
-		Logger: logger,
-		Schema: cfg.RiverSchema,
-		Queues: map[string]river.QueueConfig{
-			QueueLatencySensitive: {MaxWorkers: 1},
-			QueueMaintenance:      {MaxWorkers: 1},
-		},
-		Workers: workers,
-		PeriodicJobs: []*river.PeriodicJob{
+	periodicJobs := []*river.PeriodicJob{}
+	if oddsPollingEnabled {
+		periodicJobs = append(periodicJobs,
 			river.NewPeriodicJob(
 				river.PeriodicInterval(cfg.OddsAPIPollInterval),
 				func() (river.JobArgs, *river.InsertOpts) {
@@ -121,7 +139,24 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 				},
 				&river.PeriodicJobOpts{ID: "odds-poll", RunOnStart: true},
 			),
+		)
+	} else {
+		reason := oddsPollingDisableReason
+		if reason == "" {
+			reason = "disabled"
+		}
+		logger.Info("odds polling disabled", slog.String("reason", reason))
+	}
+
+	client, err := river.NewClient(driver, &river.Config{
+		Logger: logger,
+		Schema: cfg.RiverSchema,
+		Queues: map[string]river.QueueConfig{
+			QueueLatencySensitive: {MaxWorkers: 1},
+			QueueMaintenance:      {MaxWorkers: 1},
 		},
+		Workers:           workers,
+		PeriodicJobs:      periodicJobs,
 		ReindexerSchedule: river.NeverSchedule(),
 	})
 	if err != nil {
@@ -129,7 +164,14 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		return nil, fmt.Errorf("create river client: %w", err)
 	}
 
-	return &App{cfg: cfg, logger: logger, pool: pool, client: client}, nil
+	return &App{
+		cfg:                      cfg,
+		logger:                   logger,
+		pool:                     pool,
+		client:                   client,
+		oddsPollingEnabled:       oddsPollingEnabled,
+		oddsPollingDisableReason: oddsPollingDisableReason,
+	}, nil
 }
 
 func activeOddsPollArgs(at time.Time, registry domain.SportRegistry, configuredSports []string) OddsPollArgs {
@@ -159,6 +201,10 @@ func (a *App) EnqueueInjurySync(ctx context.Context, req injuries.Request) (*riv
 	return EnqueueInjurySync(ctx, a.client, req)
 }
 
+func (a *App) EnqueueWeatherSync(ctx context.Context, req weather.Request) (*rivertype.JobInsertResult, error) {
+	return EnqueueWeatherSync(ctx, a.client, req)
+}
+
 func (a *App) Close() {
 	a.pool.Close()
 }
@@ -169,7 +215,18 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 
-	a.logger.Info("betbot worker started", slog.Duration("poll_interval", a.cfg.OddsAPIPollInterval))
+	attrs := []any{
+		slog.Duration("poll_interval", a.cfg.OddsAPIPollInterval),
+		slog.Bool("odds_polling_enabled", a.oddsPollingEnabled),
+	}
+	if !a.oddsPollingEnabled {
+		reason := a.oddsPollingDisableReason
+		if reason == "" {
+			reason = "disabled"
+		}
+		attrs = append(attrs, slog.String("odds_polling_disabled_reason", reason))
+	}
+	a.logger.Info("betbot worker started", attrs...)
 	<-ctx.Done()
 
 	stopCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

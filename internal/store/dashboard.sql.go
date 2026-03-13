@@ -94,6 +94,29 @@ func (q *Queries) GetLatestPollRun(ctx context.Context) (PollRun, error) {
 	return i, err
 }
 
+const getOddsArchiveSummary = `-- name: GetOddsArchiveSummary :one
+SELECT
+    COUNT(*)::BIGINT AS snapshots_count,
+    MAX(oh.captured_at)::timestamptz AS last_snapshot_at
+FROM odds_history AS oh
+JOIN games AS g ON g.id = oh.game_id
+WHERE
+    $1::text IS NULL
+    OR g.sport = $1::text
+`
+
+type GetOddsArchiveSummaryRow struct {
+	SnapshotsCount int64              `json:"snapshots_count"`
+	LastSnapshotAt pgtype.Timestamptz `json:"last_snapshot_at"`
+}
+
+func (q *Queries) GetOddsArchiveSummary(ctx context.Context, sport *string) (GetOddsArchiveSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getOddsArchiveSummary, sport)
+	var i GetOddsArchiveSummaryRow
+	err := row.Scan(&i.SnapshotsCount, &i.LastSnapshotAt)
+	return i, err
+}
+
 const insertPollRun = `-- name: InsertPollRun :one
 INSERT INTO poll_runs (
     source,

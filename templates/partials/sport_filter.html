@@ -1,0 +1,14 @@
+<form class="filter-form" method="get" action="{{or .SportFilterAction "/"}}">
+    <label class="filter-form__label" for="sport-filter">Sport scope</label>
+    <div class="filter-form__controls">
+        <select class="filter-form__select" id="sport-filter" name="sport">
+            {{range .SportFilterOptions}}
+                <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+        </select>
+        <button class="filter-form__submit" type="submit">Apply</button>
+        {{if .SelectedSport}}
+            <a class="filter-form__clear" href="{{.SportFilterAction}}">Clear</a>
+        {{end}}
+    </div>
+</form>

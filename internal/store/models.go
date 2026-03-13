@@ -33,6 +33,29 @@ type Game struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type GameWeatherSnapshot struct {
+	ID                       int64              `json:"id"`
+	GameID                   int64              `json:"game_id"`
+	Source                   string             `json:"source"`
+	ForecastTime             pgtype.Timestamptz `json:"forecast_time"`
+	VenueName                string             `json:"venue_name"`
+	VenueTimezone            string             `json:"venue_timezone"`
+	Latitude                 float64            `json:"latitude"`
+	Longitude                float64            `json:"longitude"`
+	RoofType                 string             `json:"roof_type"`
+	WeatherCode              *int32             `json:"weather_code"`
+	TemperatureF             *float64           `json:"temperature_f"`
+	ApparentTemperatureF     *float64           `json:"apparent_temperature_f"`
+	PrecipitationProbability *float64           `json:"precipitation_probability"`
+	PrecipitationInches      *float64           `json:"precipitation_inches"`
+	WindSpeedMph             *float64           `json:"wind_speed_mph"`
+	WindGustMph              *float64           `json:"wind_gust_mph"`
+	WindDirectionDegrees     *int32             `json:"wind_direction_degrees"`
+	RawJson                  json.RawMessage    `json:"raw_json"`
+	CreatedAt                pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
+}
+
 type MlbPitcherStat struct {
 	ID             int64              `json:"id"`
 	Source         string             `json:"source"`

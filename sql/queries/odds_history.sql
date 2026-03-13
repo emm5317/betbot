@@ -81,13 +81,18 @@ SELECT
     latest.captured_at
 FROM latest
 JOIN games AS g ON g.id = latest.game_id
+WHERE
+    sqlc.narg(sport)::text IS NULL
+    OR g.sport = sqlc.narg(sport)::text
 ORDER BY
     g.commence_time ASC,
     latest.book_key ASC,
     latest.market_key ASC,
     latest.outcome_name ASC
-LIMIT $1;
+LIMIT sqlc.arg(row_limit);
 
 -- name: CountOddsHistoryRows :one
 SELECT COUNT(*)::BIGINT
 FROM odds_history;
+
+

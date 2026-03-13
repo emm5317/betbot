@@ -1,11 +1,16 @@
 package worker
 
 import (
+	"context"
+	"io"
+	"log/slog"
 	"reflect"
 	"testing"
 	"time"
 
 	"betbot/internal/domain"
+
+	"github.com/riverqueue/river"
 )
 
 func TestActiveOddsPollArgsFiltersToActiveSports(t *testing.T) {
@@ -32,5 +37,20 @@ func TestActiveOddsPollArgsReturnsEmptyWhenNoConfiguredSportIsActive(t *testing.
 
 	if len(args.Sports) != 0 {
 		t.Fatalf("expected no active sports, got %v", args.Sports)
+	}
+}
+
+func TestOddsPollWorkerSkipsWhenDisabled(t *testing.T) {
+	worker := &OddsPollWorker{
+		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		enabled:        false,
+		disabledReason: "disabled-by-config",
+	}
+	job := &river.Job[OddsPollArgs]{
+		Args: OddsPollArgs{RequestedAt: time.Date(2026, time.March, 12, 8, 0, 0, 0, time.UTC)},
+	}
+
+	if err := worker.Work(context.Background(), job); err != nil {
+		t.Fatalf("Work() error = %v, want nil", err)
 	}
 }

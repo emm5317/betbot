@@ -1,3 +1,5 @@
+{{template "partials/alert_banner" .}}
+
 <section class="page-header">
     <div>
         <p class="eyebrow">Odds Archive</p>
@@ -8,17 +10,18 @@
     </div>
     <div class="page-header__meta">
         <span class="runtime-chip">stored data only</span>
-        <span class="runtime-chip">dedup aware</span>
+        <span class="runtime-chip">scope: {{or .SelectedSportLabel "All sports"}}</span>
     </div>
 </section>
 
 <section class="panel">
-    <div class="panel__header">
+    <div class="panel__header panel__header--dense">
         <div>
             <p class="eyebrow">Operational Read</p>
             <h3>Book and market rows</h3>
+            <span class="panel__caption">Most recent snapshots by market identity</span>
         </div>
-        <span class="panel__caption">Most recent snapshots by market identity</span>
+        {{template "partials/sport_filter" .}}
     </div>
     {{template "partials/odds_table" .}}
 </section>

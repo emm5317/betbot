@@ -2,7 +2,7 @@
 
 Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸️ DEFERRED`
 
-**Last updated:** 2026-03-11
+**Last updated:** 2026-03-13
 **Current phase:** Phase 2 — Sport Foundation
 
 ---
@@ -16,6 +16,8 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - `internal/store` is now generated from `sqlc` query sources and used by the app surface
 - `internal/domain` now exposes a concrete `SportConfig` registry for MLB/NBA/NHL/NFL
 - Worker scheduling now filters odds polling to sports active in the current season
+- Local/dev runtime now supports explicit odds polling disable mode plus placeholder-key auto-guard so compose health stays green without a live Odds API key
+- Operator read views now support explicit sport filters (all sports + canonical MLB/NBA/NHL/NFL keys) for `/`, `/odds`, and `/pipeline/health`
 - Minimal sport-stat schema is now live: team tables for MLB/NBA/NHL/NFL plus MLB pitcher, NHL goalie, and NFL QB foundations
 - MLB stats ETL now has a live MLB Stats API provider, explicit River enqueue path, and sqlc-backed team and pitcher upserts
 - NBA stats ETL now has a live stats.nba.com provider path, explicit River enqueue helper, and idempotent nba_team_stats upserts
@@ -23,6 +25,8 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - NHL stats ETL now has a first-pass live team path via the official NHL web API; goalie writes remain deferred pending a date-consistent goalie source
 - NFL stats ETL now has a live merged provider path using nflverse team stats plus official NFL standings, explicit River enqueue wiring, and idempotent nfl_team_stats upserts; nfl_qb_stats remain deferred in this phase
 - First-pass injury ingestion now persists Rotowire NFL injury availability records via an explicit worker and sqlc-backed upserts; lineup confirmations remain deferred in this phase
+- First-pass weather ingestion now persists explicit game-linked MLB and NFL weather snapshots via Open-Meteo plus in-repo venue metadata; roof handling is now policy-driven across outdoor, fixed indoor, and retractable-unknown branches, with explicit date-bounded venue exceptions for Athletics naming variants
+- Deterministic local weather smoke harness now exists for MLB/NFL roof-policy coverage, including River enqueue/completion checks and idempotent rerun assertions
 - Documentation is now aligned to the four-sport direction: `MLB`, `NBA`, `NHL`, `NFL`
 
 The current implementation target is intentionally narrower than the full product architecture. Phase 2 is now extending that ingestion slice into tightly scoped sport-specific ETL foundations before broader modeling breadth.
@@ -91,8 +95,11 @@ Goal: add the shared four-sport substrate required before serious baseline model
 | P2-006 | Implement `NHLStatsETLJob` | ✅ DONE | P1 | First-pass NHL ETL now writes `nhl_team_stats` from the official NHL web API; goalie writes are deferred until a date-consistent source is selected |
 | P2-007 | Implement `NFLStatsETLJob` | ✅ DONE | P1 | Live first-pass NFL ETL now writes `nfl_team_stats` from nflverse team stats merged with official NFL standings; `nfl_qb_stats` remain deferred pending a clean success-rate-capable source |
 | P2-008 | Implement injury and lineup ingestion | ✅ DONE | P0 | First pass now persists Rotowire NFL injury availability records; broad lineup-confirmation coverage remains deferred until a credible machine-readable source is selected |
-| P2-009 | Implement weather ingestion for outdoor sports | ⬜ TODO | P1 | MLB and NFL first |
-| P2-010 | Add operator-facing sport filters to read views | ⬜ TODO | P2 | Keep views usable as breadth grows |
+| P2-009 | Implement weather ingestion for outdoor sports | ✅ DONE | P1 | Open-Meteo-backed first pass now persists game-linked MLB and NFL weather rows; roofed venues are explicit and broader venue cases remain deferred |
+| P2-010b | Tighten retractable-roof and venue exception policy for persisted weather ingestion | ✅ DONE | P1 | Weather ingest now uses explicit roof-policy branches (outdoor fetch, fixed-indoor placeholder, retractable-unknown placeholder) and a shared Athletics/Oakland Athletics date override for the temporary Las Vegas venue window |
+| P2-010c | Build reproducible local weather smoke harness (MLB/NFL roof policy) | ✅ DONE | P1 | Added deterministic River-backed smoke test plus scripts/weather_smoke.ps1 runner and runbook checks for outdoor, dome, retractable, job completion, and idempotent rerun behavior |
+| P2-010d | Make local compose health-green without live Odds API key | ✅ DONE | P1 | Added explicit odds polling disable switch, placeholder-key guard, worker scheduling skip path, and health/read-view semantics for intentional local polling disablement |
+| P2-010 | Add operator-facing sport filters to read views | ✅ DONE | P2 | Read views now accept explicit canonical sport filter keys with 400 responses for invalid filters and scoped odds archive metrics on home/pipeline |
 
 Phase 2 exit criteria:
 
@@ -169,16 +176,6 @@ Goal: validate edge with constrained capital and iterate safely.
 | P6-003 | Add sharper odds sources where justified | ⬜ TODO | P1 | Pinnacle, OddsJam, OpticOdds evaluation |
 | P6-004 | Introduce ML sidecar where baseline models plateau | ⬜ TODO | P1 | Only after measurement is solid |
 | P6-005 | Expand sport-specific prop models | ⬜ TODO | P2 | After game-market process is stable |
-
-
-
-
-
-
-
-
-
-
 
 
 

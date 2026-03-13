@@ -20,14 +20,15 @@ func TestSportStatTablesMigration(t *testing.T) {
 	defer pool.Close()
 
 	expectedColumns := map[string][]string{
-		"mlb_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"mlb_pitcher_stats":     {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
-		"nba_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"nhl_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"nhl_goalie_stats":      {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
-		"nfl_team_stats":        {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
-		"nfl_qb_stats":          {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
-		"player_injury_reports": {"source", "sport", "report_date", "external_id", "player_name", "team_external_id", "position", "injury", "status", "raw_json", "created_at", "updated_at"},
+		"mlb_team_stats":         {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"mlb_pitcher_stats":      {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
+		"nba_team_stats":         {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"nhl_team_stats":         {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"nhl_goalie_stats":       {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
+		"nfl_team_stats":         {"source", "external_id", "season", "stat_date", "team_name", "created_at", "updated_at"},
+		"nfl_qb_stats":           {"source", "external_id", "season", "stat_date", "player_name", "team_external_id", "team_name", "created_at", "updated_at"},
+		"player_injury_reports":  {"source", "sport", "report_date", "external_id", "player_name", "team_external_id", "position", "injury", "status", "raw_json", "created_at", "updated_at"},
+		"game_weather_snapshots": {"game_id", "source", "forecast_time", "venue_name", "venue_timezone", "roof_type", "raw_json", "created_at", "updated_at"},
 	}
 
 	for table, columns := range expectedColumns {
@@ -41,6 +42,15 @@ func TestSportStatTablesMigration(t *testing.T) {
 				}
 			}
 		})
+	}
+
+	var weatherGameID int64
+	if err := pool.QueryRow(ctx, `
+        INSERT INTO games (source, external_id, sport, home_team, away_team, commence_time)
+        VALUES ('the-odds-api', 'weather-phase2-game', 'MLB', 'Boston Red Sox', 'New York Yankees', $1)
+        RETURNING id
+    `, time.Date(2026, time.March, 12, 18, 30, 0, 0, time.UTC)).Scan(&weatherGameID); err != nil {
+		t.Fatalf("insert weather game seed: %v", err)
 	}
 
 	inserts := []struct {
@@ -87,6 +97,11 @@ func TestSportStatTablesMigration(t *testing.T) {
 			name: "player_injury_reports",
 			sql:  "INSERT INTO player_injury_reports (source, sport, report_date, external_id, player_name, team_external_id, position, injury, status, player_url, raw_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
 			args: []any{"rotowire", "nfl", time.Date(2026, time.March, 11, 0, 0, 0, 0, time.UTC), "12483", "Josh Allen", "buf", "QB", "Foot", "Questionable", "https://www.rotowire.com/football/player/josh-allen-12483", []byte(`{"ID":"12483"}`)},
+		},
+		{
+			name: "game_weather_snapshots",
+			sql:  "INSERT INTO game_weather_snapshots (game_id, source, forecast_time, venue_name, venue_timezone, latitude, longitude, roof_type, temperature_f, raw_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+			args: []any{weatherGameID, "open-meteo", time.Date(2026, time.March, 12, 19, 0, 0, 0, time.UTC), "Fenway Park", "America/New_York", 42.3467, -71.0972, "outdoor", 68.5, []byte(`{"forecast_time":"2026-03-12T19:00:00Z"}`)},
 		},
 	}
 

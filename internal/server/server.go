@@ -19,6 +19,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type readQueries interface {
+	GetLatestPollRun(ctx context.Context) (store.PollRun, error)
+	GetOddsArchiveSummary(ctx context.Context, sport *string) (store.GetOddsArchiveSummaryRow, error)
+	ListLatestOdds(ctx context.Context, arg store.ListLatestOddsParams) ([]store.ListLatestOddsRow, error)
+}
+
 type App struct {
 	app    *fiber.App
 	cfg    config.Config
@@ -27,7 +33,9 @@ type App struct {
 		Close()
 		Ping(context.Context) error
 	}
-	queries *store.Queries
+	queries                   readQueries
+	oddsPollingEnabled        bool
+	oddsPollingDisabledReason string
 }
 
 func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, error) {
@@ -42,12 +50,15 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 		Views:   engine,
 	})
 
+	oddsPollingEnabled, oddsPollingDisabledReason := cfg.OddsPollingRuntime()
 	instance := &App{
-		app:     app,
-		cfg:     cfg,
-		logger:  appLogger,
-		pool:    pool,
-		queries: store.New(pool),
+		app:                       app,
+		cfg:                       cfg,
+		logger:                    appLogger,
+		pool:                      pool,
+		queries:                   store.New(pool),
+		oddsPollingEnabled:        oddsPollingEnabled,
+		oddsPollingDisabledReason: oddsPollingDisabledReason,
 	}
 	instance.routes()
 	return instance, nil
@@ -98,20 +109,55 @@ func (a *App) routes() {
 }
 
 func (a *App) handleHome(c fiber.Ctx) error {
-	_, overallStatus := a.pipelineView(c.Context())
-	return c.Render("pages/home", map[string]any{
+	sportFilter, filterErr := resolveSportFilter(c.Query("sport"))
+	pipeline, overallStatus := a.pipelineView(c.Context(), sportFilter)
+
+	view := map[string]any{
 		"Title":         "betbot",
 		"ActiveNav":     "home",
 		"OverallStatus": overallStatus,
 		"Environment":   a.cfg.Env,
 		"WorkerStatus":  overallStatus,
-		"Pipeline":      first(a.pipelineView(c.Context())),
+		"Pipeline":      pipeline,
 		"Status":        overallStatus,
-	}, "layouts/base")
+	}
+	applySportFilterView(view, "/", sportFilter)
+	if filterErr != nil {
+		view["Alert"] = map[string]any{
+			"Title":   "Invalid sport filter",
+			"Message": filterErr.Error(),
+		}
+		return c.Status(fiber.StatusBadRequest).Render("pages/home", view, "layouts/base")
+	}
+
+	return c.Render("pages/home", view, "layouts/base")
 }
 
 func (a *App) handleOdds(c fiber.Ctx) error {
-	rows, err := a.queries.ListLatestOdds(c.Context(), 200)
+	sportFilter, filterErr := resolveSportFilter(c.Query("sport"))
+	_, overallStatus := a.pipelineView(c.Context(), sportFilter)
+
+	view := map[string]any{
+		"Title":         "Latest Odds",
+		"ActiveNav":     "odds",
+		"OverallStatus": overallStatus,
+		"Environment":   a.cfg.Env,
+		"Rows":          []map[string]any{},
+		"Status":        overallStatus,
+	}
+	applySportFilterView(view, "/odds", sportFilter)
+	if filterErr != nil {
+		view["Alert"] = map[string]any{
+			"Title":   "Invalid sport filter",
+			"Message": filterErr.Error(),
+		}
+		return c.Status(fiber.StatusBadRequest).Render("pages/odds", view, "layouts/base")
+	}
+
+	rows, err := a.queries.ListLatestOdds(c.Context(), store.ListLatestOddsParams{
+		RowLimit: 200,
+		Sport:    sportFilter.storeParam(),
+	})
 	if err != nil {
 		return err
 	}
@@ -133,28 +179,32 @@ func (a *App) handleOdds(c fiber.Ctx) error {
 			"CapturedAt":    formatTimestamp(row.CapturedAt, "pending"),
 		})
 	}
-
-	_, overallStatus := a.pipelineView(c.Context())
-	return c.Render("pages/odds", map[string]any{
-		"Title":         "Latest Odds",
-		"ActiveNav":     "odds",
-		"OverallStatus": overallStatus,
-		"Environment":   a.cfg.Env,
-		"Rows":          oddsRows,
-		"Status":        overallStatus,
-	}, "layouts/base")
+	view["Rows"] = oddsRows
+	return c.Render("pages/odds", view, "layouts/base")
 }
 
 func (a *App) handlePipelineHealth(c fiber.Ctx) error {
-	pipeline, overallStatus := a.pipelineView(c.Context())
-	return c.Render("pages/pipeline_health", map[string]any{
+	sportFilter, filterErr := resolveSportFilter(c.Query("sport"))
+	pipeline, overallStatus := a.pipelineView(c.Context(), sportFilter)
+
+	view := map[string]any{
 		"Title":         "Pipeline Health",
 		"ActiveNav":     "pipeline",
 		"OverallStatus": overallStatus,
 		"Environment":   a.cfg.Env,
 		"Pipeline":      pipeline,
 		"Status":        overallStatus,
-	}, "layouts/base")
+	}
+	applySportFilterView(view, "/pipeline/health", sportFilter)
+	if filterErr != nil {
+		view["Alert"] = map[string]any{
+			"Title":   "Invalid sport filter",
+			"Message": filterErr.Error(),
+		}
+		return c.Status(fiber.StatusBadRequest).Render("pages/pipeline_health", view, "layouts/base")
+	}
+
+	return c.Render("pages/pipeline_health", view, "layouts/base")
 }
 
 func (a *App) handleHealth(c fiber.Ctx) error {
@@ -171,6 +221,16 @@ func (a *App) handleHealth(c fiber.Ctx) error {
 		statusCode = fiber.StatusServiceUnavailable
 		response["status"] = "degraded"
 		response["database"] = err.Error()
+	}
+
+	if !a.oddsPollingEnabled {
+		reason := a.oddsPollingDisabledReason
+		if reason == "" {
+			reason = "disabled"
+		}
+		response["worker"] = "odds-poll-disabled"
+		response["odds_polling_reason"] = reason
+		return c.Status(statusCode).JSON(response)
 	}
 
 	run, err := a.queries.GetLatestPollRun(c.Context())
@@ -199,31 +259,57 @@ func (a *App) handleHealth(c fiber.Ctx) error {
 	return c.Status(statusCode).JSON(response)
 }
 
-func (a *App) pipelineView(ctx context.Context) (map[string]any, string) {
+func (a *App) pipelineView(ctx context.Context, sportFilter sportFilterSelection) (map[string]any, string) {
+	summary := map[string]any{
+		"ScopeSportLabel":     sportFilter.Label,
+		"ScopeSnapshotsCount": "0",
+		"ScopeLastSnapshotAt": "pending",
+		"ScopeError":          "none",
+	}
+
+	oddsSummary, err := a.queries.GetOddsArchiveSummary(ctx, sportFilter.storeParam())
+	if err != nil {
+		summary["ScopeError"] = err.Error()
+	} else {
+		summary["ScopeSnapshotsCount"] = fmt.Sprintf("%d", oddsSummary.SnapshotsCount)
+		summary["ScopeLastSnapshotAt"] = formatTimestamp(oddsSummary.LastSnapshotAt, "pending")
+	}
+
+	if !a.oddsPollingEnabled {
+		reason := a.oddsPollingDisabledReason
+		if reason == "" {
+			reason = "disabled"
+		}
+		summary["Status"] = "disabled"
+		summary["LastSuccessAt"] = "disabled"
+		summary["InsertCount"] = "0"
+		summary["DedupCount"] = "0"
+		summary["LastStartedAt"] = "disabled"
+		summary["Duration"] = "n/a"
+		summary["LastError"] = "odds polling disabled (" + reason + ")"
+		return summary, "ok"
+	}
+
 	run, err := a.queries.GetLatestPollRun(ctx)
 	if err != nil {
 		if store.IsNoRows(err) {
-			pending := map[string]any{
-				"Status":        "warming",
-				"LastSuccessAt": "pending",
-				"InsertCount":   "0",
-				"DedupCount":    "0",
-				"LastStartedAt": "pending",
-				"Duration":      "n/a",
-				"LastError":     "none",
-			}
-			return pending, "warming"
+			summary["Status"] = "warming"
+			summary["LastSuccessAt"] = "pending"
+			summary["InsertCount"] = "0"
+			summary["DedupCount"] = "0"
+			summary["LastStartedAt"] = "pending"
+			summary["Duration"] = "n/a"
+			summary["LastError"] = "none"
+			return summary, "warming"
 		}
-		degraded := map[string]any{
-			"Status":        "degraded",
-			"LastSuccessAt": "pending",
-			"InsertCount":   "0",
-			"DedupCount":    "0",
-			"LastStartedAt": "pending",
-			"Duration":      "n/a",
-			"LastError":     err.Error(),
-		}
-		return degraded, "degraded"
+		summary["Status"] = "degraded"
+		summary["LastSuccessAt"] = "pending"
+		summary["InsertCount"] = "0"
+		summary["DedupCount"] = "0"
+		summary["LastStartedAt"] = "pending"
+		summary["Duration"] = "n/a"
+		summary["LastError"] = err.Error()
+		return summary, "degraded"
 	}
 
 	overall := run.Status
@@ -242,25 +328,20 @@ func (a *App) pipelineView(ctx context.Context) (map[string]any, string) {
 		lastStartedAt = run.StartedAt.Time.UTC().Format(time.RFC3339)
 	}
 
-	return map[string]any{
-		"Status":        overall,
-		"LastSuccessAt": lastSuccess,
-		"InsertCount":   fmt.Sprintf("%d", run.InsertsCount),
-		"DedupCount":    fmt.Sprintf("%d", run.DedupSkips),
-		"LastStartedAt": lastStartedAt,
-		"Duration":      duration,
-		"LastError":     emptyAsNone(run.ErrorText),
-	}, overall
+	summary["Status"] = overall
+	summary["LastSuccessAt"] = lastSuccess
+	summary["InsertCount"] = fmt.Sprintf("%d", run.InsertsCount)
+	summary["DedupCount"] = fmt.Sprintf("%d", run.DedupSkips)
+	summary["LastStartedAt"] = lastStartedAt
+	summary["Duration"] = duration
+	summary["LastError"] = emptyAsNone(run.ErrorText)
+	return summary, overall
 }
 
 func emptyAsNone(value string) string {
 	if value == "" {
 		return "none"
 	}
-	return value
-}
-
-func first(value map[string]any, _ string) map[string]any {
 	return value
 }
 

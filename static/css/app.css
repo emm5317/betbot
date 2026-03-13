@@ -233,6 +233,11 @@ body::before {
     gap: 16px;
 }
 
+.panel__header--dense {
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
 .checklist__item {
     padding-left: 18px;
     border-left: 2px solid rgba(255, 143, 63, 0.28);
@@ -244,6 +249,54 @@ body::before {
 
 .route-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filter-form {
+    display: grid;
+    gap: 8px;
+    min-width: min(100%, 320px);
+}
+
+.filter-form__label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.filter-form__controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-form__select,
+.filter-form__submit,
+.filter-form__clear {
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--panel-strong);
+    color: var(--text);
+    font: inherit;
+}
+
+.filter-form__select {
+    min-width: 210px;
+    padding: 9px 12px;
+}
+
+.filter-form__submit,
+.filter-form__clear {
+    padding: 9px 12px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.filter-form__submit {
+    background: rgba(255, 143, 63, 0.16);
+    border-color: rgba(255, 143, 63, 0.3);
 }
 
 .table-shell {
@@ -287,7 +340,7 @@ body::before {
 
 .detail-strip {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 14px;
     padding: 16px 18px;
     border-radius: var(--radius-md);
@@ -305,6 +358,10 @@ body::before {
     border-radius: var(--radius-md);
     border: 1px solid rgba(255, 214, 107, 0.22);
     background: rgba(255, 214, 107, 0.08);
+}
+
+.alert-banner p {
+    margin: 8px 0 0;
 }
 
 @media (max-width: 980px) {
@@ -335,3 +392,4 @@ body::before {
         flex-wrap: wrap;
     }
 }
+

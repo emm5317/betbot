@@ -25,10 +25,12 @@ const (
 	defaultOddsAPIDateFmt   = "iso"
 	defaultOddsAPITimeout   = 10 * time.Second
 	defaultOddsPollInterval = 5 * time.Minute
+	defaultOddsPollingOn    = true
 	defaultOddsRateLimit    = 750 * time.Millisecond
 	defaultOddsSource       = "the-odds-api"
 	defaultRiverSchema      = "public"
 	defaultRecentPollWindow = 20 * time.Minute
+	oddsAPIKeyPlaceholder   = "TODO_SET_BETBOT_ODDS_API_KEY"
 )
 
 type Config struct {
@@ -49,6 +51,7 @@ type Config struct {
 	OddsAPIOddsFormat   string
 	OddsAPIDateFormat   string
 	OddsAPITimeout      time.Duration
+	OddsPollingEnabled  bool
 	OddsAPIPollInterval time.Duration
 	OddsAPIRateLimit    time.Duration
 	OddsAPISource       string
@@ -85,6 +88,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	oddsPollingEnabled, err := getBool("BETBOT_ODDS_POLLING_ENABLED", defaultOddsPollingOn)
+	if err != nil {
+		return Config{}, err
+	}
 	recentPollWindow, err := getDuration("BETBOT_RECENT_POLL_WINDOW", defaultRecentPollWindow)
 	if err != nil {
 		return Config{}, err
@@ -116,6 +123,7 @@ func Load() (Config, error) {
 		OddsAPIOddsFormat:   getenv("BETBOT_ODDS_API_ODDS_FORMAT", defaultOddsAPIOddsFmt),
 		OddsAPIDateFormat:   getenv("BETBOT_ODDS_API_DATE_FORMAT", defaultOddsAPIDateFmt),
 		OddsAPITimeout:      oddsTimeout,
+		OddsPollingEnabled:  oddsPollingEnabled,
 		OddsAPIPollInterval: pollInterval,
 		OddsAPIRateLimit:    rateLimit,
 		OddsAPISource:       getenv("BETBOT_ODDS_API_SOURCE", defaultOddsSource),
@@ -131,6 +139,20 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func (c Config) OddsPollingRuntime() (bool, string) {
+	if !c.OddsPollingEnabled {
+		return false, "disabled-by-config"
+	}
+	if IsUnresolvedOddsAPIKey(c.OddsAPIKey) {
+		return false, "unresolved-placeholder-api-key"
+	}
+	return true, ""
+}
+
+func IsUnresolvedOddsAPIKey(apiKey string) bool {
+	return strings.EqualFold(strings.TrimSpace(apiKey), oddsAPIKeyPlaceholder)
 }
 
 func getenv(key string, fallback string) string {
@@ -159,6 +181,17 @@ func getInt32(key string, fallback int32) (int32, error) {
 			return 0, fmt.Errorf("%s: %w", key, err)
 		}
 		return int32(parsed), nil
+	}
+	return fallback, nil
+}
+
+func getBool(key string, fallback bool) (bool, error) {
+	if value := os.Getenv(key); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return false, fmt.Errorf("%s: %w", key, err)
+		}
+		return parsed, nil
 	}
 	return fallback, nil
 }

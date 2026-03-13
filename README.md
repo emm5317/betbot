@@ -185,6 +185,15 @@ docker compose -f deploy/docker/docker-compose.yml up -d --build
 go test ./...
 ```
 
+
+Local compose runs odds polling in explicit disabled mode so health is deterministic without a real Odds API key:
+
+```bash
+BETBOT_ODDS_POLLING_ENABLED=false
+BETBOT_ODDS_API_KEY=TODO_SET_BETBOT_ODDS_API_KEY
+```
+
+Set `BETBOT_ODDS_POLLING_ENABLED=true` and provide a real `BETBOT_ODDS_API_KEY` when you want live odds ingestion.
 If you are upgrading an older local Docker volume from PostgreSQL 16, recreate that local database volume before starting the PostgreSQL 17 container. The old data directory is not compatible with PostgreSQL 17.
 
 To run the Postgres-backed integration package explicitly:
@@ -198,6 +207,27 @@ Current entrypoints:
 - `cmd/server`
 - `cmd/worker`
 - `cmd/backtest`
+
+### Operator sport filters (read views)
+
+Read views accept an optional `sport` query parameter for operator scoping. If omitted, views stay in all-sports mode.
+
+Examples:
+
+- `GET /odds`
+- `GET /odds?sport=baseball_mlb`
+- `GET /pipeline/health`
+- `GET /pipeline/health?sport=icehockey_nhl`
+- `GET /?sport=americanfootball_nfl`
+
+Allowed `sport` values are exactly:
+
+- `baseball_mlb`
+- `basketball_nba`
+- `icehockey_nhl`
+- `americanfootball_nfl`
+
+Invalid sport filters return `HTTP 400` and render an explicit operator-facing error message.
 
 ## Documentation
 
@@ -288,7 +318,6 @@ This repository is for infrastructure, analytics, and research. Sports betting l
 ## Keywords
 
 Open-source sports betting bot, sports betting analytics, sports betting tracker, odds tracking, closing line value, CLV tracker, expected value betting, Kelly Criterion bankroll management, sportsbook odds history, line shopping, sports betting backtesting, MLB betting model, NBA betting model, NHL betting model, NFL betting model, Go sports betting project, PostgreSQL odds database.
-
 
 
 
