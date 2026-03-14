@@ -2,8 +2,8 @@
 
 Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸️ DEFERRED`
 
-**Last updated:** 2026-03-13
-**Current phase:** Phase 2 — Sport Foundation
+**Last updated:** 2026-03-14
+**Current phase:** Phase 3 — Baseline Models and Backtesting
 
 ---
 
@@ -28,8 +28,13 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - First-pass weather ingestion now persists explicit game-linked MLB and NFL weather snapshots via Open-Meteo plus in-repo venue metadata; roof handling is now policy-driven across outdoor, fixed indoor, and retractable-unknown branches, with explicit date-bounded venue exceptions for Athletics naming variants
 - Deterministic local weather smoke harness now exists for MLB/NFL roof-policy coverage, including River enqueue/completion checks and idempotent rerun assertions
 - Documentation is now aligned to the four-sport direction: `MLB`, `NBA`, `NHL`, `NFL`
+- `model_predictions` persistence is now live with manifest-backed stable feature indexing (`feature_vector` ordering guaranteed by `internal/modeling/features` manifests)
+- `cmd/backtest` now runs an end-to-end deterministic replay from stored odds, persists model outputs, and emits `pipeline_report.json` plus `outcomes.csv` artifacts
+- Walk-forward validation and CLV/calibration reporting are now emitted together in one pipeline output
+- NHL and NFL Phase 3 baseline model packages are now implemented with bounded-output unit coverage
+- Sport-specific Kelly defaults are now explicit policy values for MLB/NBA/NHL/NFL and are wired into replay stake recommendations plus decision sizing defaults
 
-The current implementation target is intentionally narrower than the full product architecture. Phase 2 is now extending that ingestion slice into tightly scoped sport-specific ETL foundations before broader modeling breadth.
+The current implementation target is now early Phase 4 decision-engine implementation, with execution still explicitly deferred to later phases.
 
 ---
 
@@ -117,20 +122,20 @@ Goal: build sport-specific baseline models and validate them offline before any 
 |----|------|--------|----------|-------|
 | P3-001 | Build MLB pitcher matchup model | ✅ DONE | P0 | Added validated baseline predictor in `internal/modeling/mlb` with starter + team context outputs for full-game moneyline/total and first-five side/total orientation (done 2026-03-13) |
 | P3-002 | Build NBA lineup-adjusted net rating model | ✅ DONE | P0 | Added validated baseline predictor in `internal/modeling/nba` with lineup-availability net-rating adjustments plus margin/total, win, and spread-cover outputs (done 2026-03-13) |
-| P3-003 | Build NHL xG plus goalie model | ⬜ TODO | P1 | PDO regression support |
-| P3-004 | Build NFL EPA/DVOA situational model | ⬜ TODO | P1 | Key-number awareness required |
+| P3-003 | Build NHL xG plus goalie model | ✅ DONE | P1 | Added `internal/modeling/nhl` xG+goalie baseline with explicit PDO-regression pressure, bounded probability outputs, and unit validation coverage (done 2026-03-14) |
+| P3-004 | Build NFL EPA/DVOA situational model | ✅ DONE | P1 | Added `internal/modeling/nfl` EPA/DVOA situational baseline with key-number-aware spread-cover adjustment, wind handling, and unit validation coverage (done 2026-03-14) |
 | P3-005 | Implement sport-specific feature builders | ✅ DONE | P0 | Added deterministic shared builder contract + registry in `internal/modeling/features` with validated MLB/NBA/NHL/NFL feature builders covering market priors, team quality, situational, injury/weather, and sport-specific contexts (done 2026-03-13) |
-| P3-006 | Implement model persistence in `model_predictions` | 🔵 IN PROGRESS | P0 | Version and feature vector storage; 2026-03-13 added explicit feature-manifest v1 support in `internal/modeling/features` for stable ordering/index compatibility ahead of persistence binding |
-| P3-007 | Build backtesting CLI | ⬜ TODO | P0 | Replay against stored odds |
-| P3-008 | Add walk-forward validation | 🔵 IN PROGRESS | P0 | Prevent look-ahead bias; 2026-03-13 added deterministic walk-forward split + validation scaffolding for offline feature-scale calibration |
-| P3-009 | Add CLV and calibration reporting | 🔵 IN PROGRESS | P0 | Sport-aware reporting cadence; 2026-03-13 added offline calibration artifact diagnostics (log loss/Brier/calibration error) without live config mutation |
-| P3-010 | Add sport-specific Kelly defaults | ⬜ TODO | P1 | Variance-aware bankroll policy |
+| P3-006 | Implement model persistence in `model_predictions` | ✅ DONE | P0 | Added migration `015_create_model_predictions_v2`, sqlc prediction queries, and `internal/modeling.PersistPrediction` manifest-backed vector encoding/persistence wiring (done 2026-03-14) |
+| P3-007 | Build backtesting CLI | ✅ DONE | P0 | Implemented `cmd/backtest` and `internal/backtest` deterministic replay pipeline consuming stored odds snapshots, dispatching baseline models, persisting predictions, and writing JSON/CSV artifacts (done 2026-03-14) |
+| P3-008 | Add walk-forward validation | ✅ DONE | P0 | Backtest pipeline now emits deterministic no-look-ahead walk-forward folds over replay outcomes with per-fold CLV/calibration metrics (done 2026-03-14) |
+| P3-009 | Add CLV and calibration reporting | ✅ DONE | P0 | Backtest pipeline now emits unified CLV + calibration reports and per-sport calibration artifacts from one run output (`pipeline_report.json` + `outcomes.csv`) (done 2026-03-14) |
+| P3-010 | Add sport-specific Kelly defaults | ✅ DONE | P1 | Added explicit MLB/NBA/NHL/NFL Kelly + per-bet cap defaults, wired into backtest virtual bankroll and shared decision sizing with deterministic bounds coverage (done 2026-03-14) |
 
 Phase 3 exit criteria:
 
 - each prioritized sport has a baseline model
 - backtests run on historical data without leakage
-- calibration and CLV reporting are available for review
+- calibration and CLV reporting are available for review in a single replay artifact output
 
 ---
 
@@ -176,6 +181,11 @@ Goal: validate edge with constrained capital and iterate safely.
 | P6-003 | Add sharper odds sources where justified | ⬜ TODO | P1 | Pinnacle, OddsJam, OpticOdds evaluation |
 | P6-004 | Introduce ML sidecar where baseline models plateau | ⬜ TODO | P1 | Only after measurement is solid |
 | P6-005 | Expand sport-specific prop models | ⬜ TODO | P2 | After game-market process is stable |
+
+
+
+
+
 
 
 

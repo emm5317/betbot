@@ -96,6 +96,25 @@ type MlbTeamStat struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ModelPrediction struct {
+	ID                   int64              `json:"id"`
+	GameID               int64              `json:"game_id"`
+	Source               string             `json:"source"`
+	Sport                string             `json:"sport"`
+	BookKey              string             `json:"book_key"`
+	MarketKey            string             `json:"market_key"`
+	ModelFamily          string             `json:"model_family"`
+	ModelVersion         string             `json:"model_version"`
+	ManifestVersion      string             `json:"manifest_version"`
+	FeatureVector        []float64          `json:"feature_vector"`
+	PredictedProbability float64            `json:"predicted_probability"`
+	MarketProbability    float64            `json:"market_probability"`
+	ClosingProbability   *float64           `json:"closing_probability"`
+	EventTime            pgtype.Timestamptz `json:"event_time"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+}
+
 type NbaTeamStat struct {
 	ID              int64              `json:"id"`
 	Source          string             `json:"source"`

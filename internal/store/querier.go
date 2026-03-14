@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	CompletePollRun(ctx context.Context, arg CompletePollRunParams) error
+	CountModelPredictions(ctx context.Context) (int64, error)
 	CountOddsHistoryRows(ctx context.Context) (int64, error)
 	GetBankrollBalanceCents(ctx context.Context) (int64, error)
 	GetDashboardSummary(ctx context.Context) (GetDashboardSummaryRow, error)
@@ -19,13 +20,16 @@ type Querier interface {
 	InsertBankrollEntry(ctx context.Context, arg InsertBankrollEntryParams) (BankrollLedger, error)
 	InsertOddsSnapshot(ctx context.Context, arg InsertOddsSnapshotParams) (OddsHistory, error)
 	InsertPollRun(ctx context.Context, arg InsertPollRunParams) (PollRun, error)
+	ListBacktestReplayRows(ctx context.Context, arg ListBacktestReplayRowsParams) ([]ListBacktestReplayRowsRow, error)
 	ListLatestOdds(ctx context.Context, arg ListLatestOddsParams) ([]ListLatestOddsRow, error)
+	ListModelPredictionsForSportSeason(ctx context.Context, arg ListModelPredictionsForSportSeasonParams) ([]ModelPrediction, error)
 	ListUpcomingGames(ctx context.Context, limit int32) ([]Game, error)
 	ListUpcomingWeatherGames(ctx context.Context, arg ListUpcomingWeatherGamesParams) ([]Game, error)
 	UpsertGame(ctx context.Context, arg UpsertGameParams) (Game, error)
 	UpsertGameWeatherSnapshot(ctx context.Context, arg UpsertGameWeatherSnapshotParams) error
 	UpsertMLBPitcherStats(ctx context.Context, arg UpsertMLBPitcherStatsParams) error
 	UpsertMLBTeamStats(ctx context.Context, arg UpsertMLBTeamStatsParams) error
+	UpsertModelPrediction(ctx context.Context, arg UpsertModelPredictionParams) (ModelPrediction, error)
 	UpsertNBATeamStats(ctx context.Context, arg UpsertNBATeamStatsParams) error
 	UpsertNFLTeamStats(ctx context.Context, arg UpsertNFLTeamStatsParams) error
 	UpsertNHLTeamStats(ctx context.Context, arg UpsertNHLTeamStatsParams) error
