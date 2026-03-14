@@ -8,6 +8,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("BETBOT_DATABASE_URL", "")
 	t.Setenv("BETBOT_DB_CONNECT_TIMEOUT", "")
 	t.Setenv("BETBOT_ODDS_POLLING_ENABLED", "")
+	t.Setenv("BETBOT_EV_THRESHOLD", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -46,6 +47,10 @@ func TestLoadDefaults(t *testing.T) {
 		t.Fatalf("OddsPollingEnabled = %t, want true", cfg.OddsPollingEnabled)
 	}
 
+	if cfg.EVThreshold != defaultEVThreshold {
+		t.Fatalf("EVThreshold = %.3f, want %.3f", cfg.EVThreshold, defaultEVThreshold)
+	}
+
 	if len(cfg.OddsAPISports) != 4 {
 		t.Fatalf("OddsAPISports len = %d, want 4", len(cfg.OddsAPISports))
 	}
@@ -69,6 +74,26 @@ func TestLoadOddsPollingEnabledInvalid(t *testing.T) {
 
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() expected error for invalid BETBOT_ODDS_POLLING_ENABLED")
+	}
+}
+
+func TestLoadEVThresholdOverride(t *testing.T) {
+	t.Setenv("BETBOT_EV_THRESHOLD", "0.035")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.EVThreshold != 0.035 {
+		t.Fatalf("EVThreshold = %.3f, want 0.035", cfg.EVThreshold)
+	}
+}
+
+func TestLoadEVThresholdInvalid(t *testing.T) {
+	t.Setenv("BETBOT_EV_THRESHOLD", "0")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() expected error for invalid BETBOT_EV_THRESHOLD")
 	}
 }
 

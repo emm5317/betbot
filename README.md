@@ -72,6 +72,7 @@ The repository is still early-stage. What exists today:
 - walk-forward validation plus unified CLV/calibration reporting in one pipeline output
 - NHL xG + goalie and NFL EPA/DVOA situational baseline model packages with unit test coverage
 - sport-specific Kelly baseline defaults (MLB/NBA/NHL/NFL) wired into replay stake recommendations and shared decision sizing
+- decision-engine EV threshold filter with sport-aware defaults and pass/fail gating for candidate evaluation
 
 What is built now:
 
@@ -83,7 +84,7 @@ What is built now:
 - minimal Fiber operational views for health and current odds
 - sport-aware registry and active-season polling policy
 
-The current open build step is Phase 4 decision-engine implementation (`P4-001` onward).
+The current open build step is Phase 4 decision-engine implementation (`P4-002` onward).
 
 ## Roadmap
 
@@ -324,6 +325,7 @@ This repository is for infrastructure, analytics, and research. Sports betting l
 ## Keywords
 
 Open-source sports betting bot, sports betting analytics, sports betting tracker, odds tracking, closing line value, CLV tracker, expected value betting, Kelly Criterion bankroll management, sportsbook odds history, line shopping, sports betting backtesting, MLB betting model, NBA betting model, NHL betting model, NFL betting model, Go sports betting project, PostgreSQL odds database.
+
 
 
 

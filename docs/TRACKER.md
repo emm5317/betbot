@@ -3,7 +3,7 @@
 Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸️ DEFERRED`
 
 **Last updated:** 2026-03-14
-**Current phase:** Phase 3 — Baseline Models and Backtesting
+**Current phase:** Phase 4 — Decision Engine
 
 ---
 
@@ -145,7 +145,7 @@ Goal: turn model output into risk-checked bet tickets.
 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
-| P4-001 | Implement EV threshold filter | ⬜ TODO | P0 | Shared rule, sport-aware tuning |
+| P4-001 | Implement EV threshold filter | ✅ DONE | P0 | Shared rule with sport-aware defaults, override support, and decision-engine filter wiring (done 2026-03-14) |
 | P4-002 | Implement line shopping | ⬜ TODO | P0 | Best available odds across books |
 | P4-003 | Implement Kelly sizer | ⬜ TODO | P0 | Fractional and capped |
 | P4-004 | Implement bankroll availability checks | ⬜ TODO | P0 | Ledger-backed |
@@ -181,6 +181,7 @@ Goal: validate edge with constrained capital and iterate safely.
 | P6-003 | Add sharper odds sources where justified | ⬜ TODO | P1 | Pinnacle, OddsJam, OpticOdds evaluation |
 | P6-004 | Introduce ML sidecar where baseline models plateau | ⬜ TODO | P1 | Only after measurement is solid |
 | P6-005 | Expand sport-specific prop models | ⬜ TODO | P2 | After game-market process is stable |
+
 
 
 

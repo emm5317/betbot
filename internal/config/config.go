@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ const (
 	defaultOddsSource       = "the-odds-api"
 	defaultRiverSchema      = "public"
 	defaultRecentPollWindow = 20 * time.Minute
+	defaultEVThreshold      = 0.02
 	oddsAPIKeyPlaceholder   = "TODO_SET_BETBOT_ODDS_API_KEY"
 )
 
@@ -57,6 +59,7 @@ type Config struct {
 	OddsAPISource       string
 	RiverSchema         string
 	RecentPollWindow    time.Duration
+	EVThreshold         float64
 }
 
 func Load() (Config, error) {
@@ -96,6 +99,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	evThreshold, err := getFloat64("BETBOT_EV_THRESHOLD", defaultEVThreshold)
+	if err != nil {
+		return Config{}, err
+	}
 	maxConns, err := getInt32("BETBOT_DB_MAX_CONNS", defaultDBMaxConns)
 	if err != nil {
 		return Config{}, err
@@ -129,6 +136,7 @@ func Load() (Config, error) {
 		OddsAPISource:       getenv("BETBOT_ODDS_API_SOURCE", defaultOddsSource),
 		RiverSchema:         getenv("BETBOT_RIVER_SCHEMA", defaultRiverSchema),
 		RecentPollWindow:    recentPollWindow,
+		EVThreshold:         evThreshold,
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -136,6 +144,9 @@ func Load() (Config, error) {
 	}
 	if cfg.DBMinConns < 0 || cfg.DBMaxConns < 1 || cfg.DBMinConns > cfg.DBMaxConns {
 		return Config{}, errors.New("invalid pgxpool bounds")
+	}
+	if math.IsNaN(cfg.EVThreshold) || math.IsInf(cfg.EVThreshold, 0) || cfg.EVThreshold <= 0 || cfg.EVThreshold > 1 {
+		return Config{}, errors.New("BETBOT_EV_THRESHOLD must be finite in (0,1]")
 	}
 
 	return cfg, nil
@@ -190,6 +201,17 @@ func getBool(key string, fallback bool) (bool, error) {
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
 			return false, fmt.Errorf("%s: %w", key, err)
+		}
+		return parsed, nil
+	}
+	return fallback, nil
+}
+
+func getFloat64(key string, fallback float64) (float64, error) {
+	if value := os.Getenv(key); value != "" {
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err != nil {
+			return 0, fmt.Errorf("%s: %w", key, err)
 		}
 		return parsed, nil
 	}
