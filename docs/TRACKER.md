@@ -119,7 +119,7 @@ Goal: build sport-specific baseline models and validate them offline before any 
 | P3-002 | Build NBA lineup-adjusted net rating model | ✅ DONE | P0 | Added validated baseline predictor in `internal/modeling/nba` with lineup-availability net-rating adjustments plus margin/total, win, and spread-cover outputs (done 2026-03-13) |
 | P3-003 | Build NHL xG plus goalie model | ⬜ TODO | P1 | PDO regression support |
 | P3-004 | Build NFL EPA/DVOA situational model | ⬜ TODO | P1 | Key-number awareness required |
-| P3-005 | Implement sport-specific feature builders | ⬜ TODO | P0 | Shared interface, specialized inputs |
+| P3-005 | Implement sport-specific feature builders | ✅ DONE | P0 | Added deterministic shared builder contract + registry in `internal/modeling/features` with validated MLB/NBA/NHL/NFL feature builders covering market priors, team quality, situational, injury/weather, and sport-specific contexts (done 2026-03-13) |
 | P3-006 | Implement model persistence in `model_predictions` | ⬜ TODO | P0 | Version and feature vector storage |
 | P3-007 | Build backtesting CLI | ⬜ TODO | P0 | Replay against stored odds |
 | P3-008 | Add walk-forward validation | ⬜ TODO | P0 | Prevent look-ahead bias |
@@ -176,6 +176,7 @@ Goal: validate edge with constrained capital and iterate safely.
 | P6-003 | Add sharper odds sources where justified | ⬜ TODO | P1 | Pinnacle, OddsJam, OpticOdds evaluation |
 | P6-004 | Introduce ML sidecar where baseline models plateau | ⬜ TODO | P1 | Only after measurement is solid |
 | P6-005 | Expand sport-specific prop models | ⬜ TODO | P2 | After game-market process is stable |
+
 
 
 
