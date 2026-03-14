@@ -267,6 +267,20 @@ type PollRun struct {
 	ErrorText     string             `json:"error_text"`
 }
 
+type RecommendationOutcome struct {
+	ID                int64              `json:"id"`
+	SnapshotID        int64              `json:"snapshot_id"`
+	EvaluationStatus  string             `json:"evaluation_status"`
+	CloseAmericanOdds *int32             `json:"close_american_odds"`
+	CloseProbability  *float64           `json:"close_probability"`
+	RealizedResult    *string            `json:"realized_result"`
+	ClvDelta          *float64           `json:"clv_delta"`
+	SettledAt         pgtype.Timestamptz `json:"settled_at"`
+	Notes             string             `json:"notes"`
+	Metadata          json.RawMessage    `json:"metadata"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
 type RecommendationSnapshot struct {
 	ID                     int64              `json:"id"`
 	GeneratedAt            pgtype.Timestamptz `json:"generated_at"`

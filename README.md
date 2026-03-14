@@ -88,6 +88,8 @@ The current open build step is Phase 4 decision-engine implementation (`P4-002` 
 
 Recommendation mode is now available through `GET /recommendations` for ranked bet suggestions. This flow is recommendation-only and does not invoke live placement adapters.
 
+Recommendation performance monitoring is now available through `GET /recommendations/performance` for CLV/outcome audit rows plus aggregate operator summary metrics.
+
 ## Roadmap
 
 ### Phase 1: Data Foundation Vertical Slice
@@ -237,6 +239,20 @@ Allowed `sport` values are exactly:
 - `americanfootball_nfl`
 
 Invalid sport filters return `HTTP 400` and render an explicit operator-facing error message.
+
+### Recommendation endpoints (recommendation-only)
+
+Use the recommendation pull surface for ranked picks:
+
+- `GET /recommendations`
+- `GET /recommendations?sport=baseball_mlb&date=2026-03-16&limit=20`
+
+Use the performance surface for recommendation quality and CLV monitoring:
+
+- `GET /recommendations/performance`
+- `GET /recommendations/performance?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&limit=100`
+
+Performance rows are deterministic and include explicit status when close or result data is not yet available (`close_unavailable`, `pending_outcome`, `settled`).
 
 ## Documentation
 

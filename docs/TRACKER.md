@@ -34,6 +34,7 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - NHL and NFL Phase 3 baseline model packages are now implemented with bounded-output unit coverage
 - Sport-specific Kelly defaults are now explicit policy values for MLB/NBA/NHL/NFL and are wired into replay stake recommendations plus decision sizing defaults
 - Recommendation-only decision surface is now live via `GET /recommendations`, with ranked best-bet suggestions built from EV thresholding, line shopping, Kelly sizing, and ledger-backed bankroll checks, plus append-only recommendation snapshots for audit replay
+- Recommendation monitoring is now live via `GET /recommendations/performance`, with append-only `recommendation_outcomes` persistence, CLV delta capture against close, explicit unavailable/pending/settled statusing, and operator summary metrics (count, avg edge, avg CLV, bankroll pass rate, settled count)
 
 The current implementation target is now early Phase 4 decision-engine implementation, with execution still explicitly deferred to later phases.
 
@@ -154,6 +155,7 @@ Goal: turn model output into risk-checked bet tickets.
 | P4-006 | Implement circuit breakers | ⬜ TODO | P0 | Daily, weekly, drawdown |
 | P4-007 | Build decision-engine integration tests | ⬜ TODO | P1 | Prediction to ticket flow |
 | P4-008 | Build recommendation-only best-bets pull surface | ✅ DONE | P0 | Added `GET /recommendations` with sport/date/limit filters, ranked decision assembly, and append-only `recommendation_snapshots` persistence (done 2026-03-14) |
+| P4-009 | Add recommendation performance + CLV monitoring surface | ✅ DONE | P0 | Added append-only `recommendation_outcomes`, pure CLV/outcome computation, and `GET /recommendations/performance` with filter validation, deterministic rows, and aggregate summary metrics (done 2026-03-14) |
 
 ---
 

@@ -24,7 +24,9 @@ type readQueries interface {
 	GetOddsArchiveSummary(ctx context.Context, sport *string) (store.GetOddsArchiveSummaryRow, error)
 	ListLatestOdds(ctx context.Context, arg store.ListLatestOddsParams) ([]store.ListLatestOddsRow, error)
 	ListModelPredictionsForSportSeason(ctx context.Context, arg store.ListModelPredictionsForSportSeasonParams) ([]store.ModelPrediction, error)
+	ListRecommendationPerformanceSnapshots(ctx context.Context, arg store.ListRecommendationPerformanceSnapshotsParams) ([]store.ListRecommendationPerformanceSnapshotsRow, error)
 	GetBankrollBalanceCents(ctx context.Context) (int64, error)
+	InsertRecommendationOutcomeIfChanged(ctx context.Context, arg store.InsertRecommendationOutcomeIfChangedParams) (int64, error)
 	InsertRecommendationSnapshot(ctx context.Context, arg store.InsertRecommendationSnapshotParams) (store.RecommendationSnapshot, error)
 }
 
@@ -109,6 +111,7 @@ func (a *App) routes() {
 	a.app.Get("/health", a.handleHealth)
 	a.app.Get("/odds", a.handleOdds)
 	a.app.Get("/recommendations", a.handleRecommendations)
+	a.app.Get("/recommendations/performance", a.handleRecommendationsPerformance)
 	a.app.Get("/pipeline/health", a.handlePipelineHealth)
 	a.app.Get("/partials/topbar-status", a.handlePartialTopbarStatus)
 	a.app.Get("/partials/pipeline-status", a.handlePartialPipelineStatus)

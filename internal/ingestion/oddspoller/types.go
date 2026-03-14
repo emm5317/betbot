@@ -13,6 +13,8 @@ type APIGame struct {
 	HomeTeam     string          `json:"home_team"`
 	AwayTeam     string          `json:"away_team"`
 	Bookmakers   []APIBookmaker  `json:"bookmakers"`
+	Completed    *bool           `json:"completed,omitempty"`
+	Scores       json.RawMessage `json:"scores,omitempty"`
 	Raw          json.RawMessage `json:"-"`
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,17 +17,23 @@ import (
 	"github.com/gofiber/fiber/v3"
 	html "github.com/gofiber/template/html/v2"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type fakeReadQueries struct {
 	listLatestOddsRows           []store.ListLatestOddsRow
 	listLatestOddsErr            error
 	listLatestOddsCalls          []store.ListLatestOddsParams
+	listPerformanceRows          []store.ListRecommendationPerformanceSnapshotsRow
+	listPerformanceErr           error
+	listPerformanceCalls         []store.ListRecommendationPerformanceSnapshotsParams
 	modelPredictionsBySport      map[string][]store.ModelPrediction
 	modelPredictionsCalls        []store.ListModelPredictionsForSportSeasonParams
 	modelPredictionsErr          error
 	bankrollBalanceCents         int64
 	bankrollBalanceErr           error
+	insertOutcomeCalls           []store.InsertRecommendationOutcomeIfChangedParams
+	insertOutcomeErr             error
 	insertSnapshotCalls          []store.InsertRecommendationSnapshotParams
 	insertSnapshotErr            error
 	latestPollRun                store.PollRun
@@ -73,11 +80,27 @@ func (f *fakeReadQueries) ListModelPredictionsForSportSeason(_ context.Context, 
 	return f.modelPredictionsBySport[arg.Sport], nil
 }
 
+func (f *fakeReadQueries) ListRecommendationPerformanceSnapshots(_ context.Context, arg store.ListRecommendationPerformanceSnapshotsParams) ([]store.ListRecommendationPerformanceSnapshotsRow, error) {
+	f.listPerformanceCalls = append(f.listPerformanceCalls, arg)
+	if f.listPerformanceErr != nil {
+		return nil, f.listPerformanceErr
+	}
+	return f.listPerformanceRows, nil
+}
+
 func (f *fakeReadQueries) GetBankrollBalanceCents(context.Context) (int64, error) {
 	if f.bankrollBalanceErr != nil {
 		return 0, f.bankrollBalanceErr
 	}
 	return f.bankrollBalanceCents, nil
+}
+
+func (f *fakeReadQueries) InsertRecommendationOutcomeIfChanged(_ context.Context, arg store.InsertRecommendationOutcomeIfChangedParams) (int64, error) {
+	f.insertOutcomeCalls = append(f.insertOutcomeCalls, arg)
+	if f.insertOutcomeErr != nil {
+		return 0, f.insertOutcomeErr
+	}
+	return 1, nil
 }
 
 func (f *fakeReadQueries) InsertRecommendationSnapshot(_ context.Context, arg store.InsertRecommendationSnapshotParams) (store.RecommendationSnapshot, error) {
@@ -412,6 +435,177 @@ func TestHandleRecommendationsReturnsServiceUnavailableWhenBankrollUnavailable(t
 	}
 	body := readBody(t, resp)
 	assertContains(t, body, "bankroll balance unavailable")
+}
+
+func TestHandleRecommendationsPerformanceReturnsRowsAndSummary(t *testing.T) {
+	queries := &fakeReadQueries{
+		listPerformanceRows: []store.ListRecommendationPerformanceSnapshotsRow{
+			{
+				SnapshotID:             701,
+				GeneratedAt:            store.Timestamptz(time.Date(2026, time.March, 14, 16, 0, 0, 0, time.UTC)),
+				Sport:                  "MLB",
+				GameID:                 77,
+				HomeTeam:               "Boston Red Sox",
+				AwayTeam:               "New York Yankees",
+				EventTime:              store.Timestamptz(time.Date(2026, time.March, 15, 1, 0, 0, 0, time.UTC)),
+				EventDate:              pgtype.Date{Time: time.Date(2026, time.March, 15, 0, 0, 0, 0, time.UTC), Valid: true},
+				MarketKey:              "h2h",
+				RecommendedSide:        "home",
+				BestBook:               "book-a",
+				BestAmericanOdds:       110,
+				ModelProbability:       0.58,
+				MarketProbability:      0.52,
+				Edge:                   0.06,
+				SuggestedStakeFraction: 0.02,
+				SuggestedStakeCents:    2000,
+				BankrollCheckPass:      true,
+				BankrollCheckReason:    "ok",
+				RankScore:              602.01,
+				SnapshotMetadata:       json.RawMessage(`{"mode":"recommendation-only"}`),
+				CloseLineID:            9001,
+				CloseAmericanOdds:      -105,
+				CloseProbability:       0.55,
+				CloseCapturedAt:        store.Timestamptz(time.Date(2026, time.March, 15, 4, 0, 0, 0, time.UTC)),
+				CloseRawJson:           json.RawMessage(`{"completed":true,"scores":[{"name":"Boston Red Sox","score":"5"},{"name":"New York Yankees","score":"2"}]}`),
+				PersistedOutcomeID:     0,
+				PersistedStatus:        "",
+				PersistedNotes:         "",
+				PersistedMetadata:      json.RawMessage(`{}`),
+				PersistedCreatedAt:     store.Timestamptz(time.Date(2026, time.March, 14, 16, 0, 0, 0, time.UTC)),
+			},
+			{
+				SnapshotID:             700,
+				GeneratedAt:            store.Timestamptz(time.Date(2026, time.March, 14, 15, 0, 0, 0, time.UTC)),
+				Sport:                  "MLB",
+				GameID:                 78,
+				HomeTeam:               "Chicago Cubs",
+				AwayTeam:               "St. Louis Cardinals",
+				EventTime:              store.Timestamptz(time.Date(2026, time.March, 15, 3, 0, 0, 0, time.UTC)),
+				EventDate:              pgtype.Date{Time: time.Date(2026, time.March, 15, 0, 0, 0, 0, time.UTC), Valid: true},
+				MarketKey:              "h2h",
+				RecommendedSide:        "away",
+				BestBook:               "book-b",
+				BestAmericanOdds:       118,
+				ModelProbability:       0.44,
+				MarketProbability:      0.49,
+				Edge:                   0.04,
+				SuggestedStakeFraction: 0.01,
+				SuggestedStakeCents:    1000,
+				BankrollCheckPass:      false,
+				BankrollCheckReason:    "insufficient_funds",
+				RankScore:              401.01,
+				SnapshotMetadata:       json.RawMessage(`{"mode":"recommendation-only"}`),
+				CloseLineID:            0,
+				CloseAmericanOdds:      0,
+				CloseProbability:       0,
+				CloseCapturedAt:        store.Timestamptz(time.Date(2026, time.March, 15, 3, 0, 0, 0, time.UTC)),
+				CloseRawJson:           json.RawMessage(`{}`),
+				PersistedOutcomeID:     0,
+				PersistedStatus:        "",
+				PersistedNotes:         "",
+				PersistedMetadata:      json.RawMessage(`{}`),
+				PersistedCreatedAt:     store.Timestamptz(time.Date(2026, time.March, 14, 15, 0, 0, 0, time.UTC)),
+			},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations/performance?sport=baseball_mlb&date_from=2026-03-10&date_to=2026-03-17&limit=2")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations/performance status = %d, want 200", resp.StatusCode)
+	}
+
+	var payload struct {
+		Rows    []map[string]any `json:"rows"`
+		Summary map[string]any   `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &payload); err != nil {
+		t.Fatalf("decode recommendations/performance: %v", err)
+	}
+	if len(payload.Rows) != 2 {
+		t.Fatalf("len(rows) = %d, want 2", len(payload.Rows))
+	}
+
+	if got := int(payload.Rows[0]["snapshot_id"].(float64)); got != 701 {
+		t.Fatalf("rows[0].snapshot_id = %d, want 701", got)
+	}
+	if got := payload.Rows[0]["status"].(string); got != "settled" {
+		t.Fatalf("rows[0].status = %q, want settled", got)
+	}
+	if got := payload.Rows[0]["realized_result"].(string); got != "win" {
+		t.Fatalf("rows[0].realized_result = %q, want win", got)
+	}
+	if got := payload.Rows[1]["status"].(string); got != "close_unavailable" {
+		t.Fatalf("rows[1].status = %q, want close_unavailable", got)
+	}
+
+	if got := int(payload.Summary["count"].(float64)); got != 2 {
+		t.Fatalf("summary.count = %d, want 2", got)
+	}
+	if got := int(payload.Summary["settled_count"].(float64)); got != 1 {
+		t.Fatalf("summary.settled_count = %d, want 1", got)
+	}
+	if got := payload.Summary["avg_clv"].(float64); math.Abs(got-0.03) > 1e-9 {
+		t.Fatalf("summary.avg_clv = %.6f, want 0.03", got)
+	}
+
+	if len(queries.listPerformanceCalls) != 1 {
+		t.Fatalf("ListRecommendationPerformanceSnapshots call count = %d, want 1", len(queries.listPerformanceCalls))
+	}
+	call := queries.listPerformanceCalls[0]
+	if call.Sport == nil || *call.Sport != "MLB" {
+		t.Fatalf("list performance sport = %v, want MLB", call.Sport)
+	}
+	if !call.DateFrom.Valid || call.DateFrom.Time.Format("2006-01-02") != "2026-03-10" {
+		t.Fatalf("date_from = %+v, want 2026-03-10", call.DateFrom)
+	}
+	if !call.DateTo.Valid || call.DateTo.Time.Format("2006-01-02") != "2026-03-17" {
+		t.Fatalf("date_to = %+v, want 2026-03-17", call.DateTo)
+	}
+	if call.RowLimit != 2 {
+		t.Fatalf("row_limit = %d, want 2", call.RowLimit)
+	}
+
+	if len(queries.insertOutcomeCalls) != 2 {
+		t.Fatalf("InsertRecommendationOutcomeIfChanged call count = %d, want 2", len(queries.insertOutcomeCalls))
+	}
+	firstResult := queries.insertOutcomeCalls[0].RealizedResult
+	if firstResult == nil || *firstResult != "win" {
+		t.Fatalf("first realized_result = %v, want win", firstResult)
+	}
+	if queries.insertOutcomeCalls[1].RealizedResult != nil {
+		t.Fatalf("second realized_result = %v, want nil", queries.insertOutcomeCalls[1].RealizedResult)
+	}
+}
+
+func TestHandleRecommendationsPerformanceRejectsInvalidDate(t *testing.T) {
+	app := newTestServerApp(t, &fakeReadQueries{})
+
+	resp := doRequest(t, app.app, "/recommendations/performance?date_from=03-10-2026")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /recommendations/performance invalid date status = %d, want 400", resp.StatusCode)
+	}
+	assertContains(t, readBody(t, resp), "expected YYYY-MM-DD")
+}
+
+func TestHandleRecommendationsPerformanceRejectsInvalidDateRange(t *testing.T) {
+	app := newTestServerApp(t, &fakeReadQueries{})
+
+	resp := doRequest(t, app.app, "/recommendations/performance?date_from=2026-03-20&date_to=2026-03-10")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /recommendations/performance invalid date range status = %d, want 400", resp.StatusCode)
+	}
+	assertContains(t, readBody(t, resp), "date_from")
+}
+
+func TestHandleRecommendationsPerformanceRejectsInvalidLimit(t *testing.T) {
+	app := newTestServerApp(t, &fakeReadQueries{})
+
+	resp := doRequest(t, app.app, "/recommendations/performance?limit=0")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /recommendations/performance invalid limit status = %d, want 400", resp.StatusCode)
+	}
+	assertContains(t, readBody(t, resp), "expected integer in [1,500]")
 }
 
 func newTestServerApp(t *testing.T, queries readQueries) *App {
