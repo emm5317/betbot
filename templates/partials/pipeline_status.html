@@ -1,9 +1,10 @@
 {{$pipeline := .Pipeline}}
-<div class="status-grid">
+{{$status := or $pipeline.Status .Status .OverallStatus "warming"}}
+<div class="status-grid" data-status="{{$status}}">
     <article class="status-card">
         <span class="status-card__label">Overall</span>
-        <strong class="status-card__value">{{or $pipeline.Status .Status .OverallStatus "warming"}}</strong>
-        <p class="status-card__hint">Readiness should include both DB access and worker health.</p>
+        <strong class="status-card__value status-card__value--status">{{$status}}</strong>
+        <p class="status-card__hint">Readiness includes DB access and worker health posture.</p>
     </article>
     <article class="status-card">
         <span class="status-card__label">Last Success</span>
@@ -18,17 +19,17 @@
     <article class="status-card">
         <span class="status-card__label">Dedup Skips</span>
         <strong class="status-card__value">{{or $pipeline.DedupCount .DedupCount .DedupSkips "0"}}</strong>
-        <p class="status-card__hint">Unchanged market rows prevented from bloating the archive.</p>
+        <p class="status-card__hint">Unchanged market rows skipped to protect archive quality.</p>
     </article>
     <article class="status-card">
         <span class="status-card__label">Sport Scope</span>
         <strong class="status-card__value">{{or $pipeline.ScopeSportLabel .SelectedSportLabel "All sports"}}</strong>
-        <p class="status-card__hint">Scope applies only to archive metrics shown below.</p>
+        <p class="status-card__hint">Scope applies to archive metrics shown below.</p>
     </article>
     <article class="status-card">
         <span class="status-card__label">Scoped Snapshots</span>
         <strong class="status-card__value">{{or $pipeline.ScopeSnapshotsCount "0"}}</strong>
-        <p class="status-card__hint">Odds rows in the append-only archive for the selected sport.</p>
+        <p class="status-card__hint">Odds rows in the append-only archive for current scope.</p>
     </article>
 </div>
 
@@ -47,11 +48,10 @@
     </div>
     <div>
         <span class="detail-strip__label">Last Error</span>
-        <strong>{{or $pipeline.LastError .LastError "none"}}</strong>
+        <strong class="detail-strip__value-break">{{or $pipeline.LastError .LastError "none"}}</strong>
     </div>
     <div>
         <span class="detail-strip__label">Scope Query Error</span>
-        <strong>{{or $pipeline.ScopeError "none"}}</strong>
+        <strong class="detail-strip__value-break">{{or $pipeline.ScopeError "none"}}</strong>
     </div>
 </div>
-

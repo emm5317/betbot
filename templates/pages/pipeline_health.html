@@ -5,7 +5,7 @@
         <p class="eyebrow">Pipeline Health</p>
         <h2>Last poll status and ingestion pressure</h2>
         <p class="page-header__lede">
-            Operators should be able to see success, staleness, and the shape of the last run without reading worker logs first.
+            Monitor success, staleness, and ingestion shape without reading worker logs first.
         </p>
     </div>
     <div class="page-header__meta">
@@ -23,5 +23,5 @@
         </div>
         {{template "partials/sport_filter" .}}
     </div>
-    {{template "partials/pipeline_status" .}}
+    {{template "partials/pipeline_status_block" .}}
 </section>

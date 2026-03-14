@@ -115,9 +115,7 @@ func TestHandleOddsWithInvalidSportFilterReturnsBadRequest(t *testing.T) {
 		t.Fatalf("ListLatestOdds call count = %d, want 0", len(queries.listLatestOddsCalls))
 	}
 	body := readBody(t, resp)
-	if !strings.Contains(body, "invalid sport filter") {
-		t.Fatalf("invalid filter response missing explicit error text: %q", body)
-	}
+	assertContains(t, body, "invalid sport filter")
 }
 
 func TestHandlePipelineHealthSportFilterScopesSummary(t *testing.T) {
@@ -162,6 +160,114 @@ func TestHandleHomeSportFilterScopesSummary(t *testing.T) {
 	}
 }
 
+func TestPartialPipelineStatusValidSportFilter(t *testing.T) {
+	queries := &fakeReadQueries{
+		latestPollRunErr:      pgx.ErrNoRows,
+		oddsArchiveSummary:    store.GetOddsArchiveSummaryRow{},
+		oddsArchiveSummaryErr: nil,
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/partials/pipeline-status?sport=icehockey_nhl")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /partials/pipeline-status?sport=icehockey_nhl status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if len(queries.oddsArchiveSummarySportCalls) == 0 {
+		t.Fatal("GetOddsArchiveSummary was not called")
+	}
+	got := queries.oddsArchiveSummarySportCalls[0]
+	if got == nil || *got != "NHL" {
+		t.Fatalf("GetOddsArchiveSummary sport = %v, want NHL", got)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "id=\"pipeline-status-block\"")
+}
+
+func TestPartialPipelineStatusInvalidSportFilterReturnsBadRequest(t *testing.T) {
+	queries := &fakeReadQueries{latestPollRunErr: pgx.ErrNoRows}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/partials/pipeline-status?sport=soccer_epl")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /partials/pipeline-status?sport=soccer_epl status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "invalid sport filter")
+}
+
+func TestPartialOddsTableValidSportFilter(t *testing.T) {
+	queries := &fakeReadQueries{listLatestOddsRows: []store.ListLatestOddsRow{}}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/partials/odds-table?sport=baseball_mlb")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /partials/odds-table?sport=baseball_mlb status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if len(queries.listLatestOddsCalls) != 1 {
+		t.Fatalf("ListLatestOdds call count = %d, want 1", len(queries.listLatestOddsCalls))
+	}
+	sport := queries.listLatestOddsCalls[0].Sport
+	if sport == nil || *sport != "MLB" {
+		t.Fatalf("ListLatestOdds sport = %v, want MLB", sport)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "id=\"odds-table-block\"")
+}
+
+func TestPartialOddsTableInvalidSportFilterReturnsBadRequest(t *testing.T) {
+	queries := &fakeReadQueries{listLatestOddsRows: []store.ListLatestOddsRow{}}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/partials/odds-table?sport=soccer_epl")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /partials/odds-table?sport=soccer_epl status = %d, want %d", resp.StatusCode, http.StatusBadRequest)
+	}
+	if len(queries.listLatestOddsCalls) != 0 {
+		t.Fatalf("ListLatestOdds call count = %d, want 0", len(queries.listLatestOddsCalls))
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "invalid sport filter")
+}
+
+func TestPartialTopbarStatusRendersLiveFragment(t *testing.T) {
+	queries := &fakeReadQueries{latestPollRunErr: pgx.ErrNoRows}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/partials/topbar-status?sport=basketball_nba")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /partials/topbar-status?sport=basketball_nba status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "id=\"topbar-status-region\"")
+	assertContains(t, body, "/partials/topbar-status?sport=basketball_nba")
+}
+
+func TestOverviewPageContainsHTMXRefreshTargets(t *testing.T) {
+	queries := &fakeReadQueries{latestPollRunErr: pgx.ErrNoRows}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/?sport=basketball_nba")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /?sport=basketball_nba status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "/partials/topbar-status?sport=basketball_nba")
+	assertContains(t, body, "/partials/pipeline-status?sport=basketball_nba")
+}
+
+func TestOddsPageContainsHTMXRefreshTargets(t *testing.T) {
+	queries := &fakeReadQueries{latestPollRunErr: pgx.ErrNoRows}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/odds?sport=americanfootball_nfl")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /odds?sport=americanfootball_nfl status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "/partials/topbar-status?sport=americanfootball_nfl")
+	assertContains(t, body, "/partials/odds-table?sport=americanfootball_nfl")
+}
+
 func newTestServerApp(t *testing.T, queries readQueries) *App {
 	t.Helper()
 	engine := html.New("../../templates", ".html")
@@ -203,4 +309,11 @@ func cloneStringPtr(value *string) *string {
 	}
 	cloned := *value
 	return &cloned
+}
+
+func assertContains(t *testing.T, body, substring string) {
+	t.Helper()
+	if !strings.Contains(body, substring) {
+		t.Fatalf("response body missing %q: %q", substring, body)
+	}
 }

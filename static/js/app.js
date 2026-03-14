@@ -26,10 +26,10 @@
         return seconds >= 0 ? `in ${days}d` : `${days}d ago`;
     };
 
-    const syncTimestamps = () => {
-        document.querySelectorAll('.timestamp[data-timestamp]').forEach((node) => {
+    const syncTimestamps = (scope = document) => {
+        scope.querySelectorAll('.timestamp[data-timestamp]').forEach((node) => {
             const raw = node.getAttribute('data-timestamp');
-            if (!raw || raw === '-' || raw === 'pending') {
+            if (!raw || raw === '-' || raw === 'pending' || raw === 'disabled') {
                 return;
             }
 
@@ -38,8 +38,29 @@
         });
     };
 
+    const installHTMXHooks = () => {
+        if (!window.htmx || !document.body) {
+            return;
+        }
+
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+            if (event?.detail?.target) {
+                syncTimestamps(event.detail.target);
+            }
+        });
+
+        document.body.addEventListener('htmx:responseError', (event) => {
+            const target = event?.detail?.target;
+            if (!target) {
+                return;
+            }
+            target.classList.add('live-fragment--error');
+        });
+    };
+
     document.addEventListener('DOMContentLoaded', () => {
         syncTimestamps();
-        window.setInterval(syncTimestamps, 30000);
+        installHTMXHooks();
+        window.setInterval(() => syncTimestamps(), 30000);
     });
 })();

@@ -1,5 +1,5 @@
 {{with .Alert}}
-    <div class="alert-banner">
+    <div class="alert-banner" role="alert" aria-live="assertive">
         <strong>{{or .Title "Operator note"}}</strong>
         <p>{{or .Message "No additional alerts."}}</p>
     </div>

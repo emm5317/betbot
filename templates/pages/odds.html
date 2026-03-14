@@ -5,7 +5,7 @@
         <p class="eyebrow">Odds Archive</p>
         <h2>Latest persisted market view</h2>
         <p class="page-header__lede">
-            This page should reflect the most recent stored rows from the append-only archive, not a best-effort frontend cache.
+            Read from storage only. This table is the current persisted snapshot of market rows.
         </p>
     </div>
     <div class="page-header__meta">
@@ -19,9 +19,9 @@
         <div>
             <p class="eyebrow">Operational Read</p>
             <h3>Book and market rows</h3>
-            <span class="panel__caption">Most recent snapshots by market identity</span>
+            <span class="panel__caption">Auto-refreshes every 25s with current scope.</span>
         </div>
         {{template "partials/sport_filter" .}}
     </div>
-    {{template "partials/odds_table" .}}
+    {{template "partials/odds_table_block" .}}
 </section>

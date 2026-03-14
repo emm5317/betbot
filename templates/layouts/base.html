@@ -6,33 +6,32 @@
     <title>{{if .Title}}{{.Title}} · {{end}}betbot</title>
     <meta name="description" content="betbot operational surface for Phase 1 odds ingestion and pipeline visibility.">
     <link rel="stylesheet" href="/static/css/app.css">
+    <script defer src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script defer src="/static/js/app.js"></script>
 </head>
 <body>
+    <a class="skip-link" href="#workspace">Skip to workspace</a>
     <div class="app-shell">
         <div class="chrome">
             <header class="topbar">
                 <div class="topbar__brand">
                     <a class="brand-mark" href="/">bb</a>
                     <div>
-                        <p class="eyebrow">Phase 1 Operational UI</p>
+                        <p class="eyebrow">Ops UI v1</p>
                         <h1 class="brand-title">betbot</h1>
                     </div>
                 </div>
 
                 <nav class="topbar__nav" aria-label="Primary">
-                    <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/">Overview</a>
-                    <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds">Odds</a>
-                    <a class="nav-link {{if eq .ActiveNav "pipeline"}}is-active{{end}}" href="/pipeline/health">Pipeline</a>
+                    <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/{{.SelectedSportQuery}}">Overview</a>
+                    <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds{{.SelectedSportQuery}}">Odds</a>
+                    <a class="nav-link {{if eq .ActiveNav "pipeline"}}is-active{{end}}" href="/pipeline/health{{.SelectedSportQuery}}">Pipeline</a>
                 </nav>
 
-                <div class="topbar__meta">
-                    <span class="status-pill status-pill--{{if eq .OverallStatus "ok"}}good{{else}}warn{{end}}">{{or .OverallStatus "warming"}}</span>
-                    <span class="runtime-chip">{{or .Environment "development"}}</span>
-                </div>
+                {{template "partials/topbar_status" .}}
             </header>
 
-            <main class="workspace">
+            <main id="workspace" class="workspace">
                 {{embed}}
             </main>
         </div>

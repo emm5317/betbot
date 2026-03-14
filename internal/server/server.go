@@ -106,6 +106,9 @@ func (a *App) routes() {
 	a.app.Get("/health", a.handleHealth)
 	a.app.Get("/odds", a.handleOdds)
 	a.app.Get("/pipeline/health", a.handlePipelineHealth)
+	a.app.Get("/partials/topbar-status", a.handlePartialTopbarStatus)
+	a.app.Get("/partials/pipeline-status", a.handlePartialPipelineStatus)
+	a.app.Get("/partials/odds-table", a.handlePartialOddsTable)
 }
 
 func (a *App) handleHome(c fiber.Ctx) error {
@@ -120,6 +123,7 @@ func (a *App) handleHome(c fiber.Ctx) error {
 		"WorkerStatus":  overallStatus,
 		"Pipeline":      pipeline,
 		"Status":        overallStatus,
+		"PageStatus":    overallStatus,
 	}
 	applySportFilterView(view, "/", sportFilter)
 	if filterErr != nil {
@@ -142,8 +146,9 @@ func (a *App) handleOdds(c fiber.Ctx) error {
 		"ActiveNav":     "odds",
 		"OverallStatus": overallStatus,
 		"Environment":   a.cfg.Env,
-		"Rows":          []map[string]any{},
+		"OddsRows":      []map[string]any{},
 		"Status":        overallStatus,
+		"PageStatus":    overallStatus,
 	}
 	applySportFilterView(view, "/odds", sportFilter)
 	if filterErr != nil {
@@ -162,24 +167,7 @@ func (a *App) handleOdds(c fiber.Ctx) error {
 		return err
 	}
 
-	oddsRows := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		oddsRows = append(oddsRows, map[string]any{
-			"Sport":         row.Sport,
-			"HomeTeam":      row.HomeTeam,
-			"AwayTeam":      row.AwayTeam,
-			"Book":          row.BookName,
-			"BookKey":       row.BookKey,
-			"Market":        row.MarketName,
-			"MarketKey":     row.MarketKey,
-			"Outcome":       row.OutcomeName,
-			"Side":          row.OutcomeSide,
-			"Point":         row.Point,
-			"PriceAmerican": row.PriceAmerican,
-			"CapturedAt":    formatTimestamp(row.CapturedAt, "pending"),
-		})
-	}
-	view["Rows"] = oddsRows
+	view["OddsRows"] = mapLatestOddsRows(rows)
 	return c.Render("pages/odds", view, "layouts/base")
 }
 
@@ -194,6 +182,7 @@ func (a *App) handlePipelineHealth(c fiber.Ctx) error {
 		"Environment":   a.cfg.Env,
 		"Pipeline":      pipeline,
 		"Status":        overallStatus,
+		"PageStatus":    overallStatus,
 	}
 	applySportFilterView(view, "/pipeline/health", sportFilter)
 	if filterErr != nil {
@@ -205,6 +194,75 @@ func (a *App) handlePipelineHealth(c fiber.Ctx) error {
 	}
 
 	return c.Render("pages/pipeline_health", view, "layouts/base")
+}
+
+func (a *App) handlePartialTopbarStatus(c fiber.Ctx) error {
+	sportFilter, filterErr := resolveSportFilter(c.Query("sport"))
+	_, overallStatus := a.pipelineView(c.Context(), sportFilter)
+
+	view := map[string]any{
+		"OverallStatus": overallStatus,
+		"Environment":   a.cfg.Env,
+		"Status":        overallStatus,
+		"PageStatus":    overallStatus,
+	}
+	applySportFilterView(view, c.Path(), sportFilter)
+	if filterErr != nil {
+		view["Alert"] = map[string]any{
+			"Title":   "Invalid sport filter",
+			"Message": filterErr.Error(),
+		}
+		return c.Status(fiber.StatusBadRequest).Render("partials/fragment_error", view)
+	}
+
+	return c.Render("partials/topbar_status", view)
+}
+
+func (a *App) handlePartialPipelineStatus(c fiber.Ctx) error {
+	sportFilter, filterErr := resolveSportFilter(c.Query("sport"))
+	pipeline, overallStatus := a.pipelineView(c.Context(), sportFilter)
+
+	view := map[string]any{
+		"Pipeline":      pipeline,
+		"OverallStatus": overallStatus,
+		"Status":        overallStatus,
+	}
+	applySportFilterView(view, c.Path(), sportFilter)
+	if filterErr != nil {
+		view["Alert"] = map[string]any{
+			"Title":   "Invalid sport filter",
+			"Message": filterErr.Error(),
+		}
+		return c.Status(fiber.StatusBadRequest).Render("partials/fragment_error", view)
+	}
+
+	return c.Render("partials/pipeline_status_block", view)
+}
+
+func (a *App) handlePartialOddsTable(c fiber.Ctx) error {
+	sportFilter, filterErr := resolveSportFilter(c.Query("sport"))
+	view := map[string]any{
+		"OddsRows": []map[string]any{},
+	}
+	applySportFilterView(view, c.Path(), sportFilter)
+	if filterErr != nil {
+		view["Alert"] = map[string]any{
+			"Title":   "Invalid sport filter",
+			"Message": filterErr.Error(),
+		}
+		return c.Status(fiber.StatusBadRequest).Render("partials/fragment_error", view)
+	}
+
+	rows, err := a.queries.ListLatestOdds(c.Context(), store.ListLatestOddsParams{
+		RowLimit: 200,
+		Sport:    sportFilter.storeParam(),
+	})
+	if err != nil {
+		return err
+	}
+
+	view["OddsRows"] = mapLatestOddsRows(rows)
+	return c.Render("partials/odds_table_block", view)
 }
 
 func (a *App) handleHealth(c fiber.Ctx) error {
@@ -343,6 +401,27 @@ func emptyAsNone(value string) string {
 		return "none"
 	}
 	return value
+}
+
+func mapLatestOddsRows(rows []store.ListLatestOddsRow) []map[string]any {
+	oddsRows := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		oddsRows = append(oddsRows, map[string]any{
+			"Sport":         row.Sport,
+			"HomeTeam":      row.HomeTeam,
+			"AwayTeam":      row.AwayTeam,
+			"Book":          row.BookName,
+			"BookKey":       row.BookKey,
+			"Market":        row.MarketName,
+			"MarketKey":     row.MarketKey,
+			"Outcome":       row.OutcomeName,
+			"Side":          row.OutcomeSide,
+			"Point":         row.Point,
+			"PriceAmerican": row.PriceAmerican,
+			"CapturedAt":    formatTimestamp(row.CapturedAt, "pending"),
+		})
+	}
+	return oddsRows
 }
 
 func formatTimestamp(value pgtype.Timestamptz, empty string) string {
