@@ -35,6 +35,9 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Sport-specific Kelly defaults are now explicit policy values for MLB/NBA/NHL/NFL and are wired into replay stake recommendations plus decision sizing defaults
 - Recommendation-only decision surface is now live via `GET /recommendations`, with ranked best-bet suggestions built from EV thresholding, line shopping, Kelly sizing, and ledger-backed bankroll checks, plus append-only recommendation snapshots for audit replay
 - Recommendation monitoring is now live via `GET /recommendations/performance`, with append-only `recommendation_outcomes` persistence, CLV delta capture against close, explicit unavailable/pending/settled statusing, and operator summary metrics (count, avg edge, avg CLV, bankroll pass rate, settled count)
+- Recommendation calibration monitoring is now live via `GET /recommendations/calibration`, with deterministic rank-percentile buckets, settled/excluded accounting, per-bucket observed vs expected win rates, Brier scores, mean CLV, and overall ECE (done 2026-03-14)
+- Recommendation calibration drift alerting is now live via `GET /recommendations/calibration/alerts`, with sport-scoped baseline/current window comparison, minimum-sample guardrails, deterministic alert reason ordering, and per-bucket calibration-gap/Brier deltas (done 2026-03-14)
+- Recommendation calibration drift history and rolling trend visibility are now live via `GET /recommendations/calibration/alerts/history` plus rolling mode on `GET /recommendations/calibration/alerts`, with append-only alert-run persistence, deterministic trend ordering, and auditable per-step metadata (done 2026-03-14)
 
 The current implementation target is now early Phase 4 decision-engine implementation, with execution still explicitly deferred to later phases.
 
@@ -156,6 +159,9 @@ Goal: turn model output into risk-checked bet tickets.
 | P4-007 | Build decision-engine integration tests | ⬜ TODO | P1 | Prediction to ticket flow |
 | P4-008 | Build recommendation-only best-bets pull surface | ✅ DONE | P0 | Added `GET /recommendations` with sport/date/limit filters, ranked decision assembly, and append-only `recommendation_snapshots` persistence (done 2026-03-14) |
 | P4-009 | Add recommendation performance + CLV monitoring surface | ✅ DONE | P0 | Added append-only `recommendation_outcomes`, pure CLV/outcome computation, and `GET /recommendations/performance` with filter validation, deterministic rows, and aggregate summary metrics (done 2026-03-14) |
+| P4-010 | Add recommendation calibration monitoring by sport + rank bucket | ✅ DONE | P0 | Added `GET /recommendations/calibration` with filter echo, deterministic rank-percentile bucketing (1..20), settled/excluded handling, per-bucket observed/expected rates, calibration gap, Brier, mean CLV, plus overall observed/expected, Brier, and ECE summary metrics (done 2026-03-14) |
+| P4-011 | Add recommendation calibration drift alerts with sample guardrails | ✅ DONE | P0 | Added `GET /recommendations/calibration/alerts` with current vs baseline windows, configurable thresholds, minimum settled overall/per-bucket guardrails, deterministic reason ordering, and per-bucket delta metrics (done 2026-03-14) |
+| P4-012 | Add calibration drift history and rolling trend windows | ✅ DONE | P0 | Added append-only `recommendation_calibration_alert_runs` persistence, `GET /recommendations/calibration/alerts/history`, and `mode=rolling` support on `GET /recommendations/calibration/alerts` with deterministic per-step trend rows and persisted run metadata (done 2026-03-14) |
 
 ---
 

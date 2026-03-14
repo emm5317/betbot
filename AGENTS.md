@@ -18,7 +18,7 @@ betbot is a five-layer pipeline system: Data Ingestion → Postgres Data Store �
 |-------|-----------|
 | Language | Go 1.24.x (current repo baseline) |
 | HTTP | Target: Fiber v3 (`gofiber/fiber/v3`) |
-| Database | Target: PostgreSQL 17; local dev currently uses Postgres 16 Alpine |
+| Database | Target: PostgreSQL 17; local dev uses Postgres 17 |
 | SQL | sqlc (`sqlc-dev/sqlc`) — all queries are generated, never hand-written Go SQL |
 | Job Queue | River (`riverqueue/river`) |
 | Numerics | gonum (`gonum/gonum`) for Elo, regression, probability |
@@ -40,7 +40,7 @@ These values are the current repo baseline and should stay aligned with the actu
 | In-container app port | `8080` |
 | Local health endpoint | `GET /health` |
 | Local compose file | `deploy/docker/docker-compose.yml` |
-| Current bootstrap server | Minimal `net/http` health service until Fiber dashboard work lands |
+| Current server | Fiber v3 operational + recommendation-only API surface (`/recommendations`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`) |
 
 ---
 
@@ -56,7 +56,7 @@ betbot/
     domain/         → core types: Game, Odds, Bet, Bankroll, Prediction
     ingestion/      → odds poller, stats ETL, injury scraper
     modeling/       → EV calc, Elo system, feature engineering
-    decision/       → Kelly sizer, correlation guard, bankroll manager
+    decision/       → recommendation-only decision logic, calibration, drift alerts, rolling trends
     execution/      → book adapters, placement, idempotency, audit
     store/          → sqlc-generated queries (DO NOT EDIT GENERATED FILES)
   proto/            → gRPC .proto definitions for Python sidecar
@@ -120,12 +120,13 @@ These rules are **never** violated. If a change would break an invariant, stop a
 5. **`odds_history` is append-only.** Never UPDATE or DELETE. Always INSERT. This table is the source of truth for backtesting.
 6. **Raw JSON is stored alongside normalized data.** Every API response is preserved verbatim for reprocessing.
 7. **Timestamps use database-side `NOW()`.** Not application time. NTP-synced workers, but Postgres is canonical.
+8. **Calibration alert run history is append-only.** `recommendation_calibration_alert_runs` is INSERT-only audit history for drift evaluations; no UPDATE/DELETE overwrite path.
 
 ### Modeling Discipline
 
-8. **No model touches real capital without backtesting.** The backtest CLI must validate any model against historical odds data before the model is eligible for live execution.
-9. **CLV is the primary performance metric.** Win/loss record over small samples is noise. Track CLV over 500+ bets.
-10. **Calibration is monitored.** If a model says 60%, it must win ~60% of the time on holdout data. Miscalibrated models are disabled.
+9. **No model touches real capital without backtesting.** The backtest CLI must validate any model against historical odds data before the model is eligible for live execution.
+10. **CLV is the primary performance metric.** Win/loss record over small samples is noise. Track CLV over 500+ bets.
+11. **Calibration is monitored.** If a model says 60%, it must win ~60% of the time on holdout data. Miscalibrated models are disabled.
 
 ---
 

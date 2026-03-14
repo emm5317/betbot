@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "WebFetch(domain:the-odds-api.com)",
+      "Bash(go run:*)"
+    ]
+  }
+}

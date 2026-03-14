@@ -115,6 +115,57 @@ type ModelPrediction struct {
 	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 }
 
+type MoneypuckGoalieGame struct {
+	ID               int64              `json:"id"`
+	Season           int32              `json:"season"`
+	GameID           string             `json:"game_id"`
+	PlayerID         string             `json:"player_id"`
+	Name             string             `json:"name"`
+	Team             string             `json:"team"`
+	Opponent         string             `json:"opponent"`
+	HomeOrAway       string             `json:"home_or_away"`
+	GameDate         pgtype.Date        `json:"game_date"`
+	Situation        string             `json:"situation"`
+	Icetime          *float64           `json:"icetime"`
+	Xgoals           *float64           `json:"xgoals"`
+	Goals            *float64           `json:"goals"`
+	Gsax             *float64           `json:"gsax"`
+	ShotsAgainst     *float64           `json:"shots_against"`
+	HighDangerXgoals *float64           `json:"high_danger_xgoals"`
+	HighDangerGoals  *float64           `json:"high_danger_goals"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type MoneypuckTeamGame struct {
+	ID                              int64              `json:"id"`
+	Season                          int32              `json:"season"`
+	GameID                          string             `json:"game_id"`
+	Team                            string             `json:"team"`
+	Opponent                        string             `json:"opponent"`
+	HomeOrAway                      string             `json:"home_or_away"`
+	GameDate                        pgtype.Date        `json:"game_date"`
+	Situation                       string             `json:"situation"`
+	IsPlayoff                       bool               `json:"is_playoff"`
+	XgoalsPercentage                *float64           `json:"xgoals_percentage"`
+	XgoalsFor                       *float64           `json:"xgoals_for"`
+	XgoalsAgainst                   *float64           `json:"xgoals_against"`
+	ScoreVenueAdjustedXgoalsFor     *float64           `json:"score_venue_adjusted_xgoals_for"`
+	ScoreVenueAdjustedXgoalsAgainst *float64           `json:"score_venue_adjusted_xgoals_against"`
+	CorsiPercentage                 *float64           `json:"corsi_percentage"`
+	FenwickPercentage               *float64           `json:"fenwick_percentage"`
+	ShotsOnGoalFor                  *float64           `json:"shots_on_goal_for"`
+	ShotsOnGoalAgainst              *float64           `json:"shots_on_goal_against"`
+	ShotAttemptsFor                 *float64           `json:"shot_attempts_for"`
+	ShotAttemptsAgainst             *float64           `json:"shot_attempts_against"`
+	HighDangerShotsFor              *float64           `json:"high_danger_shots_for"`
+	HighDangerShotsAgainst          *float64           `json:"high_danger_shots_against"`
+	HighDangerXgoalsFor             *float64           `json:"high_danger_xgoals_for"`
+	HighDangerXgoalsAgainst         *float64           `json:"high_danger_xgoals_against"`
+	GoalsFor                        *float64           `json:"goals_for"`
+	GoalsAgainst                    *float64           `json:"goals_against"`
+	CreatedAt                       pgtype.Timestamptz `json:"created_at"`
+}
+
 type NbaTeamStat struct {
 	ID              int64              `json:"id"`
 	Source          string             `json:"source"`
@@ -265,6 +316,44 @@ type PollRun struct {
 	InsertsCount  int32              `json:"inserts_count"`
 	DedupSkips    int32              `json:"dedup_skips"`
 	ErrorText     string             `json:"error_text"`
+}
+
+type RecommendationCalibrationAlertRun struct {
+	ID                          int64              `json:"id"`
+	Sport                       string             `json:"sport"`
+	RequestHash                 string             `json:"request_hash"`
+	RunGroupHash                string             `json:"run_group_hash"`
+	Mode                        string             `json:"mode"`
+	StepIndex                   int32              `json:"step_index"`
+	StepCount                   int32              `json:"step_count"`
+	WindowDays                  *int32             `json:"window_days"`
+	CurrentFrom                 pgtype.Date        `json:"current_from"`
+	CurrentTo                   pgtype.Date        `json:"current_to"`
+	BaselineFrom                pgtype.Date        `json:"baseline_from"`
+	BaselineTo                  pgtype.Date        `json:"baseline_to"`
+	BucketCount                 int32              `json:"bucket_count"`
+	RowLimit                    int32              `json:"row_limit"`
+	MinSettledOverall           int32              `json:"min_settled_overall"`
+	MinSettledPerBucket         int32              `json:"min_settled_per_bucket"`
+	WarnEceDelta                float64            `json:"warn_ece_delta"`
+	CriticalEceDelta            float64            `json:"critical_ece_delta"`
+	WarnBrierDelta              float64            `json:"warn_brier_delta"`
+	CriticalBrierDelta          float64            `json:"critical_brier_delta"`
+	AlertLevel                  string             `json:"alert_level"`
+	Reasons                     json.RawMessage    `json:"reasons"`
+	CurrentOverallEce           float64            `json:"current_overall_ece"`
+	BaselineOverallEce          float64            `json:"baseline_overall_ece"`
+	EceDelta                    float64            `json:"ece_delta"`
+	CurrentOverallBrier         float64            `json:"current_overall_brier"`
+	BaselineOverallBrier        float64            `json:"baseline_overall_brier"`
+	BrierDelta                  float64            `json:"brier_delta"`
+	CurrentSettledRows          int32              `json:"current_settled_rows"`
+	BaselineSettledRows         int32              `json:"baseline_settled_rows"`
+	InsufficientOverallWindows  int32              `json:"insufficient_overall_windows"`
+	CurrentInsufficientBuckets  int32              `json:"current_insufficient_buckets"`
+	BaselineInsufficientBuckets int32              `json:"baseline_insufficient_buckets"`
+	Payload                     []byte             `json:"payload"`
+	CreatedAt                   pgtype.Timestamptz `json:"created_at"`
 }
 
 type RecommendationOutcome struct {

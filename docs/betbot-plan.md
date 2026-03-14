@@ -9,7 +9,7 @@ March 2026
 
 betbot is a quantitative sports betting trading system specialized for `MLB`, `NBA`, `NHL`, and `NFL`. The product direction is no longer "generic multi-sport." Every major planning decision now assumes these four leagues are the core operating surface for data ingestion, modeling, scheduling, and execution.
 
-The immediate implementation goal is still narrow: finish the sport-foundation substrate after shipping the production-shaped Phase 1 data foundation. The repository now has a real Fiber operational surface, River-backed worker, `sqlc` store layer, and active-sport scheduling baseline. The roadmap below separates that current baseline from the target system so implementation work can proceed without doc drift.
+The immediate implementation goal is now to complete remaining Phase 4 risk controls while keeping execution deferred. The repository now has a real Fiber operational surface, River-backed worker, `sqlc` store layer, active-sport scheduling baseline, and recommendation-only monitoring endpoints including calibration drift rolling/history. The roadmap below separates that current baseline from the target system so implementation work can proceed without doc drift.
 
 ### Why These Four Sports
 
@@ -38,7 +38,8 @@ The immediate implementation goal is still narrow: finish the sport-foundation s
 | Queue | River-backed worker and periodic odds polling are live | River-backed workers and periodic jobs |
 | Odds ingestion | Continuous polling, normalization, dedup, and append-only storage are live | Broader source coverage and downstream ETL |
 | Sport support | `SportConfig` registry and season-aware odds polling are live | Explicitly specialized end-to-end for MLB/NBA/NHL/NFL |
-| Modeling | Placeholder packages | Sport-specific baseline models, then ML sidecar expansion |
+| Modeling | Sport-specific baseline models and backtest replay are live | Expanded model stack and ML sidecar |
+| Decision monitoring | Recommendation-only pull, calibration, and drift history/rolling are live | Full ticket controls and execution-ready handoff |
 
 This document is canonical for product direction and phase order. [ARCHITECTURE.md](ARCHITECTURE.md) carries the technical details, and [TRACKER.md](TRACKER.md) carries the executable work queue.
 
@@ -168,6 +169,9 @@ Build the shared specialization substrate:
 
 - EV thresholding
 - line shopping
+- recommendation pull + performance monitoring
+- calibration monitoring and drift alerting
+- append-only drift history and rolling trend windows
 - bankroll state machine
 - correlation controls
 - circuit breakers

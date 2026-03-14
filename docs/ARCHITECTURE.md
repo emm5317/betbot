@@ -6,18 +6,19 @@ Technical architecture for the four-sport `MLB` / `NBA` / `NHL` / `NFL` betbot s
 
 ## 1. Baseline and Scope
 
-The repository is still early-stage, but it is no longer just a scaffold. Phase 1 shipped the data-foundation slice, and early Phase 2 sport-foundation work is now live. Many parts of the system described here remain target architecture rather than shipped implementation.
+The repository is still early-stage, but it is no longer just a scaffold. Phases 1 through 3 are shipped, and early-to-mid Phase 4 recommendation-only decision work is now live. Many parts of the system described here remain target architecture rather than shipped implementation.
 
 ### Runtime Baseline vs Target
 
 | Concern | Current repo baseline | Target state |
 |--------|------------------------|--------------|
-| HTTP server | Fiber v3 operational server | Fiber v3 server with broader operational HTML and API routes |
+| HTTP server | Fiber v3 operational + recommendation monitoring server | Fiber v3 server with broader operational HTML and API routes |
 | Worker runtime | River-backed worker with periodic odds polling | River-backed worker process |
 | Database | PostgreSQL 17 with live Phase 1 migrations and partitions | PostgreSQL 17 with broader sport-specific schema |
 | DB access | `pgxpool` + `sqlc` store layer | `pgxpool` and `sqlc` as the standard path |
 | Odds ingestion | scheduled external polling, normalization, dedup, persistence | broader source coverage and downstream ETL |
-| Modeling | Placeholder packages | sport-specific model registry and feature builders |
+| Modeling | Sport-specific baseline model packages and backtest replay | sport-specific model registry, feature builders, and sidecar expansion |
+| Decision monitoring | Recommendation-only pull + calibration/drift monitoring with rolling/history | Full ticketing controls plus execution handoff |
 
 ### Architectural Invariants
 
@@ -45,8 +46,8 @@ The repository is still early-stage, but it is no longer just a scaffold. Phase 
                ▼                       ▼
 ┌──────────────────────────┐  ┌───────────────────────────────┐
 │      MODELING LAYER      │  │     FIBER READ SURFACE        │
-│  sport registry │ model  │  │  health │ odds │ diagnostics  │
-│  features       │ EV     │  │  pipeline status │ later UI    │
+│  sport registry │ model  │  │ health │ odds │ recommendations│
+│  features       │ EV     │  │ calibration │ drift alerts     │
 └──────────────┬───────────┘  └───────────────────────────────┘
                │
                ▼
@@ -62,7 +63,7 @@ The repository is still early-stage, but it is no longer just a scaffold. Phase 
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The shipped implementation covers the left edge of this diagram: DB foundation, odds ingestion, queue bootstrap, Fiber operational reads, and the first sport-aware scheduler policy. Sport-specific ETL, modeling, and execution layers remain later work.
+The shipped implementation now covers the full ingestion/storage baseline, sport ETL foundations, baseline modeling/backtest flow, and recommendation-only decision monitoring (`/recommendations*` + calibration drift history). Execution and live placement layers remain later work.
 
 ---
 
@@ -264,7 +265,7 @@ The system should not assume one calibration cadence or Kelly fraction across al
 
 ## 8. Layer 4: Decision Engine
 
-Later phases convert predictions into bet tickets through a shared pipeline:
+Later phases convert predictions into executable bet tickets through a shared pipeline:
 
 - EV threshold
 - line shopping
@@ -272,6 +273,14 @@ Later phases convert predictions into bet tickets through a shared pipeline:
 - correlation checks
 - bankroll checks
 - circuit breakers
+
+Current shipped decision-layer scope (recommendation-only):
+
+- ranked recommendation pull surface (`GET /recommendations`)
+- recommendation performance + CLV monitoring (`GET /recommendations/performance`)
+- calibration by rank bucket (`GET /recommendations/calibration`)
+- calibration drift alerts with sample guardrails (`GET /recommendations/calibration/alerts`)
+- rolling drift trend mode and append-only drift run history (`GET /recommendations/calibration/alerts?mode=rolling...`, `GET /recommendations/calibration/alerts/history`)
 
 Even though decision logic is shared, the inputs are sport-aware:
 
@@ -330,12 +339,17 @@ Documented server behavior:
 - readiness semantics that include DB and worker dependencies
 - middleware for logging, recovery, and later auth
 
-Phase 1 route surface:
+Current route surface includes:
 
 - `GET /`
 - `GET /health`
 - `GET /odds`
 - `GET /pipeline/health`
+- `GET /recommendations`
+- `GET /recommendations/performance`
+- `GET /recommendations/calibration`
+- `GET /recommendations/calibration/alerts`
+- `GET /recommendations/calibration/alerts/history`
 
 ---
 

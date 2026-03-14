@@ -30,11 +30,11 @@ betbot/
 
 | Area | Current truth | Intended shape |
 |------|---------------|----------------|
-| `cmd/server` | Fiber operational server with health and read views | Fiber app with health and operational views |
+| `cmd/server` | Fiber server with operational views plus recommendation-only monitoring APIs | Fiber app with health, operational views, and broader APIs |
 | `cmd/worker` | River-backed worker with scheduled odds polling | River-backed worker process |
 | `internal/store` | `sqlc`-generated access layer used by app code | `sqlc`-generated access layer used by all app code |
-| `internal/ingestion/*` | mostly placeholders | odds poller plus sport-specific ETL workers |
-| `internal/modeling/*` | placeholders | sport-specific feature builders and baseline models |
+| `internal/ingestion/*` | odds poller + first-pass sport/injury/weather ETL foundations | broader source coverage and ingestion depth |
+| `internal/modeling/*` | baseline sport models and replay/backtest wiring | deeper feature builders and model families |
 | `templates/` and `static/` | layout exists | minimal Phase 1 operational views, later richer dashboard |
 | `deploy/` | local runtime baseline exists | production-oriented app, worker, and ML deployment paths |
 
@@ -95,7 +95,7 @@ Direction:
 - `internal/decision`
 - `internal/execution`
 
-These remain later-phase packages. Their presence in the tree is not evidence of complete implementation.
+`internal/decision` is now partially live for recommendation-only flows (EV filtering, line shopping, calibration, drift alerts, rolling trend evaluation). `internal/execution` remains later-phase for live or paper ticket placement semantics.
 
 ### Store and Runtime Wiring
 
@@ -109,7 +109,7 @@ These remain later-phase packages. Their presence in the tree is not evidence of
 Intent:
 
 - `internal/store` is the `sqlc` output target
-- `internal/server` holds Fiber setup, routes, and handlers
+- `internal/server` holds Fiber setup, routes, and handlers (including recommendation and calibration drift monitoring endpoints)
 - `internal/worker` holds River client and scheduler wiring
 - `internal/config` owns `BETBOT_` configuration loading
 

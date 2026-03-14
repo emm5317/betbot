@@ -2,4 +2,221 @@ openapi: 3.1.0
 info:
   title: betbot API
   version: 0.0.0
-paths: {}
+paths:
+  /recommendations:
+    get:
+      summary: Recommendation-only best-bet pull surface
+      parameters:
+        - in: query
+          name: sport
+          schema:
+            type: string
+            enum: [baseball_mlb, basketball_nba, icehockey_nhl, americanfootball_nfl]
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Ranked recommendations
+        "400":
+          description: Invalid filter input
+  /recommendations/performance:
+    get:
+      summary: Recommendation performance and CLV monitoring
+      parameters:
+        - in: query
+          name: sport
+          schema:
+            type: string
+            enum: [baseball_mlb, basketball_nba, icehockey_nhl, americanfootball_nfl]
+        - in: query
+          name: date_from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: date_to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Performance rows and summary
+        "400":
+          description: Invalid filter input
+  /recommendations/calibration:
+    get:
+      summary: Recommendation calibration by rank bucket
+      parameters:
+        - in: query
+          name: sport
+          schema:
+            type: string
+            enum: [baseball_mlb, basketball_nba, icehockey_nhl, americanfootball_nfl]
+        - in: query
+          name: date_from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: date_to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: bucket_count
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Calibration summary and bucket rows
+        "400":
+          description: Invalid filter input
+  /recommendations/calibration/alerts:
+    get:
+      summary: Calibration drift alerts with point-in-time or rolling mode
+      parameters:
+        - in: query
+          name: sport
+          schema:
+            type: string
+            enum: [baseball_mlb, basketball_nba, icehockey_nhl, americanfootball_nfl]
+        - in: query
+          name: mode
+          schema:
+            type: string
+            enum: [point_in_time, rolling]
+            default: point_in_time
+        - in: query
+          name: current_from
+          schema:
+            type: string
+            format: date
+          description: point_in_time mode only
+        - in: query
+          name: current_to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: baseline_from
+          schema:
+            type: string
+            format: date
+          description: point_in_time mode only
+        - in: query
+          name: baseline_to
+          schema:
+            type: string
+            format: date
+          description: point_in_time mode only
+        - in: query
+          name: window_days
+          schema:
+            type: integer
+            minimum: 1
+          description: rolling mode only
+        - in: query
+          name: steps
+          schema:
+            type: integer
+            minimum: 1
+          description: rolling mode only
+        - in: query
+          name: bucket_count
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: min_settled_overall
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: min_settled_per_bucket
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: warn_ece_delta
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+        - in: query
+          name: critical_ece_delta
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+        - in: query
+          name: warn_brier_delta
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+        - in: query
+          name: critical_brier_delta
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+      responses:
+        "200":
+          description: Drift alert summary, bucket deltas, and optional rolling trend
+        "400":
+          description: Invalid filter input
+  /recommendations/calibration/alerts/history:
+    get:
+      summary: Append-only calibration drift alert run history
+      parameters:
+        - in: query
+          name: sport
+          schema:
+            type: string
+            enum: [baseball_mlb, basketball_nba, icehockey_nhl, americanfootball_nfl]
+        - in: query
+          name: date_from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: date_to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Newest-first drift alert run history rows (`created_at DESC, id DESC`)
+        "400":
+          description: Invalid filter input

@@ -73,6 +73,13 @@ The repository is still early-stage. What exists today:
 - NHL xG + goalie and NFL EPA/DVOA situational baseline model packages with unit test coverage
 - sport-specific Kelly baseline defaults (MLB/NBA/NHL/NFL) wired into replay stake recommendations and shared decision sizing
 - decision-engine EV threshold filter with sport-aware defaults and pass/fail gating for candidate evaluation
+- recommendation-only pull and monitoring API surface:
+  - `GET /recommendations`
+  - `GET /recommendations/performance`
+  - `GET /recommendations/calibration`
+  - `GET /recommendations/calibration/alerts`
+  - `GET /recommendations/calibration/alerts/history`
+- append-only recommendation calibration alert run persistence with deterministic rolling trend windows
 
 What is built now:
 
@@ -83,8 +90,9 @@ What is built now:
 - deduplicated market snapshots
 - minimal Fiber operational views for health and current odds
 - sport-aware registry and active-season polling policy
+- recommendation-only calibration/drift observability with append-only historical alert runs
 
-The current open build step is Phase 4 decision-engine implementation (`P4-002` onward).
+The current open build step is Phase 4 decision-engine implementation (`P4-003` onward), with execution still deferred.
 
 Recommendation mode is now available through `GET /recommendations` for ranked bet suggestions. This flow is recommendation-only and does not invoke live placement adapters.
 
@@ -253,6 +261,34 @@ Use the performance surface for recommendation quality and CLV monitoring:
 - `GET /recommendations/performance?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&limit=100`
 
 Performance rows are deterministic and include explicit status when close or result data is not yet available (`close_unavailable`, `pending_outcome`, `settled`).
+
+Use the calibration surface for confidence alignment checks by rank bucket:
+
+- `GET /recommendations/calibration`
+- `GET /recommendations/calibration?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&bucket_count=10&limit=500`
+
+Calibration supports `bucket_count` in `[1,20]` (default `10`) and reports filter echo, settled/excluded counts, per-bucket observed vs expected win rates, calibration gaps, Brier scores, and overall ECE.
+
+Use the drift-alert surface to compare current vs baseline calibration windows with sample guardrails:
+
+- `GET /recommendations/calibration/alerts`
+- `GET /recommendations/calibration/alerts?sport=baseball_mlb&current_from=2026-03-01&current_to=2026-03-14&baseline_from=2026-02-01&baseline_to=2026-02-14&bucket_count=10&min_settled_overall=100&min_settled_per_bucket=20`
+
+Alert levels are `ok`, `warn`, `critical`, or `insufficient_sample`, with deterministic reasons and per-bucket calibration-gap/Brier deltas.
+
+Use rolling mode on the same endpoint to evaluate deterministic multi-window drift trends:
+
+- `GET /recommendations/calibration/alerts?mode=rolling&sport=baseball_mlb&current_to=2026-03-14&window_days=7&steps=5&bucket_count=10&limit=500`
+- `GET /recommendations/calibration/alerts?mode=rolling&sport=baseball_mlb&current_to=2026-03-14&window_days=30&steps=10&min_settled_overall=200&min_settled_per_bucket=25`
+
+Rolling mode returns the existing latest-window alert block plus a deterministic `trend` array ordered oldest-to-newest (`window_start`, `window_end`, `alert_level`, `ece_delta`, `brier_delta`, settled sample counts).
+
+Use drift history for append-only alert run audit visibility:
+
+- `GET /recommendations/calibration/alerts/history`
+- `GET /recommendations/calibration/alerts/history?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&limit=100`
+
+History rows are ordered `created_at DESC, id DESC` and include run hashes, window bounds, thresholds/guardrails, alert level/reasons, summary deltas, and optional persisted payload snapshot.
 
 ## Documentation
 

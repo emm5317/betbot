@@ -8,6 +8,8 @@ The house always wins unless you treat this like a trading system.
 
 betbot is a four-sport quantitative betting system focused on `MLB`, `NBA`, `NHL`, and `NFL`. It exists to identify mispriced probability, measure whether that edge is real, and only then automate sizing and execution.
 
+Today, the live product posture is recommendation-only for decision output. It does not place live bets yet.
+
 It is not trying to be a generic sports platform. The product is intentionally specialized where the market depth, public data quality, and year-round operating cadence justify the effort.
 
 ---
@@ -48,8 +50,16 @@ betbot is:
 
 - a measurement system for odds and closing-line behavior
 - a modeling and validation pipeline
-- a bankroll and risk engine
+- a recommendation-only decision and monitoring surface
 - an execution system only after the data and model layers are credible
+
+### Current Operator Surface
+
+- ranked recommendation pull endpoint (`/recommendations`)
+- performance and CLV endpoint (`/recommendations/performance`)
+- calibration by rank bucket endpoint (`/recommendations/calibration`)
+- drift alert endpoint with point-in-time and rolling modes (`/recommendations/calibration/alerts`)
+- append-only drift run history endpoint (`/recommendations/calibration/alerts/history`)
 
 ---
 
@@ -103,7 +113,7 @@ This focus should show up in the product language. betbot is not "sport agnostic
 The operator:
 
 1. Maintains the data pipeline before touching model complexity.
-2. Treats calibration drift as a production incident.
+2. Treats calibration drift as a production incident and reviews both rolling trend windows and append-only run history.
 3. Respects circuit breakers and audit trails.
 4. Thinks in samples, not anecdotes.
 5. Scales only when CLV and process quality justify it.
@@ -132,7 +142,7 @@ If a new idea conflicts with this order, the idea loses.
 
 **Phase 3:** baseline models and backtesting
 
-**Phase 4:** decision engine and bankroll control
+**Phase 4:** recommendation-only decision engine, calibration drift guardrails, rolling trends, append-only drift history
 
 **Phase 5:** execution and paper validation
 

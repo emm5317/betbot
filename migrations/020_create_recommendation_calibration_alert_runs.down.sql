@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS recommendation_calibration_alert_runs;
