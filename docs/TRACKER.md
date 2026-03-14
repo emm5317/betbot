@@ -116,7 +116,7 @@ Goal: build sport-specific baseline models and validate them offline before any 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
 | P3-001 | Build MLB pitcher matchup model | ✅ DONE | P0 | Added validated baseline predictor in `internal/modeling/mlb` with starter + team context outputs for full-game moneyline/total and first-five side/total orientation (done 2026-03-13) |
-| P3-002 | Build NBA lineup-adjusted net rating model | ⬜ TODO | P0 | Spread and total first |
+| P3-002 | Build NBA lineup-adjusted net rating model | ✅ DONE | P0 | Added validated baseline predictor in `internal/modeling/nba` with lineup-availability net-rating adjustments plus margin/total, win, and spread-cover outputs (done 2026-03-13) |
 | P3-003 | Build NHL xG plus goalie model | ⬜ TODO | P1 | PDO regression support |
 | P3-004 | Build NFL EPA/DVOA situational model | ⬜ TODO | P1 | Key-number awareness required |
 | P3-005 | Implement sport-specific feature builders | ⬜ TODO | P0 | Shared interface, specialized inputs |
