@@ -1,6 +1,7 @@
 package features
 
 import (
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -144,6 +145,77 @@ func TestCalibrateNormalizationScalesDeterministic(t *testing.T) {
 	}
 	if len(required) != 0 {
 		t.Fatalf("missing expected recommendations: %v", required)
+	}
+}
+
+func TestFitJointWeightsImprovesObjectiveOverBaseline(t *testing.T) {
+	sport := domain.SportNFL
+	modelFamily := "epa-dvoa-situational"
+	samples := makeCalibrationSamples(t, sport, 30)
+
+	manifest, err := ManifestFor(sport, modelFamily)
+	if err != nil {
+		t.Fatalf("ManifestFor() error = %v", err)
+	}
+	sorted, err := validateAndSortSamples(samples, sport, modelFamily, manifest)
+	if err != nil {
+		t.Fatalf("validateAndSortSamples() error = %v", err)
+	}
+	specs, err := calibrationSpecsForSport(sport, DefaultBuilderConfig())
+	if err != nil {
+		t.Fatalf("calibrationSpecsForSport() error = %v", err)
+	}
+	matrix, err := buildJointCalibrationSamples(sorted, specs)
+	if err != nil {
+		t.Fatalf("buildJointCalibrationSamples() error = %v", err)
+	}
+	splits, err := BuildWalkForwardSplits(len(matrix), WalkForwardConfig{TrainWindow: 12, ValidationWindow: 4, Step: 4})
+	if err != nil {
+		t.Fatalf("BuildWalkForwardSplits() error = %v", err)
+	}
+
+	train := matrix[splits[0].TrainStart:splits[0].TrainEnd]
+	fitted, err := fitJointWeights(train)
+	if err != nil {
+		t.Fatalf("fitJointWeights() error = %v", err)
+	}
+
+	baseline := make([]float64, len(fitted))
+	for i := range baseline {
+		baseline[i] = 1.0
+	}
+	fittedLoss := jointObjective(train, fitted)
+	baselineLoss := jointObjective(train, baseline)
+	if fittedLoss >= baselineLoss-calibrationEpsilon {
+		t.Fatalf("joint objective did not improve: fitted=%.6f baseline=%.6f", fittedLoss, baselineLoss)
+	}
+}
+
+func TestCalibrateNormalizationScalesJointWeightsRespectBounds(t *testing.T) {
+	artifact, err := CalibrateNormalizationScales(CalibrationRequest{
+		Sport:       domain.SportNFL,
+		ModelFamily: "epa-dvoa-situational",
+		Samples:     makeCalibrationSamples(t, domain.SportNFL, 28),
+		Window:      WalkForwardConfig{TrainWindow: 12, ValidationWindow: 4, Step: 3},
+		BaseConfig:  DefaultBuilderConfig(),
+	})
+	if err != nil {
+		t.Fatalf("CalibrateNormalizationScales() error = %v", err)
+	}
+
+	for _, rec := range artifact.Recommendations {
+		if rec.RecommendedWeight < jointCalibrationMinWeight-calibrationEpsilon || rec.RecommendedWeight > jointCalibrationMaxWeight+calibrationEpsilon {
+			t.Fatalf("parameter %s out of bounds weight %.4f", rec.Parameter, rec.RecommendedWeight)
+		}
+		if !isFinite(rec.RecommendedScale) || rec.RecommendedScale <= 0 {
+			t.Fatalf("parameter %s invalid recommended scale %.4f", rec.Parameter, rec.RecommendedScale)
+		}
+		if !isFinite(rec.RecommendedWeight) {
+			t.Fatalf("parameter %s invalid recommended weight %.4f", rec.Parameter, rec.RecommendedWeight)
+		}
+		if math.IsNaN(rec.Diagnostics.LogLoss) || math.IsInf(rec.Diagnostics.LogLoss, 0) {
+			t.Fatalf("parameter %s invalid diagnostics log loss %.4f", rec.Parameter, rec.Diagnostics.LogLoss)
+		}
 	}
 }
 

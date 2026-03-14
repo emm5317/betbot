@@ -11,7 +11,15 @@ import (
 	"betbot/internal/domain"
 )
 
-const calibrationEpsilon = 1e-9
+const (
+	calibrationEpsilon        = 1e-9
+	jointRegularizationLambda = 0.02
+	jointCalibrationMinWeight = 0.25
+	jointCalibrationMaxWeight = 3.0
+	jointCalibrationMaxIter   = 8
+)
+
+var jointCalibrationCandidates = []float64{0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0}
 
 type CalibrationSample struct {
 	EventTime time.Time     `json:"event_time"`
@@ -90,6 +98,12 @@ type calibrationParameterSpec struct {
 	features  []string
 }
 
+type jointCalibrationSample struct {
+	baseProb float64
+	outcome  float64
+	signals  []float64
+}
+
 func BuildWalkForwardSplits(sampleCount int, cfg WalkForwardConfig) ([]WalkForwardSplit, error) {
 	if cfg.TrainWindow <= 0 {
 		return nil, errors.New("train window must be > 0")
@@ -164,6 +178,11 @@ func CalibrateNormalizationScales(req CalibrationRequest) (CalibrationArtifact, 
 		return CalibrationArtifact{}, err
 	}
 
+	jointSamples, err := buildJointCalibrationSamples(samples, specs)
+	if err != nil {
+		return CalibrationArtifact{}, fmt.Errorf("build calibration matrix: %w", err)
+	}
+
 	splitBounds := make([]WalkForwardSplitBounds, 0, len(splits))
 	for _, split := range splits {
 		splitBounds = append(splitBounds, WalkForwardSplitBounds{
@@ -176,44 +195,45 @@ func CalibrateNormalizationScales(req CalibrationRequest) (CalibrationArtifact, 
 		})
 	}
 
-	recommendations := make([]ScaleRecommendation, 0, len(specs))
-	overallPredictions := make([]float64, 0, len(specs)*len(splits)*req.Window.ValidationWindow)
-	overallOutcomes := make([]float64, 0, len(specs)*len(splits)*req.Window.ValidationWindow)
+	overallPredictions := make([]float64, 0, len(splits)*req.Window.ValidationWindow)
+	overallOutcomes := make([]float64, 0, len(splits)*req.Window.ValidationWindow)
+	parameterPredictions := make([][]float64, len(specs))
+	parameterOutcomes := make([][]float64, len(specs))
+	weightedCoefficients := make([]float64, len(specs))
+	totalWeights := make([]float64, len(specs))
 
-	for _, spec := range specs {
-		totalWeight := 0.0
-		weightedCoefficient := 0.0
-		parameterPredictions := make([]float64, 0, len(splits)*req.Window.ValidationWindow)
-		parameterOutcomes := make([]float64, 0, len(splits)*req.Window.ValidationWindow)
-
-		for _, split := range splits {
-			coefficient, err := fitCoefficient(samples[split.TrainStart:split.TrainEnd], spec)
-			if err != nil {
-				return CalibrationArtifact{}, fmt.Errorf("fit coefficient for %s: %w", spec.name, err)
-			}
-
-			for i := split.ValidationStart; i < split.ValidationEnd; i++ {
-				signal, err := parameterSignal(samples[i].Vector, spec.features)
-				if err != nil {
-					return CalibrationArtifact{}, fmt.Errorf("compute validation signal for %s: %w", spec.name, err)
-				}
-				baseProb, ok := samples[i].Vector.Value("market_home_implied_prob")
-				if !ok {
-					return CalibrationArtifact{}, errors.New("missing market_home_implied_prob feature")
-				}
-				prediction := calibratedProbability(baseProb, signal, coefficient)
-				parameterPredictions = append(parameterPredictions, prediction)
-				parameterOutcomes = append(parameterOutcomes, samples[i].Outcome)
-				overallPredictions = append(overallPredictions, prediction)
-				overallOutcomes = append(overallOutcomes, samples[i].Outcome)
-			}
-
-			validationCount := float64(split.ValidationEnd - split.ValidationStart)
-			weightedCoefficient += coefficient * validationCount
-			totalWeight += validationCount
+	for _, split := range splits {
+		weights, err := fitJointWeights(jointSamples[split.TrainStart:split.TrainEnd])
+		if err != nil {
+			return CalibrationArtifact{}, fmt.Errorf("fit joint weights for split [%d:%d): %w", split.TrainStart, split.TrainEnd, err)
 		}
 
-		recommendedWeight := weightedCoefficient / totalWeight
+		validationCount := float64(split.ValidationEnd - split.ValidationStart)
+		for i := range weights {
+			weightedCoefficients[i] += weights[i] * validationCount
+			totalWeights[i] += validationCount
+		}
+
+		for i := split.ValidationStart; i < split.ValidationEnd; i++ {
+			sample := jointSamples[i]
+			prediction := calibratedProbabilityFromScore(sample.baseProb, dot(weights, sample.signals))
+			overallPredictions = append(overallPredictions, prediction)
+			overallOutcomes = append(overallOutcomes, sample.outcome)
+
+			for j := range specs {
+				componentPrediction := calibratedProbabilityFromScore(sample.baseProb, weights[j]*sample.signals[j])
+				parameterPredictions[j] = append(parameterPredictions[j], componentPrediction)
+				parameterOutcomes[j] = append(parameterOutcomes[j], sample.outcome)
+			}
+		}
+	}
+
+	recommendations := make([]ScaleRecommendation, 0, len(specs))
+	for i, spec := range specs {
+		recommendedWeight := 1.0
+		if totalWeights[i] > 0 {
+			recommendedWeight = weightedCoefficients[i] / totalWeights[i]
+		}
 		recommendedScale := spec.baseScale
 		if recommendedWeight > calibrationEpsilon {
 			recommendedScale = spec.baseScale / recommendedWeight
@@ -225,7 +245,7 @@ func CalibrateNormalizationScales(req CalibrationRequest) (CalibrationArtifact, 
 			BaseScale:         spec.baseScale,
 			RecommendedScale:  recommendedScale,
 			RecommendedWeight: recommendedWeight,
-			Diagnostics:       computeDiagnostics(parameterPredictions, parameterOutcomes),
+			Diagnostics:       computeDiagnostics(parameterPredictions[i], parameterOutcomes[i]),
 		})
 	}
 
@@ -289,39 +309,110 @@ func validateAndSortSamples(samples []CalibrationSample, sport domain.Sport, mod
 	return sorted, nil
 }
 
-func fitCoefficient(train []CalibrationSample, spec calibrationParameterSpec) (float64, error) {
-	if len(train) == 0 {
-		return 0, errors.New("training window cannot be empty")
+func buildJointCalibrationSamples(samples []CalibrationSample, specs []calibrationParameterSpec) ([]jointCalibrationSample, error) {
+	if len(specs) == 0 {
+		return nil, errors.New("calibration specs cannot be empty")
 	}
 
-	candidates := []float64{0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0}
-	best := candidates[0]
-	bestLoss := math.MaxFloat64
+	matrix := make([]jointCalibrationSample, 0, len(samples))
+	for i, sample := range samples {
+		baseProb, ok := sample.Vector.Value("market_home_implied_prob")
+		if !ok {
+			return nil, fmt.Errorf("sample %d missing market_home_implied_prob", i)
+		}
 
-	for _, candidate := range candidates {
-		predictions := make([]float64, 0, len(train))
-		outcomes := make([]float64, 0, len(train))
-		for _, sample := range train {
+		signals := make([]float64, len(specs))
+		for j, spec := range specs {
 			signal, err := parameterSignal(sample.Vector, spec.features)
 			if err != nil {
-				return 0, err
+				return nil, fmt.Errorf("sample %d parameter %s: %w", i, spec.name, err)
 			}
-			baseProb, ok := sample.Vector.Value("market_home_implied_prob")
-			if !ok {
-				return 0, errors.New("missing market_home_implied_prob feature")
-			}
-			predictions = append(predictions, calibratedProbability(baseProb, signal, candidate))
-			outcomes = append(outcomes, sample.Outcome)
+			signals[j] = signal
 		}
 
-		loss := computeDiagnostics(predictions, outcomes).LogLoss
-		if loss < bestLoss-calibrationEpsilon || (math.Abs(loss-bestLoss) <= calibrationEpsilon && candidate < best) {
-			bestLoss = loss
-			best = candidate
+		matrix = append(matrix, jointCalibrationSample{
+			baseProb: baseProb,
+			outcome:  sample.Outcome,
+			signals:  signals,
+		})
+	}
+
+	return matrix, nil
+}
+
+func fitJointWeights(train []jointCalibrationSample) ([]float64, error) {
+	if len(train) == 0 {
+		return nil, errors.New("training window cannot be empty")
+	}
+	if len(train[0].signals) == 0 {
+		return nil, errors.New("joint calibration signals cannot be empty")
+	}
+
+	dim := len(train[0].signals)
+	for i, sample := range train {
+		if len(sample.signals) != dim {
+			return nil, fmt.Errorf("training row %d has signal length %d, want %d", i, len(sample.signals), dim)
 		}
 	}
 
-	return best, nil
+	weights := make([]float64, dim)
+	for i := range weights {
+		weights[i] = 1.0
+	}
+
+	for iter := 0; iter < jointCalibrationMaxIter; iter++ {
+		changed := false
+		for idx := range weights {
+			current := weights[idx]
+			best := current
+			bestObjective := jointObjective(train, weights)
+
+			for _, candidate := range jointCalibrationCandidates {
+				if candidate < jointCalibrationMinWeight || candidate > jointCalibrationMaxWeight {
+					continue
+				}
+				weights[idx] = candidate
+				objective := jointObjective(train, weights)
+				if objective < bestObjective-calibrationEpsilon || (math.Abs(objective-bestObjective) <= calibrationEpsilon && candidate < best) {
+					bestObjective = objective
+					best = candidate
+				}
+			}
+
+			weights[idx] = best
+			if math.Abs(best-current) > calibrationEpsilon {
+				changed = true
+			}
+		}
+
+		if !changed {
+			break
+		}
+	}
+
+	for i := range weights {
+		weights[i] = clamp(weights[i], jointCalibrationMinWeight, jointCalibrationMaxWeight)
+	}
+	return weights, nil
+}
+
+func jointObjective(samples []jointCalibrationSample, weights []float64) float64 {
+	loss := 0.0
+	for _, sample := range samples {
+		prediction := calibratedProbabilityFromScore(sample.baseProb, dot(weights, sample.signals))
+		y := sample.outcome
+		loss += -(y*math.Log(prediction) + (1-y)*math.Log(1-prediction))
+	}
+	loss /= float64(len(samples))
+
+	regularization := 0.0
+	for _, weight := range weights {
+		delta := weight - 1.0
+		regularization += delta * delta
+	}
+	regularization = jointRegularizationLambda * (regularization / float64(len(weights)))
+
+	return loss + regularization
 }
 
 func parameterSignal(vector FeatureVector, names []string) (float64, error) {
@@ -340,10 +431,22 @@ func parameterSignal(vector FeatureVector, names []string) (float64, error) {
 }
 
 func calibratedProbability(baseProb, signal, coefficient float64) float64 {
+	return calibratedProbabilityFromScore(baseProb, coefficient*signal)
+}
+
+func calibratedProbabilityFromScore(baseProb, score float64) float64 {
 	base := clamp(baseProb, calibrationEpsilon, 1-calibrationEpsilon)
 	logit := math.Log(base / (1 - base))
-	raw := 1 / (1 + math.Exp(-(logit + coefficient*signal)))
+	raw := 1 / (1 + math.Exp(-(logit + score)))
 	return clamp(raw, calibrationEpsilon, 1-calibrationEpsilon)
+}
+
+func dot(weights, signals []float64) float64 {
+	total := 0.0
+	for i := range weights {
+		total += weights[i] * signals[i]
+	}
+	return total
 }
 
 func computeDiagnostics(predictions, outcomes []float64) FitDiagnostics {
