@@ -33,6 +33,7 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Walk-forward validation and CLV/calibration reporting are now emitted together in one pipeline output
 - NHL and NFL Phase 3 baseline model packages are now implemented with bounded-output unit coverage
 - Sport-specific Kelly defaults are now explicit policy values for MLB/NBA/NHL/NFL and are wired into replay stake recommendations plus decision sizing defaults
+- Recommendation-only decision surface is now live via `GET /recommendations`, with ranked best-bet suggestions built from EV thresholding, line shopping, Kelly sizing, and ledger-backed bankroll checks, plus append-only recommendation snapshots for audit replay
 
 The current implementation target is now early Phase 4 decision-engine implementation, with execution still explicitly deferred to later phases.
 
@@ -146,12 +147,13 @@ Goal: turn model output into risk-checked bet tickets.
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
 | P4-001 | Implement EV threshold filter | ✅ DONE | P0 | Shared rule with sport-aware defaults, override support, and decision-engine filter wiring (done 2026-03-14) |
-| P4-002 | Implement line shopping | ⬜ TODO | P0 | Best available odds across books |
+| P4-002 | Implement line shopping | ✅ DONE | P0 | Best available odds across books implemented in `internal/decision/lineshopper.go` with deterministic tie-break and validation coverage (done 2026-03-14) |
 | P4-003 | Implement Kelly sizer | ⬜ TODO | P0 | Fractional and capped |
 | P4-004 | Implement bankroll availability checks | ⬜ TODO | P0 | Ledger-backed |
 | P4-005 | Implement correlation guard | ⬜ TODO | P0 | Same-game exposure control |
 | P4-006 | Implement circuit breakers | ⬜ TODO | P0 | Daily, weekly, drawdown |
 | P4-007 | Build decision-engine integration tests | ⬜ TODO | P1 | Prediction to ticket flow |
+| P4-008 | Build recommendation-only best-bets pull surface | ✅ DONE | P0 | Added `GET /recommendations` with sport/date/limit filters, ranked decision assembly, and append-only `recommendation_snapshots` persistence (done 2026-03-14) |
 
 ---
 

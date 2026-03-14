@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +22,13 @@ type fakeReadQueries struct {
 	listLatestOddsRows           []store.ListLatestOddsRow
 	listLatestOddsErr            error
 	listLatestOddsCalls          []store.ListLatestOddsParams
+	modelPredictionsBySport      map[string][]store.ModelPrediction
+	modelPredictionsCalls        []store.ListModelPredictionsForSportSeasonParams
+	modelPredictionsErr          error
+	bankrollBalanceCents         int64
+	bankrollBalanceErr           error
+	insertSnapshotCalls          []store.InsertRecommendationSnapshotParams
+	insertSnapshotErr            error
 	latestPollRun                store.PollRun
 	latestPollRunErr             error
 	oddsArchiveSummary           store.GetOddsArchiveSummaryRow
@@ -52,6 +60,32 @@ func (f *fakeReadQueries) ListLatestOdds(_ context.Context, arg store.ListLatest
 		return nil, f.listLatestOddsErr
 	}
 	return f.listLatestOddsRows, nil
+}
+
+func (f *fakeReadQueries) ListModelPredictionsForSportSeason(_ context.Context, arg store.ListModelPredictionsForSportSeasonParams) ([]store.ModelPrediction, error) {
+	f.modelPredictionsCalls = append(f.modelPredictionsCalls, arg)
+	if f.modelPredictionsErr != nil {
+		return nil, f.modelPredictionsErr
+	}
+	if f.modelPredictionsBySport == nil {
+		return nil, nil
+	}
+	return f.modelPredictionsBySport[arg.Sport], nil
+}
+
+func (f *fakeReadQueries) GetBankrollBalanceCents(context.Context) (int64, error) {
+	if f.bankrollBalanceErr != nil {
+		return 0, f.bankrollBalanceErr
+	}
+	return f.bankrollBalanceCents, nil
+}
+
+func (f *fakeReadQueries) InsertRecommendationSnapshot(_ context.Context, arg store.InsertRecommendationSnapshotParams) (store.RecommendationSnapshot, error) {
+	f.insertSnapshotCalls = append(f.insertSnapshotCalls, arg)
+	if f.insertSnapshotErr != nil {
+		return store.RecommendationSnapshot{}, f.insertSnapshotErr
+	}
+	return store.RecommendationSnapshot{}, nil
 }
 
 func TestHandleOddsWithoutSportFilterUsesAllSports(t *testing.T) {
@@ -266,6 +300,118 @@ func TestOddsPageContainsHTMXRefreshTargets(t *testing.T) {
 	body := readBody(t, resp)
 	assertContains(t, body, "/partials/topbar-status?sport=americanfootball_nfl")
 	assertContains(t, body, "/partials/odds-table?sport=americanfootball_nfl")
+}
+
+func TestHandleRecommendationsReturnsRankedJSONAndPersistsSnapshots(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 100000,
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{
+					ID:                   1,
+					GameID:               42,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.58,
+					MarketProbability:    0.52,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
+				},
+				{
+					ID:                   2,
+					GameID:               43,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.62,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 20, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 42, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 105},
+			{GameID: 42, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -120},
+			{GameID: 42, BookKey: "book-b", BookName: "book-b", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 42, BookKey: "book-b", BookName: "book-b", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -125},
+			{GameID: 43, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 102},
+			{GameID: 43, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -115},
+			{GameID: 43, BookKey: "book-c", BookName: "book-c", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 108},
+			{GameID: 43, BookKey: "book-c", BookName: "book-c", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -121},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations?sport=baseball_mlb&date=2026-03-16&limit=2")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations status = %d, want 200", resp.StatusCode)
+	}
+
+	var body []map[string]any
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &body); err != nil {
+		t.Fatalf("decode recommendations: %v", err)
+	}
+	if len(body) != 2 {
+		t.Fatalf("len(body) = %d, want 2", len(body))
+	}
+	if got := int(body[0]["game_id"].(float64)); got != 43 {
+		t.Fatalf("body[0].game_id = %d, want 43", got)
+	}
+	if got := body[0]["best_book"].(string); got != "book-c" {
+		t.Fatalf("body[0].best_book = %q, want book-c", got)
+	}
+	if len(queries.insertSnapshotCalls) != 2 {
+		t.Fatalf("snapshot inserts = %d, want 2", len(queries.insertSnapshotCalls))
+	}
+	if len(queries.modelPredictionsCalls) != 1 || queries.modelPredictionsCalls[0].Sport != "MLB" {
+		t.Fatalf("model predictions calls = %+v, want one MLB call", queries.modelPredictionsCalls)
+	}
+}
+
+func TestHandleRecommendationsRejectsInvalidDate(t *testing.T) {
+	queries := &fakeReadQueries{bankrollBalanceCents: 100000}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations?date=03-16-2026")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /recommendations?date=03-16-2026 status = %d, want 400", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "expected YYYY-MM-DD")
+}
+
+func TestHandleRecommendationsRejectsInvalidSport(t *testing.T) {
+	queries := &fakeReadQueries{bankrollBalanceCents: 100000}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations?sport=soccer_epl")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /recommendations?sport=soccer_epl status = %d, want 400", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "invalid sport filter")
+}
+
+func TestHandleRecommendationsRejectsInvalidLimit(t *testing.T) {
+	queries := &fakeReadQueries{bankrollBalanceCents: 100000}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations?limit=0")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /recommendations?limit=0 status = %d, want 400", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "expected integer in [1,200]")
+}
+
+func TestHandleRecommendationsReturnsServiceUnavailableWhenBankrollUnavailable(t *testing.T) {
+	queries := &fakeReadQueries{bankrollBalanceErr: pgx.ErrNoRows}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations")
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("GET /recommendations status = %d, want %d", resp.StatusCode, http.StatusServiceUnavailable)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "bankroll balance unavailable")
 }
 
 func newTestServerApp(t *testing.T, queries readQueries) *App {

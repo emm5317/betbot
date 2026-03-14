@@ -266,3 +266,26 @@ type PollRun struct {
 	DedupSkips    int32              `json:"dedup_skips"`
 	ErrorText     string             `json:"error_text"`
 }
+
+type RecommendationSnapshot struct {
+	ID                     int64              `json:"id"`
+	GeneratedAt            pgtype.Timestamptz `json:"generated_at"`
+	Sport                  string             `json:"sport"`
+	GameID                 int64              `json:"game_id"`
+	EventTime              pgtype.Timestamptz `json:"event_time"`
+	EventDate              pgtype.Date        `json:"event_date"`
+	MarketKey              string             `json:"market_key"`
+	RecommendedSide        string             `json:"recommended_side"`
+	BestBook               string             `json:"best_book"`
+	BestAmericanOdds       int32              `json:"best_american_odds"`
+	ModelProbability       float64            `json:"model_probability"`
+	MarketProbability      float64            `json:"market_probability"`
+	Edge                   float64            `json:"edge"`
+	SuggestedStakeFraction float64            `json:"suggested_stake_fraction"`
+	SuggestedStakeCents    int64              `json:"suggested_stake_cents"`
+	BankrollCheckPass      bool               `json:"bankroll_check_pass"`
+	BankrollCheckReason    string             `json:"bankroll_check_reason"`
+	RankScore              float64            `json:"rank_score"`
+	Metadata               json.RawMessage    `json:"metadata"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+}

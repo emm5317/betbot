@@ -86,6 +86,8 @@ What is built now:
 
 The current open build step is Phase 4 decision-engine implementation (`P4-002` onward).
 
+Recommendation mode is now available through `GET /recommendations` for ranked bet suggestions. This flow is recommendation-only and does not invoke live placement adapters.
+
 ## Roadmap
 
 ### Phase 1: Data Foundation Vertical Slice
