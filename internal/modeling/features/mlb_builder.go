@@ -47,9 +47,10 @@ func (b MLBBuilder) Build(req BuildRequest) (FeatureVector, error) {
 	features = append(features, b.mlbSpecificFeatures(req)...)
 
 	return FeatureVector{
-		Sport:       domain.SportMLB,
-		ModelFamily: b.sportMeta.DefaultModelFamily,
-		Features:    sortedFeatures(features),
+		Sport:           domain.SportMLB,
+		ModelFamily:     b.sportMeta.DefaultModelFamily,
+		ManifestVersion: ManifestVersionV1,
+		Features:        sortedFeatures(features),
 	}, nil
 }
 

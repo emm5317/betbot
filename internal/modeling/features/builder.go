@@ -18,9 +18,10 @@ type Feature struct {
 
 // FeatureVector is the typed output produced by a sport-specific feature builder.
 type FeatureVector struct {
-	Sport       domain.Sport
-	ModelFamily string
-	Features    []Feature
+	Sport           domain.Sport
+	ModelFamily     string
+	ManifestVersion ManifestVersion
+	Features        []Feature
 }
 
 func (v FeatureVector) Value(name string) (float64, bool) {
@@ -106,6 +107,13 @@ func (r Registry) Build(req BuildRequest) (FeatureVector, error) {
 
 	if err := validateFeatureVector(vector); err != nil {
 		return FeatureVector{}, fmt.Errorf("validate feature vector: %w", err)
+	}
+	manifest, err := ManifestFor(vector.Sport, vector.ModelFamily)
+	if err != nil {
+		return FeatureVector{}, fmt.Errorf("resolve feature manifest: %w", err)
+	}
+	if err := ValidateVectorMatchesManifest(vector, manifest); err != nil {
+		return FeatureVector{}, fmt.Errorf("validate feature manifest: %w", err)
 	}
 
 	return vector, nil
@@ -384,6 +392,9 @@ func validateFeatureVector(v FeatureVector) error {
 	}
 	if strings.TrimSpace(v.ModelFamily) == "" {
 		return errors.New("feature vector model family is required")
+	}
+	if strings.TrimSpace(string(v.ManifestVersion)) == "" {
+		return errors.New("feature vector manifest version is required")
 	}
 	if len(v.Features) == 0 {
 		return errors.New("feature vector cannot be empty")

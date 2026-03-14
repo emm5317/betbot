@@ -47,9 +47,10 @@ func (b NHLBuilder) Build(req BuildRequest) (FeatureVector, error) {
 	features = append(features, b.nhlSpecificFeatures(req)...)
 
 	return FeatureVector{
-		Sport:       domain.SportNHL,
-		ModelFamily: b.sportMeta.DefaultModelFamily,
-		Features:    sortedFeatures(features),
+		Sport:           domain.SportNHL,
+		ModelFamily:     b.sportMeta.DefaultModelFamily,
+		ManifestVersion: ManifestVersionV1,
+		Features:        sortedFeatures(features),
 	}, nil
 }
 

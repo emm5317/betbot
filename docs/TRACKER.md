@@ -120,10 +120,10 @@ Goal: build sport-specific baseline models and validate them offline before any 
 | P3-003 | Build NHL xG plus goalie model | ⬜ TODO | P1 | PDO regression support |
 | P3-004 | Build NFL EPA/DVOA situational model | ⬜ TODO | P1 | Key-number awareness required |
 | P3-005 | Implement sport-specific feature builders | ✅ DONE | P0 | Added deterministic shared builder contract + registry in `internal/modeling/features` with validated MLB/NBA/NHL/NFL feature builders covering market priors, team quality, situational, injury/weather, and sport-specific contexts (done 2026-03-13) |
-| P3-006 | Implement model persistence in `model_predictions` | ⬜ TODO | P0 | Version and feature vector storage |
+| P3-006 | Implement model persistence in `model_predictions` | 🔵 IN PROGRESS | P0 | Version and feature vector storage; 2026-03-13 added explicit feature-manifest v1 support in `internal/modeling/features` for stable ordering/index compatibility ahead of persistence binding |
 | P3-007 | Build backtesting CLI | ⬜ TODO | P0 | Replay against stored odds |
-| P3-008 | Add walk-forward validation | ⬜ TODO | P0 | Prevent look-ahead bias |
-| P3-009 | Add CLV and calibration reporting | ⬜ TODO | P0 | Sport-aware reporting cadence |
+| P3-008 | Add walk-forward validation | 🔵 IN PROGRESS | P0 | Prevent look-ahead bias; 2026-03-13 added deterministic walk-forward split + validation scaffolding for offline feature-scale calibration |
+| P3-009 | Add CLV and calibration reporting | 🔵 IN PROGRESS | P0 | Sport-aware reporting cadence; 2026-03-13 added offline calibration artifact diagnostics (log loss/Brier/calibration error) without live config mutation |
 | P3-010 | Add sport-specific Kelly defaults | ⬜ TODO | P1 | Variance-aware bankroll policy |
 
 Phase 3 exit criteria:
