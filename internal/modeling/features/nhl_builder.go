@@ -57,10 +57,12 @@ func (b NHLBuilder) Build(req BuildRequest) (FeatureVector, error) {
 func (b NHLBuilder) nhlSpecificFeatures(req BuildRequest) []Feature {
 	goalieEdge := clamp((req.NHL.HomeGoalieGSAx-req.NHL.AwayGoalieGSAx)/b.cfg.GoalieGSAxScale, -1, 1)
 	xgShareEdge := clamp((req.NHL.HomeXGShare-req.NHL.AwayXGShare)*2.0, -1, 1)
+	corsiEdge := clamp((req.NHL.HomeCorsi-req.NHL.AwayCorsi)*2.0, -1, 1)
 	homeRegressionPressure := clamp((b.cfg.PDOBaseline-req.NHL.HomePDO)/b.cfg.PDOScale, -1, 1)
 	awayRegressionPressure := clamp((b.cfg.PDOBaseline-req.NHL.AwayPDO)/b.cfg.PDOScale, -1, 1)
 
 	return []Feature{
+		{Name: "nhl_corsi_edge_norm", Value: corsiEdge},
 		{Name: "nhl_goalie_gsax_edge_norm", Value: goalieEdge},
 		{Name: "nhl_xg_share_edge_norm", Value: xgShareEdge},
 		{Name: "nhl_home_pdo_regression_pressure_norm", Value: homeRegressionPressure},
@@ -87,6 +89,12 @@ func validateNHLContext(in NHLContext) error {
 	}
 	if !isFinite(in.AwayPDO) || in.AwayPDO < 0.85 || in.AwayPDO > 1.15 {
 		return errors.New("away pdo must be finite and in [0.85,1.15]")
+	}
+	if !isFinite(in.HomeCorsi) || in.HomeCorsi < 0 || in.HomeCorsi > 1 {
+		return errors.New("home corsi must be in [0,1]")
+	}
+	if !isFinite(in.AwayCorsi) || in.AwayCorsi < 0 || in.AwayCorsi > 1 {
+		return errors.New("away corsi must be in [0,1]")
 	}
 	return nil
 }

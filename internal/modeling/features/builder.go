@@ -194,6 +194,8 @@ type NHLContext struct {
 	AwayXGShare    float64
 	HomePDO        float64
 	AwayPDO        float64
+	HomeCorsi      float64
+	AwayCorsi      float64
 }
 
 type NFLContext struct {

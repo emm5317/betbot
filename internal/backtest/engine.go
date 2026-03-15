@@ -46,6 +46,7 @@ type RunConfig struct {
 	MarketKey             string
 	RowLimit              int
 	ModelVersion          string
+	RollingWindow         int
 	WalkForwardTrain      int
 	WalkForwardValidation int
 	WalkForwardStep       int
@@ -53,6 +54,18 @@ type RunConfig struct {
 	MinimumStakeDollars   float64
 	KellyFraction         float64
 	MaxStakeFraction      float64
+}
+
+// OutcomeRunConfig configures a multi-season outcome-based backtest that iterates
+// MoneyPuck data directly without requiring odds data.
+type OutcomeRunConfig struct {
+	SeasonStart           *int
+	SeasonEnd             *int
+	RollingWindow         int
+	ModelVersion          string
+	WalkForwardTrain      int
+	WalkForwardValidation int
+	WalkForwardStep       int
 }
 
 type Outcome struct {
@@ -121,10 +134,26 @@ type SportCalibrationArtifact struct {
 	Error    string                        `json:"error,omitempty"`
 }
 
+// SeasonCalibration holds per-season calibration metrics for outcome-based backtests.
+type SeasonCalibration struct {
+	Season                int     `json:"season"`
+	Samples               int     `json:"samples"`
+	RealFeatureRate       float64 `json:"real_feature_rate"`
+	MeanAbsoluteError     float64 `json:"mean_absolute_error"`
+	BrierScore            float64 `json:"brier_score"`
+	HomeWinRate           float64 `json:"home_win_rate"`
+	PredictedHomeWinRate  float64 `json:"predicted_home_win_rate"`
+}
+
 type PipelineArtifact struct {
 	GeneratedAtUTC          time.Time                  `json:"generated_at_utc"`
+	BacktestMode            string                     `json:"backtest_mode,omitempty"`
+	CLVMode                 string                     `json:"clv_mode,omitempty"`
+	RollingWindow           int                        `json:"rolling_window,omitempty"`
 	SportFilter             *domain.Sport              `json:"sport_filter,omitempty"`
 	SeasonFilter            *int                       `json:"season_filter,omitempty"`
+	SeasonStartFilter       *int                       `json:"season_start_filter,omitempty"`
+	SeasonEndFilter         *int                       `json:"season_end_filter,omitempty"`
 	MarketKey               string                     `json:"market_key"`
 	ModelVersion            string                     `json:"model_version"`
 	PersistedPredictionRows int                        `json:"persisted_prediction_rows"`
@@ -133,6 +162,7 @@ type PipelineArtifact struct {
 	CLV                     CLVReport                  `json:"clv"`
 	Calibration             CalibrationReport          `json:"calibration"`
 	SportCalibrations       []SportCalibrationArtifact `json:"sport_calibrations"`
+	SeasonCalibrations      []SeasonCalibration        `json:"season_calibrations,omitempty"`
 }
 
 type Engine struct {
@@ -258,7 +288,7 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 		hasRealFeatures := false
 		if sport == domain.SportNHL && e.mpStore != nil {
 			nhlResult, nhlErr := BuildNHLFeatures(ctx, e.mpStore,
-				row.HomeTeam, row.AwayTeam, commenceAt, nhlSeasonFromDate(commenceAt), row.OpeningHomeImpliedProbability)
+				row.HomeTeam, row.AwayTeam, commenceAt, nhlSeasonFromDate(commenceAt), row.OpeningHomeImpliedProbability, resolved.RollingWindow)
 			if nhlErr == nil {
 				req = nhlResult.Request
 				hasRealFeatures = nhlResult.HasReal
@@ -397,9 +427,25 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 	}
 	sportCalibrations := computeSportCalibrations(samplesBySport, resolved)
 
+	// Detect CLV mode: if all CLV deltas are zero, it's single-snapshot odds data
+	clvMode := "real"
+	allZeroCLV := true
+	for _, o := range outcomes {
+		if o.CLVDelta != 0.0 {
+			allZeroCLV = false
+			break
+		}
+	}
+	if allZeroCLV {
+		clvMode = "single-snapshot"
+	}
+
 	generatedAt := outcomes[len(outcomes)-1].ClosingCapturedAtUTC
 	return PipelineArtifact{
 		GeneratedAtUTC:          generatedAt,
+		BacktestMode:            "odds",
+		CLVMode:                 clvMode,
+		RollingWindow:           resolved.RollingWindow,
 		SportFilter:             resolved.Sport,
 		SeasonFilter:            resolved.Season,
 		MarketKey:               resolved.MarketKey,
@@ -411,6 +457,255 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 		Calibration:             calibration,
 		SportCalibrations:       sportCalibrations,
 	}, nil
+}
+
+// RunOutcomeBacktest runs a multi-season outcome-based backtest that iterates MoneyPuck
+// data directly without requiring odds data. It evaluates model predictions against actual
+// game outcomes.
+func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (PipelineArtifact, error) {
+	if e.mpStore == nil {
+		return PipelineArtifact{}, errors.New("MoneyPuck store is required for outcome backtesting")
+	}
+
+	rollingWindow := cfg.RollingWindow
+	if rollingWindow <= 0 {
+		rollingWindow = defaultRollingWindow
+	}
+	modelVersion := strings.TrimSpace(cfg.ModelVersion)
+	if modelVersion == "" {
+		modelVersion = defaultModelVersion
+	}
+	wfTrain := cfg.WalkForwardTrain
+	if wfTrain <= 0 {
+		wfTrain = defaultWalkForwardTrain
+	}
+	wfValidation := cfg.WalkForwardValidation
+	if wfValidation <= 0 {
+		wfValidation = defaultWalkForwardValidation
+	}
+	wfStep := cfg.WalkForwardStep
+	if wfStep <= 0 {
+		wfStep = defaultWalkForwardStep
+	}
+
+	var seasonStart, seasonEnd *int32
+	if cfg.SeasonStart != nil {
+		v := int32(*cfg.SeasonStart)
+		seasonStart = &v
+	}
+	if cfg.SeasonEnd != nil {
+		v := int32(*cfg.SeasonEnd)
+		seasonEnd = &v
+	}
+
+	rows, err := e.mpStore.ListOutcomeBacktestGames(ctx, store.ListOutcomeBacktestGamesParams{
+		SeasonStart: seasonStart,
+		SeasonEnd:   seasonEnd,
+	})
+	if err != nil {
+		return PipelineArtifact{}, fmt.Errorf("list outcome backtest games: %w", err)
+	}
+	if len(rows) == 0 {
+		return PipelineArtifact{}, errors.New("no outcome backtest games found for the selected season range")
+	}
+
+	outcomes := make([]Outcome, 0, len(rows))
+	seasonStats := make(map[int]*seasonAccumulator)
+
+	for _, row := range rows {
+		gameDate := row.GameDate.Time
+		season := row.Season
+
+		nhlResult, nhlErr := BuildNHLFeaturesFromAbbrev(ctx, e.mpStore,
+			row.HomeTeam, row.AwayTeam, gameDate, season, rollingWindow)
+
+		var predictedHome float64
+		hasRealFeatures := false
+		if nhlErr == nil {
+			hasRealFeatures = nhlResult.HasReal
+			pred, predErr := e.nhlModel.Predict(modelnhl.MatchupInput{
+				HomeTeam: modelnhl.TeamProfile{
+					Name:                "home",
+					ExpectedGoalsShare:  nhlResult.Request.NHL.HomeXGShare,
+					GoalsForPerGame:     clamp(nhlResult.Request.TeamQuality.HomeOffenseRating/32.0, 1.8, 4.8),
+					GoalsAgainstPerGame: clamp(nhlResult.Request.TeamQuality.HomeDefenseRating/34.0, 1.8, 4.8),
+					GoalieGSAx:          nhlResult.Request.NHL.HomeGoalieGSAx,
+					PDO:                 nhlResult.Request.NHL.HomePDO,
+					CorsiShare:          nhlResult.Request.NHL.HomeCorsi,
+				},
+				AwayTeam: modelnhl.TeamProfile{
+					Name:                "away",
+					ExpectedGoalsShare:  nhlResult.Request.NHL.AwayXGShare,
+					GoalsForPerGame:     clamp(nhlResult.Request.TeamQuality.AwayOffenseRating/32.0, 1.8, 4.8),
+					GoalsAgainstPerGame: clamp(nhlResult.Request.TeamQuality.AwayDefenseRating/34.0, 1.8, 4.8),
+					GoalieGSAx:          nhlResult.Request.NHL.AwayGoalieGSAx,
+					PDO:                 nhlResult.Request.NHL.AwayPDO,
+					CorsiShare:          nhlResult.Request.NHL.AwayCorsi,
+				},
+			})
+			if predErr != nil {
+				return PipelineArtifact{}, fmt.Errorf("predict home probability for game %s: %w", row.GameID, predErr)
+			}
+			predictedHome = pred.HomeWinProbability
+		} else {
+			predictedHome = 0.50
+		}
+
+		homeGoals := deref(row.HomeGoals, 0)
+		awayGoals := deref(row.AwayGoals, 0)
+		homeWin := homeGoals > awayGoals
+		actualBinary := 0.0
+		if homeWin {
+			actualBinary = 1.0
+		}
+		outcomeCalErr := predictedHome - actualBinary
+
+		outcome := Outcome{
+			GameID:                   0,
+			Source:                   "moneypuck",
+			ExternalID:               row.GameID,
+			Sport:                    domain.SportNHL,
+			HomeTeam:                 row.HomeTeam,
+			AwayTeam:                 row.AwayTeam,
+			BookKey:                  "none",
+			MarketKey:                "outcome",
+			CommenceTimeUTC:          gameDate,
+			OpeningCapturedAtUTC:     gameDate,
+			ClosingCapturedAtUTC:     gameDate,
+			PredictedHomeProbability: predictedHome,
+			HasRealFeatures:         hasRealFeatures,
+			CalibrationError:        outcomeCalErr,
+			ActualHomeGoals:          &homeGoals,
+			ActualAwayGoals:          &awayGoals,
+			ActualHomeWin:            &homeWin,
+			OutcomeCalibrationError:  &outcomeCalErr,
+		}
+		outcomes = append(outcomes, outcome)
+
+		// Per-season accumulation
+		acc, ok := seasonStats[int(season)]
+		if !ok {
+			acc = &seasonAccumulator{}
+			seasonStats[int(season)] = acc
+		}
+		acc.samples++
+		if hasRealFeatures {
+			acc.realFeatures++
+		}
+		acc.sumAbsErr += math.Abs(outcomeCalErr)
+		acc.sumBrier += outcomeCalErr * outcomeCalErr
+		if homeWin {
+			acc.homeWins++
+		}
+		acc.sumPredicted += predictedHome
+	}
+
+	// Build per-season calibrations
+	seasonKeys := make([]int, 0, len(seasonStats))
+	for k := range seasonStats {
+		seasonKeys = append(seasonKeys, k)
+	}
+	sort.Ints(seasonKeys)
+
+	seasonCalibrations := make([]SeasonCalibration, 0, len(seasonKeys))
+	for _, s := range seasonKeys {
+		acc := seasonStats[s]
+		n := float64(acc.samples)
+		seasonCalibrations = append(seasonCalibrations, SeasonCalibration{
+			Season:               s,
+			Samples:              acc.samples,
+			RealFeatureRate:      float64(acc.realFeatures) / n,
+			MeanAbsoluteError:    acc.sumAbsErr / n,
+			BrierScore:           acc.sumBrier / n,
+			HomeWinRate:          float64(acc.homeWins) / n,
+			PredictedHomeWinRate: acc.sumPredicted / n,
+		})
+	}
+
+	// Overall calibration from outcome calibration errors
+	calibration := computeOutcomeCalibrationReport(outcomes)
+
+	// Walk-forward on outcomes using game dates
+	wfResolved := resolvedRunConfig{
+		WalkForwardTrain:      wfTrain,
+		WalkForwardValidation: wfValidation,
+		WalkForwardStep:       wfStep,
+	}
+	walkForward, err := computeWalkForward(outcomes, wfResolved)
+	if err != nil {
+		return PipelineArtifact{}, err
+	}
+
+	generatedAt := time.Now().UTC()
+	if len(outcomes) > 0 {
+		generatedAt = outcomes[len(outcomes)-1].CommenceTimeUTC
+	}
+
+	return PipelineArtifact{
+		GeneratedAtUTC:     generatedAt,
+		BacktestMode:       "outcome",
+		CLVMode:            "unavailable",
+		RollingWindow:      rollingWindow,
+		SeasonStartFilter:  cfg.SeasonStart,
+		SeasonEndFilter:    cfg.SeasonEnd,
+		MarketKey:          "outcome",
+		ModelVersion:       modelVersion,
+		Outcomes:           outcomes,
+		WalkForward:        walkForward,
+		Calibration:        calibration,
+		SeasonCalibrations: seasonCalibrations,
+	}, nil
+}
+
+type seasonAccumulator struct {
+	samples      int
+	realFeatures int
+	sumAbsErr    float64
+	sumBrier     float64
+	homeWins     int
+	sumPredicted float64
+}
+
+// computeOutcomeCalibrationReport computes calibration using actual outcomes (binary) instead of closing lines.
+func computeOutcomeCalibrationReport(outcomes []Outcome) CalibrationReport {
+	if len(outcomes) == 0 {
+		return CalibrationReport{}
+	}
+
+	predictions := make([]float64, 0, len(outcomes))
+	targets := make([]float64, 0, len(outcomes))
+	absErr := 0.0
+	brier := 0.0
+	count := 0
+
+	for _, outcome := range outcomes {
+		if outcome.OutcomeCalibrationError == nil {
+			continue
+		}
+		predicted := outcome.PredictedHomeProbability
+		actual := 0.0
+		if outcome.ActualHomeWin != nil && *outcome.ActualHomeWin {
+			actual = 1.0
+		}
+		predictions = append(predictions, predicted)
+		targets = append(targets, actual)
+		delta := predicted - actual
+		absErr += math.Abs(delta)
+		brier += delta * delta
+		count++
+	}
+
+	if count == 0 {
+		return CalibrationReport{}
+	}
+
+	n := float64(count)
+	return CalibrationReport{
+		Samples:                count,
+		MeanAbsoluteError:      absErr / n,
+		BrierScore:             brier / n,
+		ExpectedCalibrationErr: expectedCalibrationErrorContinuous(predictions, targets, 10),
+	}
 }
 
 func (e Engine) predictHomeProbability(req features.BuildRequest) (float64, error) {
@@ -497,6 +792,7 @@ func (e Engine) predictHomeProbability(req features.BuildRequest) (float64, erro
 				GoalsAgainstPerGame: clamp(req.TeamQuality.HomeDefenseRating/34.0, 1.8, 4.8),
 				GoalieGSAx:          req.NHL.HomeGoalieGSAx,
 				PDO:                 req.NHL.HomePDO,
+				CorsiShare:          req.NHL.HomeCorsi,
 			},
 			AwayTeam: modelnhl.TeamProfile{
 				Name:                "away",
@@ -505,6 +801,7 @@ func (e Engine) predictHomeProbability(req features.BuildRequest) (float64, erro
 				GoalsAgainstPerGame: clamp(req.TeamQuality.AwayDefenseRating/34.0, 1.8, 4.8),
 				GoalieGSAx:          req.NHL.AwayGoalieGSAx,
 				PDO:                 req.NHL.AwayPDO,
+				CorsiShare:          req.NHL.AwayCorsi,
 			},
 		})
 		if err != nil {
@@ -621,6 +918,8 @@ func deterministicBuildRequest(row store.ListBacktestReplayRowsRow, sport domain
 			AwayXGShare:    clamp(spreadUnit(seed+":axg", 0.44, 0.56), 0.35, 0.65),
 			HomePDO:        clamp(spreadUnit(seed+":hpdo", 0.975, 1.03), 0.90, 1.10),
 			AwayPDO:        clamp(spreadUnit(seed+":apdo", 0.975, 1.03), 0.90, 1.10),
+			HomeCorsi:      clamp(spreadUnit(seed+":hcorsi", 0.45, 0.57), 0.35, 0.65),
+			AwayCorsi:      clamp(spreadUnit(seed+":acorsi", 0.43, 0.55), 0.35, 0.65),
 		}
 	case domain.SportNFL:
 		keyNumber := 3.0
@@ -832,6 +1131,7 @@ type resolvedRunConfig struct {
 	MarketKey             string
 	RowLimit              int
 	ModelVersion          string
+	RollingWindow         int
 	WalkForwardTrain      int
 	WalkForwardValidation int
 	WalkForwardStep       int
@@ -848,6 +1148,7 @@ func resolveRunConfig(cfg RunConfig) (resolvedRunConfig, error) {
 		MarketKey:             strings.TrimSpace(cfg.MarketKey),
 		RowLimit:              cfg.RowLimit,
 		ModelVersion:          strings.TrimSpace(cfg.ModelVersion),
+		RollingWindow:         cfg.RollingWindow,
 		WalkForwardTrain:      cfg.WalkForwardTrain,
 		WalkForwardValidation: cfg.WalkForwardValidation,
 		WalkForwardStep:       cfg.WalkForwardStep,
@@ -855,6 +1156,9 @@ func resolveRunConfig(cfg RunConfig) (resolvedRunConfig, error) {
 		MinimumStakeDollars:   cfg.MinimumStakeDollars,
 		KellyFraction:         cfg.KellyFraction,
 		MaxStakeFraction:      cfg.MaxStakeFraction,
+	}
+	if resolved.RollingWindow <= 0 {
+		resolved.RollingWindow = defaultRollingWindow
 	}
 	if resolved.MarketKey == "" {
 		resolved.MarketKey = defaultMarketKey

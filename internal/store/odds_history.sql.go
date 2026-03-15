@@ -24,6 +24,23 @@ func (q *Queries) CountOddsHistoryRows(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
+const getLatestMarketProbabilityForGame = `-- name: GetLatestMarketProbabilityForGame :one
+SELECT implied_probability
+FROM odds_history
+WHERE game_id = $1
+  AND market_key = 'h2h'
+  AND outcome_side = 'home'
+ORDER BY captured_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestMarketProbabilityForGame(ctx context.Context, gameID int64) (float64, error) {
+	row := q.db.QueryRow(ctx, getLatestMarketProbabilityForGame, gameID)
+	var implied_probability float64
+	err := row.Scan(&implied_probability)
+	return implied_probability, err
+}
+
 const getLatestSnapshotHash = `-- name: GetLatestSnapshotHash :one
 SELECT snapshot_hash
 FROM odds_history
@@ -233,6 +250,128 @@ func (q *Queries) ListLatestOdds(ctx context.Context, arg ListLatestOddsParams) 
 	var items []ListLatestOddsRow
 	for rows.Next() {
 		var i ListLatestOddsRow
+		if err := rows.Scan(
+			&i.GameID,
+			&i.Sport,
+			&i.HomeTeam,
+			&i.AwayTeam,
+			&i.CommenceTime,
+			&i.BookKey,
+			&i.BookName,
+			&i.MarketKey,
+			&i.MarketName,
+			&i.OutcomeName,
+			&i.OutcomeSide,
+			&i.PriceAmerican,
+			&i.Point,
+			&i.ImpliedProbability,
+			&i.CapturedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLatestOddsForUpcoming = `-- name: ListLatestOddsForUpcoming :many
+WITH latest AS (
+    SELECT DISTINCT ON (
+        oh.game_id,
+        oh.book_key,
+        oh.market_key,
+        oh.outcome_name,
+        oh.outcome_side,
+        oh.point
+    )
+        oh.game_id,
+        oh.book_key,
+        oh.book_name,
+        oh.market_key,
+        oh.market_name,
+        oh.outcome_name,
+        oh.outcome_side,
+        oh.price_american,
+        oh.point,
+        oh.implied_probability,
+        oh.captured_at
+    FROM odds_history AS oh
+    JOIN games AS g ON g.id = oh.game_id
+    WHERE g.commence_time > NOW() - INTERVAL '12 hours'
+      AND (
+          $2::text IS NULL
+          OR g.sport = $2::text
+      )
+    ORDER BY
+        oh.game_id,
+        oh.book_key,
+        oh.market_key,
+        oh.outcome_name,
+        oh.outcome_side,
+        oh.point,
+        oh.captured_at DESC
+)
+SELECT
+    latest.game_id,
+    g.sport,
+    g.home_team,
+    g.away_team,
+    g.commence_time,
+    latest.book_key,
+    latest.book_name,
+    latest.market_key,
+    latest.market_name,
+    latest.outcome_name,
+    latest.outcome_side,
+    latest.price_american,
+    latest.point,
+    latest.implied_probability,
+    latest.captured_at
+FROM latest
+JOIN games AS g ON g.id = latest.game_id
+ORDER BY
+    g.commence_time ASC,
+    latest.book_key ASC,
+    latest.market_key ASC,
+    latest.outcome_name ASC
+LIMIT $1
+`
+
+type ListLatestOddsForUpcomingParams struct {
+	RowLimit int32   `json:"row_limit"`
+	Sport    *string `json:"sport"`
+}
+
+type ListLatestOddsForUpcomingRow struct {
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	HomeTeam           string             `json:"home_team"`
+	AwayTeam           string             `json:"away_team"`
+	CommenceTime       pgtype.Timestamptz `json:"commence_time"`
+	BookKey            string             `json:"book_key"`
+	BookName           string             `json:"book_name"`
+	MarketKey          string             `json:"market_key"`
+	MarketName         string             `json:"market_name"`
+	OutcomeName        string             `json:"outcome_name"`
+	OutcomeSide        string             `json:"outcome_side"`
+	PriceAmerican      int32              `json:"price_american"`
+	Point              *float64           `json:"point"`
+	ImpliedProbability float64            `json:"implied_probability"`
+	CapturedAt         pgtype.Timestamptz `json:"captured_at"`
+}
+
+func (q *Queries) ListLatestOddsForUpcoming(ctx context.Context, arg ListLatestOddsForUpcomingParams) ([]ListLatestOddsForUpcomingRow, error) {
+	rows, err := q.db.Query(ctx, listLatestOddsForUpcoming, arg.RowLimit, arg.Sport)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLatestOddsForUpcomingRow
+	for rows.Next() {
+		var i ListLatestOddsForUpcomingRow
 		if err := rows.Scan(
 			&i.GameID,
 			&i.Sport,

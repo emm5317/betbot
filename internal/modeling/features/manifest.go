@@ -293,6 +293,7 @@ func buildCompiledManifests() map[manifestKey]compiledManifest {
 				"market_total_points",
 				"market_total_points_norm",
 				"nhl_away_pdo_regression_pressure_norm",
+				"nhl_corsi_edge_norm",
 				"nhl_goalie_gsax_edge_norm",
 				"nhl_home_pdo_regression_pressure_norm",
 				"nhl_pdo_regression_edge_norm",

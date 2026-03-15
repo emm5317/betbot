@@ -13,10 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const (
-	defaultRollingWindow = 20
-	minRollingGames      = 10
-)
+const defaultRollingWindow = 20
 
 // MoneyPuckStore captures the sqlc queries needed for real NHL features.
 type MoneyPuckStore interface {
@@ -25,6 +22,7 @@ type MoneyPuckStore interface {
 	GetGoalieSeasonGSAx(ctx context.Context, arg store.GetGoalieSeasonGSAxParams) (store.GetGoalieSeasonGSAxRow, error)
 	GetGameResult(ctx context.Context, gameID string) ([]store.GetGameResultRow, error)
 	FindMoneypuckGameID(ctx context.Context, arg store.FindMoneypuckGameIDParams) (string, error)
+	ListOutcomeBacktestGames(ctx context.Context, arg store.ListOutcomeBacktestGamesParams) ([]store.ListOutcomeBacktestGamesRow, error)
 }
 
 // NHLFeatureResult holds the computed features and metadata for an NHL game.
@@ -53,7 +51,12 @@ func BuildNHLFeatures(
 	gameDate time.Time,
 	season int32,
 	openingHomeProb float64,
+	rollingWindow int,
 ) (NHLFeatureResult, error) {
+	if rollingWindow <= 0 {
+		rollingWindow = defaultRollingWindow
+	}
+	minRollingGames := rollingWindow / 2
 
 	tm := moneypuck.NewTeamMap()
 	homeAbbrev, err := tm.FromOddsAPIName(homeTeamAPI)
@@ -77,7 +80,7 @@ func BuildNHLFeatures(
 		Team:     homeAbbrev,
 		GameDate: pgDate,
 		Season:   season,
-		Limit:    int32(defaultRollingWindow),
+		Limit:    int32(rollingWindow),
 	})
 	if err != nil {
 		return NHLFeatureResult{}, fmt.Errorf("get home rolling stats: %w", err)
@@ -87,7 +90,7 @@ func BuildNHLFeatures(
 		Team:     awayAbbrev,
 		GameDate: pgDate,
 		Season:   season,
-		Limit:    int32(defaultRollingWindow),
+		Limit:    int32(rollingWindow),
 	})
 	if err != nil {
 		return NHLFeatureResult{}, fmt.Errorf("get away rolling stats: %w", err)
@@ -178,6 +181,142 @@ func BuildNHLFeatures(
 			AwayXGShare:    clamp(awayRolling.xgPct, 0.35, 0.65),
 			HomePDO:        clamp(homeRolling.pdo, 0.90, 1.10),
 			AwayPDO:        clamp(awayRolling.pdo, 0.90, 1.10),
+		},
+	}
+
+	return result, nil
+}
+
+// BuildNHLFeaturesFromAbbrev computes a BuildRequest using MoneyPuck abbreviations directly,
+// skipping the Odds API name translation. Used by the outcome-based backtest which iterates
+// MoneyPuck data directly.
+func BuildNHLFeaturesFromAbbrev(
+	ctx context.Context,
+	mpStore MoneyPuckStore,
+	homeAbbrev, awayAbbrev string,
+	gameDate time.Time,
+	season int32,
+	rollingWindow int,
+) (NHLFeatureResult, error) {
+	if rollingWindow <= 0 {
+		rollingWindow = defaultRollingWindow
+	}
+	minRollingGames := rollingWindow / 2
+
+	pgDate := pgtype.Date{Time: gameDate, Valid: true}
+
+	mpGameID, _ := mpStore.FindMoneypuckGameID(ctx, store.FindMoneypuckGameIDParams{
+		Team:     homeAbbrev,
+		GameDate: pgDate,
+	})
+
+	homeStats, err := mpStore.GetTeamRolling5on5Stats(ctx, store.GetTeamRolling5on5StatsParams{
+		Team:     homeAbbrev,
+		GameDate: pgDate,
+		Season:   season,
+		Limit:    int32(rollingWindow),
+	})
+	if err != nil {
+		return NHLFeatureResult{}, fmt.Errorf("get home rolling stats: %w", err)
+	}
+
+	awayStats, err := mpStore.GetTeamRolling5on5Stats(ctx, store.GetTeamRolling5on5StatsParams{
+		Team:     awayAbbrev,
+		GameDate: pgDate,
+		Season:   season,
+		Limit:    int32(rollingWindow),
+	})
+	if err != nil {
+		return NHLFeatureResult{}, fmt.Errorf("get away rolling stats: %w", err)
+	}
+
+	// Use 0.50 as default opening prob since we don't have odds data
+	defaultProb := 0.50
+
+	if len(homeStats) < minRollingGames || len(awayStats) < minRollingGames {
+		return buildDefaultNHLFeatures(defaultProb), nil
+	}
+
+	homeRolling := computeRollingAverages(homeStats)
+	awayRolling := computeRollingAverages(awayStats)
+
+	result := NHLFeatureResult{HasReal: true}
+
+	homeGSAx := 0.0
+	awayGSAx := 0.0
+
+	homeGoalie, hgErr := mpStore.GetStartingGoalie(ctx, store.GetStartingGoalieParams{
+		GameID: mpGameID,
+		Team:   homeAbbrev,
+	})
+	if hgErr == nil {
+		result.HomeGoalie = homeGoalie.Name
+		gsaxRow, gErr := mpStore.GetGoalieSeasonGSAx(ctx, store.GetGoalieSeasonGSAxParams{
+			PlayerID: homeGoalie.PlayerID,
+			Season:   season,
+			GameDate: pgDate,
+		})
+		if gErr == nil && gsaxRow.GamesPlayed > 0 {
+			homeGSAx = gsaxRow.CumulativeGsax
+		}
+	}
+
+	awayGoalie, agErr := mpStore.GetStartingGoalie(ctx, store.GetStartingGoalieParams{
+		GameID: mpGameID,
+		Team:   awayAbbrev,
+	})
+	if agErr == nil {
+		result.AwayGoalie = awayGoalie.Name
+		gsaxRow, gErr := mpStore.GetGoalieSeasonGSAx(ctx, store.GetGoalieSeasonGSAxParams{
+			PlayerID: awayGoalie.PlayerID,
+			Season:   season,
+			GameDate: pgDate,
+		})
+		if gErr == nil && gsaxRow.GamesPlayed > 0 {
+			awayGSAx = gsaxRow.CumulativeGsax
+		}
+	}
+
+	result.Request = features.BuildRequest{
+		Sport: domain.SportNHL,
+		Market: features.MarketInputs{
+			HomeMoneylineProbability: defaultProb,
+			AwayMoneylineProbability: 1 - defaultProb,
+			HomeSpread:               0,
+			TotalPoints:              homeRolling.goalsFor + homeRolling.goalsAgainst + awayRolling.goalsFor + awayRolling.goalsAgainst,
+		},
+		TeamQuality: features.TeamQualityInputs{
+			HomePowerRating:   clamp(homeRolling.xgPct*200, 60, 130),
+			AwayPowerRating:   clamp(awayRolling.xgPct*200, 60, 130),
+			HomeOffenseRating: clamp(homeRolling.goalsFor*32, 70, 140),
+			AwayOffenseRating: clamp(awayRolling.goalsFor*32, 70, 140),
+			HomeDefenseRating: clamp(homeRolling.goalsAgainst*34, 70, 140),
+			AwayDefenseRating: clamp(awayRolling.goalsAgainst*34, 70, 140),
+		},
+		Situational: features.SituationalInputs{
+			HomeRestDays:   1,
+			AwayRestDays:   1,
+			HomeGamesLast7: clampInt(len(homeStats)/3, 2, 5),
+			AwayGamesLast7: clampInt(len(awayStats)/3, 2, 5),
+		},
+		Injuries: features.InjuryInputs{
+			HomeAvailability: 0.95,
+			AwayAvailability: 0.95,
+		},
+		Weather: features.WeatherInputs{
+			TemperatureF: 70,
+			WindMPH:      0,
+			IsDome:       true,
+		},
+		NHL: &features.NHLContext{
+			HomeGoalieGSAx: clamp(homeGSAx, -40, 40),
+			AwayGoalieGSAx: clamp(awayGSAx, -40, 40),
+			HomeXGShare:    clamp(homeRolling.xgPct, 0.35, 0.65),
+			AwayXGShare:    clamp(awayRolling.xgPct, 0.35, 0.65),
+			HomePDO:        clamp(homeRolling.pdo, 0.90, 1.10),
+			AwayPDO:        clamp(awayRolling.pdo, 0.90, 1.10),
+			HomeCorsi:      clamp(homeRolling.corsi, 0.35, 0.65),
+			AwayCorsi:      clamp(awayRolling.corsi, 0.35, 0.65),
 		},
 	}
 
@@ -298,6 +437,7 @@ func buildDefaultNHLFeatures(openingHomeProb float64) NHLFeatureResult {
 				HomeGoalieGSAx: 0, AwayGoalieGSAx: 0,
 				HomeXGShare: 0.50, AwayXGShare: 0.50,
 				HomePDO: 1.0, AwayPDO: 1.0,
+				HomeCorsi: 0.50, AwayCorsi: 0.50,
 			},
 		},
 	}

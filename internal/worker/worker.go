@@ -127,6 +127,7 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	river.AddWorker(workers, NewNFLStatsETLWorker(pool, logger, statsetl.NewNFLverseProvider("", "", 0)))
 	river.AddWorker(workers, NewInjurySyncWorker(pool, logger, injuries.NewRotowireProvider("", 0)))
 	river.AddWorker(workers, NewWeatherSyncWorker(pool, logger, weather.NewOpenMeteoProvider("", 0)))
+	river.AddWorker(workers, NewPredictionWorker(pool, logger))
 
 	periodicJobs := []*river.PeriodicJob{}
 	if oddsPollingEnabled {
@@ -147,6 +148,20 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		}
 		logger.Info("odds polling disabled", slog.String("reason", reason))
 	}
+
+	// NHL prediction job runs every 15 minutes
+	periodicJobs = append(periodicJobs,
+		river.NewPeriodicJob(
+			river.PeriodicInterval(15*time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return PredictionArgs{
+					RequestedAt: time.Now().UTC(),
+					Sport:       "NHL",
+				}, nil
+			},
+			&river.PeriodicJobOpts{ID: "nhl-prediction", RunOnStart: true},
+		),
+	)
 
 	client, err := river.NewClient(driver, &river.Config{
 		Logger: logger,
@@ -203,6 +218,10 @@ func (a *App) EnqueueInjurySync(ctx context.Context, req injuries.Request) (*riv
 
 func (a *App) EnqueueWeatherSync(ctx context.Context, req weather.Request) (*rivertype.JobInsertResult, error) {
 	return EnqueueWeatherSync(ctx, a.client, req)
+}
+
+func (a *App) EnqueuePrediction(ctx context.Context, sport string) (*rivertype.JobInsertResult, error) {
+	return EnqueuePrediction(ctx, a.client, sport)
 }
 
 func (a *App) Close() {

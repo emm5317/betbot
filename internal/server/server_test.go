@@ -79,6 +79,33 @@ func (f *fakeReadQueries) ListLatestOdds(_ context.Context, arg store.ListLatest
 	return f.listLatestOddsRows, nil
 }
 
+func (f *fakeReadQueries) ListLatestOddsForUpcoming(_ context.Context, _ store.ListLatestOddsForUpcomingParams) ([]store.ListLatestOddsForUpcomingRow, error) {
+	if f.listLatestOddsErr != nil {
+		return nil, f.listLatestOddsErr
+	}
+	rows := make([]store.ListLatestOddsForUpcomingRow, len(f.listLatestOddsRows))
+	for i, r := range f.listLatestOddsRows {
+		rows[i] = store.ListLatestOddsForUpcomingRow{
+			GameID:             r.GameID,
+			Sport:              r.Sport,
+			HomeTeam:           r.HomeTeam,
+			AwayTeam:           r.AwayTeam,
+			CommenceTime:       r.CommenceTime,
+			BookKey:            r.BookKey,
+			BookName:           r.BookName,
+			MarketKey:          r.MarketKey,
+			MarketName:         r.MarketName,
+			OutcomeName:        r.OutcomeName,
+			OutcomeSide:        r.OutcomeSide,
+			PriceAmerican:      r.PriceAmerican,
+			Point:              r.Point,
+			ImpliedProbability: r.ImpliedProbability,
+			CapturedAt:         r.CapturedAt,
+		}
+	}
+	return rows, nil
+}
+
 func (f *fakeReadQueries) ListModelPredictionsForSportSeason(_ context.Context, arg store.ListModelPredictionsForSportSeasonParams) ([]store.ModelPrediction, error) {
 	f.modelPredictionsCalls = append(f.modelPredictionsCalls, arg)
 	if f.modelPredictionsErr != nil {

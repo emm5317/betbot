@@ -38,13 +38,13 @@ func (a *App) handleRecommendations(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(map[string]any{"error": err.Error()})
 	}
 
-	balanceCents, err := a.queries.GetBankrollBalanceCents(c.Context())
+	circuitMetrics, err := a.queries.GetBankrollCircuitMetrics(c.Context())
 	if err != nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(map[string]any{
 			"error": "bankroll balance unavailable",
 		})
 	}
-	if balanceCents < 0 {
+	if circuitMetrics.CurrentBalanceCents < 0 {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(map[string]any{
 			"error": "bankroll balance unavailable",
 		})
@@ -57,8 +57,22 @@ func (a *App) handleRecommendations(c fiber.Ctx) error {
 
 	generatedAt := time.Now().UTC()
 	recommendations, err := decision.BuildRecommendations(candidates, decision.RecommendationBuildConfig{
-		EVThreshold:            a.cfg.EVThreshold,
-		AvailableBankrollCents: balanceCents,
+		EVThreshold:                          a.cfg.EVThreshold,
+		KellyFraction:                        a.cfg.KellyFraction,
+		MaxBetFraction:                       a.cfg.MaxBetFraction,
+		CorrelationMaxPicksPerGame:           a.cfg.CorrelationMaxPicksPerGame,
+		CorrelationMaxStakeFractionPerGame:   a.cfg.CorrelationMaxStakeFractionPerGame,
+		CorrelationMaxPicksPerSportDayWindow: a.cfg.CorrelationMaxPicksPerSportDay,
+		CircuitDailyLossStop:                 a.cfg.DailyLossStop,
+		CircuitWeeklyLossStop:                a.cfg.WeeklyLossStop,
+		CircuitDrawdownBreaker:               a.cfg.DrawdownBreaker,
+		CircuitMetrics: decision.CircuitBreakerMetrics{
+			CurrentBalanceCents:   circuitMetrics.CurrentBalanceCents,
+			DayStartBalanceCents:  circuitMetrics.DayStartBalanceCents,
+			WeekStartBalanceCents: circuitMetrics.WeekStartBalanceCents,
+			PeakBalanceCents:      circuitMetrics.PeakBalanceCents,
+		},
+		AvailableBankrollCents: circuitMetrics.CurrentBalanceCents,
 		GeneratedAt:            generatedAt,
 	})
 	if err != nil {
@@ -68,7 +82,12 @@ func (a *App) handleRecommendations(c fiber.Ctx) error {
 	if len(recommendations) > limit {
 		recommendations = recommendations[:limit]
 	}
-	if err := a.persistRecommendationSnapshots(c.Context(), recommendations); err != nil {
+	if err := a.persistRecommendationSnapshots(c.Context(), recommendations, decision.CircuitBreakerMetrics{
+		CurrentBalanceCents:   circuitMetrics.CurrentBalanceCents,
+		DayStartBalanceCents:  circuitMetrics.DayStartBalanceCents,
+		WeekStartBalanceCents: circuitMetrics.WeekStartBalanceCents,
+		PeakBalanceCents:      circuitMetrics.PeakBalanceCents,
+	}); err != nil {
 		return fmt.Errorf("persist recommendation snapshots: %w", err)
 	}
 
@@ -108,7 +127,7 @@ func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFil
 		}
 	}
 
-	oddsRows, err := a.queries.ListLatestOdds(ctx, store.ListLatestOddsParams{
+	oddsRows, err := a.queries.ListLatestOddsForUpcoming(ctx, store.ListLatestOddsForUpcomingParams{
 		RowLimit: recommendationOddsRowLimit(limit),
 		Sport:    sportFilter.storeParam(),
 	})
@@ -116,7 +135,7 @@ func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFil
 		return nil, fmt.Errorf("list latest odds: %w", err)
 	}
 
-	quotesByMarket := latestQuotesByGameAndMarket(oddsRows)
+	quotesByMarket := latestQuotesByGameAndMarketUpcoming(oddsRows)
 	candidates := make([]decision.RecommendationCandidate, 0, len(predictionsByKey))
 	for _, prediction := range predictionsByKey {
 		sport := domain.Sport(prediction.Sport)
@@ -155,17 +174,55 @@ func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFil
 	return candidates, nil
 }
 
-func (a *App) persistRecommendationSnapshots(ctx context.Context, recommendations []decision.Recommendation) error {
-	metadata, err := json.Marshal(map[string]any{
+func (a *App) persistRecommendationSnapshots(ctx context.Context, recommendations []decision.Recommendation, circuitMetrics decision.CircuitBreakerMetrics) error {
+	baseMetadata := map[string]any{
 		"mode":         "recommendation-only",
 		"ev_threshold": a.cfg.EVThreshold,
-	})
-	if err != nil {
-		return fmt.Errorf("marshal recommendation metadata: %w", err)
+	}
+	if a.cfg.KellyFraction > 0 {
+		baseMetadata["kelly_fraction_override"] = a.cfg.KellyFraction
+	}
+	if a.cfg.MaxBetFraction > 0 {
+		baseMetadata["max_bet_fraction_override"] = a.cfg.MaxBetFraction
 	}
 
 	for i := range recommendations {
 		rec := recommendations[i]
+		metadata := make(map[string]any, len(baseMetadata)+1)
+		for key, value := range baseMetadata {
+			metadata[key] = value
+		}
+		metadata["sizing"] = map[string]any{
+			"raw_kelly_fraction":       rec.RawKellyFraction,
+			"applied_fractional_kelly": rec.AppliedFractionalKelly,
+			"capped_fraction":          rec.CappedFraction,
+			"pre_bankroll_stake_cents": rec.PreBankrollStakeCents,
+			"bankroll_available_cents": rec.BankrollAvailableCents,
+			"bankroll_check_passed":    rec.BankrollCheckPass,
+			"bankroll_check_reason":    rec.BankrollCheckReason,
+			"reasons":                  append([]string(nil), rec.SizingReasons...),
+		}
+		metadata["correlation"] = map[string]any{
+			"check_passed": rec.CorrelationCheckPass,
+			"check_reason": rec.CorrelationCheckReason,
+			"group_key":    rec.CorrelationGroupKey,
+		}
+		metadata["circuit"] = map[string]any{
+			"check_passed":             rec.CircuitCheckPass,
+			"check_reason":             rec.CircuitCheckReason,
+			"daily_loss_stop":          a.cfg.DailyLossStop,
+			"weekly_loss_stop":         a.cfg.WeeklyLossStop,
+			"drawdown_breaker":         a.cfg.DrawdownBreaker,
+			"current_balance_cents":    circuitMetrics.CurrentBalanceCents,
+			"day_start_balance_cents":  circuitMetrics.DayStartBalanceCents,
+			"week_start_balance_cents": circuitMetrics.WeekStartBalanceCents,
+			"peak_balance_cents":       circuitMetrics.PeakBalanceCents,
+		}
+		metadataJSON, err := json.Marshal(metadata)
+		if err != nil {
+			return fmt.Errorf("marshal recommendation metadata game_id=%d market=%s: %w", rec.GameID, rec.Market, err)
+		}
+
 		eventDate := rec.EventTime.UTC()
 		if _, err := a.queries.InsertRecommendationSnapshot(ctx, store.InsertRecommendationSnapshotParams{
 			GeneratedAt:            store.Timestamptz(rec.GeneratedAt),
@@ -185,7 +242,7 @@ func (a *App) persistRecommendationSnapshots(ctx context.Context, recommendation
 			BankrollCheckPass:      rec.BankrollCheckPass,
 			BankrollCheckReason:    rec.BankrollCheckReason,
 			RankScore:              rec.RankScore,
-			Metadata:               metadata,
+			Metadata:               metadataJSON,
 		}); err != nil {
 			return fmt.Errorf("insert recommendation snapshot for game_id=%d market=%s: %w", rec.GameID, rec.Market, err)
 		}
@@ -313,6 +370,80 @@ func latestQuotesByGameAndMarket(rows []store.ListLatestOddsRow) map[string][]de
 	for marketKey := range quotesByMarket {
 		sort.SliceStable(quotesByMarket[marketKey], func(i, j int) bool {
 			return quotesByMarket[marketKey][i].Book < quotesByMarket[marketKey][j].Book
+		})
+	}
+
+	return quotesByMarket
+}
+
+func latestQuotesByGameAndMarketUpcoming(rows []store.ListLatestOddsForUpcomingRow) map[string][]decision.BookQuote {
+	type marketKey struct {
+		gameID int64
+		market string
+	}
+	type quoteAccumulator struct {
+		book    string
+		home    int
+		away    int
+		hasHome bool
+		hasAway bool
+	}
+	type bookKey struct {
+		market marketKey
+		book   string
+	}
+
+	byBook := make(map[bookKey]*quoteAccumulator)
+	for _, row := range rows {
+		side := strings.ToLower(strings.TrimSpace(row.OutcomeSide))
+		if side != "home" && side != "away" {
+			continue
+		}
+
+		book := strings.TrimSpace(row.BookName)
+		if book == "" {
+			book = strings.TrimSpace(row.BookKey)
+		}
+		if book == "" {
+			continue
+		}
+
+		key := bookKey{
+			market: marketKey{gameID: row.GameID, market: row.MarketKey},
+			book:   book,
+		}
+		acc, ok := byBook[key]
+		if !ok {
+			acc = &quoteAccumulator{book: book}
+			byBook[key] = acc
+		}
+
+		price := int(row.PriceAmerican)
+		if side == "home" {
+			acc.home = price
+			acc.hasHome = true
+		} else {
+			acc.away = price
+			acc.hasAway = true
+		}
+	}
+
+	quotesByMarket := make(map[string][]decision.BookQuote)
+	for key, acc := range byBook {
+		if !acc.hasHome || !acc.hasAway {
+			continue
+		}
+		groupKey := recommendationKey(key.market.gameID, key.market.market)
+		quotesByMarket[groupKey] = append(quotesByMarket[groupKey], decision.BookQuote{
+			Book:         acc.book,
+			HomeAmerican: acc.home,
+			AwayAmerican: acc.away,
+		})
+	}
+
+	for mk := range quotesByMarket {
+		sort.SliceStable(quotesByMarket[mk], func(i, j int) bool {
+			return quotesByMarket[mk][i].Book < quotesByMarket[mk][j].Book
 		})
 	}
 

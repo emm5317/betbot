@@ -57,3 +57,11 @@ WHERE
     )
 ORDER BY rank_score DESC, generated_at DESC, id ASC
 LIMIT sqlc.arg(row_limit);
+
+-- name: GetRecommendationSnapshotByID :one
+SELECT id, generated_at, sport, game_id, event_time, event_date, market_key,
+    recommended_side, best_book, best_american_odds, model_probability,
+    market_probability, edge, suggested_stake_fraction, suggested_stake_cents,
+    bankroll_check_pass, bankroll_check_reason, rank_score, metadata, created_at
+FROM recommendation_snapshots
+WHERE id = @id;

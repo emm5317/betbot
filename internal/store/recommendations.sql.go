@@ -12,6 +12,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getRecommendationSnapshotByID = `-- name: GetRecommendationSnapshotByID :one
+SELECT id, generated_at, sport, game_id, event_time, event_date, market_key,
+    recommended_side, best_book, best_american_odds, model_probability,
+    market_probability, edge, suggested_stake_fraction, suggested_stake_cents,
+    bankroll_check_pass, bankroll_check_reason, rank_score, metadata, created_at
+FROM recommendation_snapshots
+WHERE id = $1
+`
+
+func (q *Queries) GetRecommendationSnapshotByID(ctx context.Context, id int64) (RecommendationSnapshot, error) {
+	row := q.db.QueryRow(ctx, getRecommendationSnapshotByID, id)
+	var i RecommendationSnapshot
+	err := row.Scan(
+		&i.ID,
+		&i.GeneratedAt,
+		&i.Sport,
+		&i.GameID,
+		&i.EventTime,
+		&i.EventDate,
+		&i.MarketKey,
+		&i.RecommendedSide,
+		&i.BestBook,
+		&i.BestAmericanOdds,
+		&i.ModelProbability,
+		&i.MarketProbability,
+		&i.Edge,
+		&i.SuggestedStakeFraction,
+		&i.SuggestedStakeCents,
+		&i.BankrollCheckPass,
+		&i.BankrollCheckReason,
+		&i.RankScore,
+		&i.Metadata,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertRecommendationSnapshot = `-- name: InsertRecommendationSnapshot :one
 INSERT INTO recommendation_snapshots (
     generated_at,

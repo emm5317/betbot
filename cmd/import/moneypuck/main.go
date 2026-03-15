@@ -35,9 +35,9 @@ func main() {
 	}
 
 	switch *importType {
-	case "teams", "goalies", "odds", "asplayed":
+	case "teams", "goalies", "odds", "asplayed", "lines":
 	default:
-		log.Fatal().Str("type", *importType).Msg("invalid import type (must be teams, goalies, odds, or asplayed)")
+		log.Fatal().Str("type", *importType).Msg("invalid import type (must be teams, goalies, odds, asplayed, or lines)")
 	}
 
 	f, err := os.Open(*filePath)
@@ -101,6 +101,13 @@ func main() {
 			log.Fatal().Err(err).Msg("import as-played failed")
 		}
 		log.Info().Int("rows_imported", count).Dur("duration", time.Since(start)).Msg("as-played import complete")
+
+	case "lines":
+		count, err := importLines(ctx, f, queries, tm, *batchSize, seasonFilter)
+		if err != nil {
+			log.Fatal().Err(err).Msg("import lines failed")
+		}
+		log.Info().Int("rows_imported", count).Dur("duration", time.Since(start)).Msg("lines import complete")
 	}
 }
 
@@ -178,6 +185,24 @@ func dryRunImport(importType string, r io.ReadSeeker, tm moneypuck.TeamMap, seas
 				return count, fmt.Errorf("row %d: %w", count+1, err)
 			}
 			count++
+		}
+	case "lines":
+		reader, err := moneypuck.NewLineCSVReader(r, tm, sf)
+		if err != nil {
+			return 0, err
+		}
+		for {
+			_, err := reader.Next()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return count, fmt.Errorf("row %d: %w", count+1, err)
+			}
+			count++
+			if count%5000 == 0 {
+				log.Info().Int("validated", count).Msg("progress")
+			}
 		}
 	}
 	return count, nil
@@ -619,6 +644,61 @@ func buildAsPlayedOddsSnapshots(gameID int64, row *moneypuck.AsPlayedRow, captur
 	})
 
 	return snapshots
+}
+
+func importLines(ctx context.Context, r io.Reader, q *store.Queries, tm moneypuck.TeamMap, batchSize int, seasonFilter *int) (int, error) {
+	var sf *int32
+	if seasonFilter != nil && *seasonFilter > 0 {
+		v := int32(*seasonFilter)
+		sf = &v
+	}
+
+	reader, err := moneypuck.NewLineCSVReader(r, tm, sf)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for {
+		row, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return count, fmt.Errorf("row %d: %w", count+1, err)
+		}
+
+		if err := q.UpsertMoneypuckLineGame(ctx, store.UpsertMoneypuckLineGameParams{
+			LineID:            row.LineID,
+			Name:              row.Name,
+			GameID:            row.GameID,
+			Season:            row.Season,
+			Team:              row.Team,
+			Opponent:          row.Opponent,
+			HomeOrAway:        row.HomeOrAway,
+			GameDate:          row.GameDate,
+			Position:          row.Position,
+			Situation:         row.Situation,
+			Icetime:           row.Icetime,
+			IceTimeRank:       row.IceTimeRank,
+			XgoalsPercentage:  row.XgoalsPercentage,
+			CorsiPercentage:   row.CorsiPercentage,
+			FenwickPercentage: row.FenwickPercentage,
+			XgoalsFor:         row.XgoalsFor,
+			XgoalsAgainst:     row.XgoalsAgainst,
+			GoalsFor:          row.GoalsFor,
+			GoalsAgainst:      row.GoalsAgainst,
+		}); err != nil {
+			return count, fmt.Errorf("upsert line game row %d: %w", count+1, err)
+		}
+
+		count++
+		if count%5000 == 0 {
+			log.Info().Int("imported", count).Msg("progress")
+		}
+	}
+
+	return count, nil
 }
 
 func snapshotHash(gameID int64, market, side string, price int) string {

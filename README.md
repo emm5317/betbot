@@ -73,6 +73,7 @@ The repository is still early-stage. What exists today:
 - NHL xG + goalie and NFL EPA/DVOA situational baseline model packages with unit test coverage
 - sport-specific Kelly baseline defaults (MLB/NBA/NHL/NFL) wired into replay stake recommendations and shared decision sizing
 - decision-engine EV threshold filter with sport-aware defaults and pass/fail gating for candidate evaluation
+- deterministic recommendation stake sizing with odds-aware Kelly math, hard cap enforcement, and ledger-backed bankroll availability gating
 - recommendation-only pull and monitoring API surface:
   - `GET /recommendations`
   - `GET /recommendations/performance`
@@ -92,7 +93,7 @@ What is built now:
 - sport-aware registry and active-season polling policy
 - recommendation-only calibration/drift observability with append-only historical alert runs
 
-The current open build step is Phase 4 decision-engine implementation (`P4-003` onward), with execution still deferred.
+The current open build step is Phase 4 decision-engine implementation (`P4-007` onward), with execution still deferred.
 
 Recommendation mode is now available through `GET /recommendations` for ranked bet suggestions. This flow is recommendation-only and does not invoke live placement adapters.
 
@@ -255,6 +256,50 @@ Use the recommendation pull surface for ranked picks:
 - `GET /recommendations`
 - `GET /recommendations?sport=baseball_mlb&date=2026-03-16&limit=20`
 
+`/recommendations` is recommendation-only and now returns auditable stake-sizing fields per row:
+
+- `raw_kelly_fraction`, `applied_fractional_kelly`, `capped_fraction`
+- `pre_bankroll_stake_dollars`, `pre_bankroll_stake_cents`
+- `bankroll_available_cents`, `bankroll_check_pass`, `bankroll_check_reason`
+- `suggested_stake_dollars`, `suggested_stake_cents`, `suggested_stake_fraction`
+- `correlation_check_pass`, `correlation_check_reason`, `correlation_group_key`
+- `circuit_check_pass`, `circuit_check_reason`
+- deterministic `sizing_reasons`
+
+Sizing semantics are deterministic and ordered:
+
+- compute raw Kelly from model side probability + selected best-book odds
+- apply fractional Kelly policy (sport defaults unless env override)
+- enforce max bet fraction cap
+- run ledger-backed bankroll gate against current `bankroll_ledger` balance
+- if insufficient funds, cap final stake to available cents and emit explicit reasons
+
+Correlation guard semantics are deterministic and recommendation-only:
+
+- runs after sizing/bankroll gate and before final `limit` truncation
+- groups by `sport|game_id` across mixed markets (for example `h2h`, `spreads`, `totals`)
+- applies same-game limits (`max picks`, `max summed stake fraction`) with fixed reason codes
+- optional `sport|event_date` pick limit can also be enforced
+- zero-stake rows are retained with explicit `retained_zero_stake` and do not consume exposure capacity
+
+Example:
+
+- `GET /recommendations?sport=baseball_mlb&date=2026-03-16&limit=10`
+- If two MLB markets from the same game rank highly, only the highest-ranked retained row survives when `BETBOT_CORRELATION_MAX_PICKS_PER_GAME=1`, and the response order remains deterministic.
+
+Circuit breaker semantics are deterministic and recommendation-only:
+
+- runs after correlation guard and before final `limit` truncation
+- uses persisted ledger-derived bankroll metrics (`current`, `day-start`, `week-start`, `peak`) from Postgres
+- enforces `daily_loss_stop`, `weekly_loss_stop`, and `drawdown_breaker` with deterministic reason precedence
+- exact threshold equality triggers (`>=`) a breaker
+- zero-stake rows are retained with explicit `retained_zero_stake`
+
+Example:
+
+- `GET /recommendations?sport=baseball_mlb&date=2026-03-16&limit=20`
+- If bankroll loss breaches `BETBOT_DAILY_LOSS_STOP`, positive-stake rows are dropped with `circuit_check_reason=dropped_daily_loss_stop`.
+
 Use the performance surface for recommendation quality and CLV monitoring:
 
 - `GET /recommendations/performance`
@@ -289,6 +334,21 @@ Use drift history for append-only alert run audit visibility:
 - `GET /recommendations/calibration/alerts/history?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&limit=100`
 
 History rows are ordered `created_at DESC, id DESC` and include run hashes, window bounds, thresholds/guardrails, alert level/reasons, summary deltas, and optional persisted payload snapshot.
+
+### Recommendation sizing config overrides
+
+Global env overrides for recommendation sizing are optional:
+
+- `BETBOT_KELLY_FRACTION` in `[0,1]` (`0` = use sport defaults)
+- `BETBOT_MAX_BET_FRACTION` in `[0,1]` (`0` = use sport defaults)
+- `BETBOT_CORRELATION_MAX_PICKS_PER_GAME` in `[1,25]` (default `1`)
+- `BETBOT_CORRELATION_MAX_STAKE_FRACTION_PER_GAME` in `(0,1]` (default `0.03`)
+- `BETBOT_CORRELATION_MAX_PICKS_PER_SPORT_DAY` in `[0,500]` (default `0`, disabled)
+- `BETBOT_DAILY_LOSS_STOP` in `[0,1]` (default `0.05`)
+- `BETBOT_WEEKLY_LOSS_STOP` in `[0,1]` (default `0.10`)
+- `BETBOT_DRAWDOWN_BREAKER` in `[0,1]` (default `0.15`)
+
+When sizing overrides are unset/zero, the decision layer uses sport-specific baseline sizing policy values (MLB/NBA/NHL/NFL). Correlation guard settings use the deterministic global defaults shown above.
 
 ## Documentation
 

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS bets;
+DROP TYPE IF EXISTS bet_status;
