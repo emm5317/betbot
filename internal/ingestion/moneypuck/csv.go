@@ -61,6 +61,137 @@ type GoalieGameRow struct {
 	HighDangerGoals  *float64
 }
 
+// LineGameRow is a parsed row from the MoneyPuck lines CSV.
+type LineGameRow struct {
+	LineID            string
+	Name              string
+	Season            int32
+	GameID            string
+	Team              string
+	Opponent          string
+	HomeOrAway        string
+	GameDate          pgtype.Date
+	Position          string
+	Situation         string
+	Icetime           *float64
+	IceTimeRank       *float64
+	XgoalsPercentage  *float64
+	CorsiPercentage   *float64
+	FenwickPercentage *float64
+	XgoalsFor         *float64
+	XgoalsAgainst     *float64
+	GoalsFor          *float64
+	GoalsAgainst      *float64
+}
+
+// LineCSVReader reads MoneyPuck line game CSVs row by row.
+type LineCSVReader struct {
+	reader  *csv.Reader
+	idx     columnIndex
+	teamMap TeamMap
+	filter  *int32
+}
+
+var lineRequiredCols = []string{
+	"playerId", "name", "gameId", "season", "playerTeam", "opposingTeam",
+	"home_or_away", "gameDate", "position", "situation",
+	"icetime", "iceTimeRank",
+	"xGoalsPercentage", "corsiPercentage", "fenwickPercentage",
+	"xGoalsFor", "xGoalsAgainst", "goalsFor", "goalsAgainst",
+}
+
+// NewLineCSVReader creates a reader for MoneyPuck line CSVs.
+func NewLineCSVReader(r io.Reader, tm TeamMap, seasonFilter *int32) (*LineCSVReader, error) {
+	cr := csv.NewReader(r)
+	cr.LazyQuotes = true
+	cr.FieldsPerRecord = -1
+
+	headers, err := cr.Read()
+	if err != nil {
+		return nil, fmt.Errorf("read header: %w", err)
+	}
+	idx := buildColumnIndex(headers)
+	if err := idx.require(lineRequiredCols...); err != nil {
+		return nil, err
+	}
+
+	return &LineCSVReader{reader: cr, idx: idx, teamMap: tm, filter: seasonFilter}, nil
+}
+
+// Next reads the next valid line game row. Returns nil, io.EOF when done.
+func (r *LineCSVReader) Next() (*LineGameRow, error) {
+	for {
+		record, err := r.reader.Read()
+		if err != nil {
+			return nil, err
+		}
+
+		// Exclude "Team Level" rows — we only want line-level data
+		pos := r.idx.str(record, "position")
+		if pos == "Team Level" {
+			continue
+		}
+
+		// Only 5on5 and all situations
+		sit := r.idx.str(record, "situation")
+		if sit != "5on5" && sit != "all" {
+			continue
+		}
+
+		season, err := r.idx.int32Val(record, "season")
+		if err != nil {
+			continue
+		}
+		if r.filter != nil && season != *r.filter {
+			continue
+		}
+
+		team := r.idx.str(record, "playerTeam")
+		canonical, err := r.teamMap.Canonical(team)
+		if err != nil {
+			return nil, fmt.Errorf("row team %q: %w", team, err)
+		}
+
+		opponent := r.idx.str(record, "opposingTeam")
+		canonOpp, err := r.teamMap.Canonical(opponent)
+		if err != nil {
+			return nil, fmt.Errorf("row opponent %q: %w", opponent, err)
+		}
+
+		gameDate, err := parseMoneyPuckDate(r.idx.str(record, "gameDate"))
+		if err != nil {
+			return nil, fmt.Errorf("row date: %w", err)
+		}
+
+		homeOrAway := strings.ToUpper(r.idx.str(record, "home_or_away"))
+		if homeOrAway != "HOME" && homeOrAway != "AWAY" {
+			continue
+		}
+
+		return &LineGameRow{
+			LineID:            r.idx.str(record, "playerId"),
+			Name:              r.idx.str(record, "name"),
+			Season:            season,
+			GameID:            r.idx.str(record, "gameId"),
+			Team:              canonical,
+			Opponent:          canonOpp,
+			HomeOrAway:        homeOrAway,
+			GameDate:          gameDate,
+			Position:          pos,
+			Situation:         sit,
+			Icetime:           r.idx.float(record, "icetime"),
+			IceTimeRank:       r.idx.float(record, "iceTimeRank"),
+			XgoalsPercentage:  r.idx.float(record, "xGoalsPercentage"),
+			CorsiPercentage:   r.idx.float(record, "corsiPercentage"),
+			FenwickPercentage: r.idx.float(record, "fenwickPercentage"),
+			XgoalsFor:         r.idx.float(record, "xGoalsFor"),
+			XgoalsAgainst:     r.idx.float(record, "xGoalsAgainst"),
+			GoalsFor:          r.idx.float(record, "goalsFor"),
+			GoalsAgainst:      r.idx.float(record, "goalsAgainst"),
+		}, nil
+	}
+}
+
 // OddsRow is a parsed row from the NHL odds CSV.
 type OddsRow struct {
 	Season         string

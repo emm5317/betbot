@@ -24,3 +24,11 @@ FROM games
 WHERE commence_time >= NOW() - INTERVAL '12 hours'
 ORDER BY commence_time ASC
 LIMIT $1;
+
+-- name: ListUpcomingGamesForSport :many
+SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
+FROM games
+WHERE sport = $1
+  AND commence_time > NOW()
+  AND commence_time < NOW() + INTERVAL '48 hours'
+ORDER BY commence_time ASC;

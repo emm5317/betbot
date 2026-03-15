@@ -5,10 +5,57 @@
 package store
 
 import (
+	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type BetStatus string
+
+const (
+	BetStatusPending BetStatus = "pending"
+	BetStatusPlaced  BetStatus = "placed"
+	BetStatusSettled BetStatus = "settled"
+	BetStatusFailed  BetStatus = "failed"
+	BetStatusVoided  BetStatus = "voided"
+)
+
+func (e *BetStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = BetStatus(s)
+	case string:
+		*e = BetStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for BetStatus: %T", src)
+	}
+	return nil
+}
+
+type NullBetStatus struct {
+	BetStatus BetStatus `json:"bet_status"`
+	Valid     bool      `json:"valid"` // Valid is true if BetStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullBetStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.BetStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.BetStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullBetStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.BetStatus), nil
+}
 
 type BankrollLedger struct {
 	ID            int64              `json:"id"`
@@ -19,6 +66,35 @@ type BankrollLedger struct {
 	ReferenceID   string             `json:"reference_id"`
 	Metadata      json.RawMessage    `json:"metadata"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+type Bet struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         int64              `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   float64            `json:"model_probability"`
+	MarketProbability  float64            `json:"market_probability"`
+	Edge               float64            `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Game struct {
@@ -134,6 +210,29 @@ type MoneypuckGoalieGame struct {
 	HighDangerXgoals *float64           `json:"high_danger_xgoals"`
 	HighDangerGoals  *float64           `json:"high_danger_goals"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type MoneypuckLineGame struct {
+	ID                int64       `json:"id"`
+	LineID            string      `json:"line_id"`
+	Name              string      `json:"name"`
+	GameID            string      `json:"game_id"`
+	Season            int32       `json:"season"`
+	Team              string      `json:"team"`
+	Opponent          string      `json:"opponent"`
+	HomeOrAway        string      `json:"home_or_away"`
+	GameDate          pgtype.Date `json:"game_date"`
+	Position          string      `json:"position"`
+	Situation         string      `json:"situation"`
+	Icetime           *float64    `json:"icetime"`
+	IceTimeRank       *float64    `json:"ice_time_rank"`
+	XgoalsPercentage  *float64    `json:"xgoals_percentage"`
+	CorsiPercentage   *float64    `json:"corsi_percentage"`
+	FenwickPercentage *float64    `json:"fenwick_percentage"`
+	XgoalsFor         *float64    `json:"xgoals_for"`
+	XgoalsAgainst     *float64    `json:"xgoals_against"`
+	GoalsFor          *float64    `json:"goals_for"`
+	GoalsAgainst      *float64    `json:"goals_against"`
 }
 
 type MoneypuckTeamGame struct {

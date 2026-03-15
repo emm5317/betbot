@@ -19,6 +19,7 @@ type TeamProfile struct {
 	GoalsAgainstPerGame float64
 	GoalieGSAx          float64
 	PDO                 float64
+	CorsiShare          float64
 }
 
 type MatchupInput struct {
@@ -41,7 +42,9 @@ type Config struct {
 	ExpectedGoalsShareWeight float64
 	GoalieGSAxWeight         float64
 	GoalsAgainstWeight       float64
+	GoalsForWeight           float64
 	PDORegressionWeight      float64
+	CorsiShareWeight         float64
 	WinProbabilitySlope      float64
 	MinTeamGoals             float64
 	MaxTeamGoals             float64
@@ -54,12 +57,14 @@ type XGGoalieModel struct {
 func DefaultConfig() Config {
 	return Config{
 		LeagueGoalsPerTeam:       3.05,
-		HomeIceGoalAdvantage:     0.14,
-		ExpectedGoalsShareWeight: 2.2,
-		GoalieGSAxWeight:         0.028,
-		GoalsAgainstWeight:       0.34,
-		PDORegressionWeight:      1.9,
-		WinProbabilitySlope:      1.28,
+		HomeIceGoalAdvantage:     0.06,   // modern NHL home win ~50.5%
+		ExpectedGoalsShareWeight: 1.8,   // xG% edge; diff ~0.04-0.10 typical
+		GoalieGSAxWeight:         0.008, // GSAx edge; range -15 to +20 cumulative
+		GoalsAgainstWeight:       0.08,  // defensive edge; GA/game diff ~0.3-0.8
+		GoalsForWeight:           0.14,  // offensive edge; GF/game diff ~0.3-1.0
+		PDORegressionWeight:      0.35,  // luck regression; PDO diff ~0.01-0.04
+		CorsiShareWeight:         0.70,  // possession edge; Corsi diff ~0.02-0.08
+		WinProbabilitySlope:      1.40,  // sigmoid steepness
 		MinTeamGoals:             0.8,
 		MaxTeamGoals:             6.8,
 	}
@@ -84,15 +89,19 @@ func (m XGGoalieModel) Predict(input MatchupInput) (MatchupPrediction, error) {
 	xgEdge := (input.HomeTeam.ExpectedGoalsShare - input.AwayTeam.ExpectedGoalsShare) * m.cfg.ExpectedGoalsShareWeight
 	goalieEdge := (input.HomeTeam.GoalieGSAx - input.AwayTeam.GoalieGSAx) * m.cfg.GoalieGSAxWeight
 	defenseEdge := (input.AwayTeam.GoalsAgainstPerGame - input.HomeTeam.GoalsAgainstPerGame) * m.cfg.GoalsAgainstWeight
+	offenseEdge := (input.HomeTeam.GoalsForPerGame - input.AwayTeam.GoalsForPerGame) * m.cfg.GoalsForWeight
 	pdoRegressionEdge := ((1.0 - input.HomeTeam.PDO) - (1.0 - input.AwayTeam.PDO)) * m.cfg.PDORegressionWeight
+	corsiEdge := (input.HomeTeam.CorsiShare - input.AwayTeam.CorsiShare) * m.cfg.CorsiShareWeight
+
+	totalEdge := xgEdge + goalieEdge + defenseEdge + offenseEdge + pdoRegressionEdge + corsiEdge
 
 	homeGoals := clamp(
-		m.cfg.LeagueGoalsPerTeam+m.cfg.HomeIceGoalAdvantage+xgEdge*0.52+goalieEdge*0.28+defenseEdge*0.20+pdoRegressionEdge*0.15,
+		m.cfg.LeagueGoalsPerTeam+m.cfg.HomeIceGoalAdvantage+totalEdge,
 		m.cfg.MinTeamGoals,
 		m.cfg.MaxTeamGoals,
 	)
 	awayGoals := clamp(
-		m.cfg.LeagueGoalsPerTeam-xgEdge*0.52-goalieEdge*0.28-defenseEdge*0.20-pdoRegressionEdge*0.15,
+		m.cfg.LeagueGoalsPerTeam-totalEdge,
 		m.cfg.MinTeamGoals,
 		m.cfg.MaxTeamGoals,
 	)
@@ -122,8 +131,12 @@ func validateConfig(cfg Config) error {
 		return errors.New("goalie gsax weight must be > 0")
 	case cfg.GoalsAgainstWeight <= 0:
 		return errors.New("goals against weight must be > 0")
+	case cfg.GoalsForWeight <= 0:
+		return errors.New("goals for weight must be > 0")
 	case cfg.PDORegressionWeight <= 0:
 		return errors.New("pdo regression weight must be > 0")
+	case cfg.CorsiShareWeight <= 0:
+		return errors.New("corsi share weight must be > 0")
 	case cfg.MinTeamGoals <= 0 || cfg.MaxTeamGoals <= 0 || cfg.MinTeamGoals >= cfg.MaxTeamGoals:
 		return errors.New("invalid team goal bounds")
 	}
@@ -158,6 +171,9 @@ func validateTeam(team TeamProfile, side string) error {
 	}
 	if team.PDO < 0.85 || team.PDO > 1.15 {
 		return fmt.Errorf("%s pdo must be in [0.85,1.15]", side)
+	}
+	if team.CorsiShare < 0 || team.CorsiShare > 1 {
+		return fmt.Errorf("%s corsi share must be in [0,1]", side)
 	}
 	return nil
 }

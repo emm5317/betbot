@@ -8,9 +8,13 @@ import (
 	"time"
 
 	"betbot/internal/config"
+	"betbot/internal/execution"
+	"betbot/internal/execution/adapters/paper"
+	"betbot/internal/prediction"
 	"betbot/internal/store"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5/pgxpool"
 	fiberlogger "github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
@@ -23,13 +27,19 @@ type readQueries interface {
 	GetLatestPollRun(ctx context.Context) (store.PollRun, error)
 	GetOddsArchiveSummary(ctx context.Context, sport *string) (store.GetOddsArchiveSummaryRow, error)
 	ListLatestOdds(ctx context.Context, arg store.ListLatestOddsParams) ([]store.ListLatestOddsRow, error)
+	ListLatestOddsForUpcoming(ctx context.Context, arg store.ListLatestOddsForUpcomingParams) ([]store.ListLatestOddsForUpcomingRow, error)
 	ListModelPredictionsForSportSeason(ctx context.Context, arg store.ListModelPredictionsForSportSeasonParams) ([]store.ModelPrediction, error)
 	ListRecommendationCalibrationAlertRuns(ctx context.Context, arg store.ListRecommendationCalibrationAlertRunsParams) ([]store.RecommendationCalibrationAlertRun, error)
 	ListRecommendationPerformanceSnapshots(ctx context.Context, arg store.ListRecommendationPerformanceSnapshotsParams) ([]store.ListRecommendationPerformanceSnapshotsRow, error)
 	GetBankrollBalanceCents(ctx context.Context) (int64, error)
+	GetBankrollCircuitMetrics(ctx context.Context) (store.GetBankrollCircuitMetricsRow, error)
 	InsertRecommendationCalibrationAlertRun(ctx context.Context, arg store.InsertRecommendationCalibrationAlertRunParams) (int64, error)
 	InsertRecommendationOutcomeIfChanged(ctx context.Context, arg store.InsertRecommendationOutcomeIfChangedParams) (int64, error)
 	InsertRecommendationSnapshot(ctx context.Context, arg store.InsertRecommendationSnapshotParams) (store.RecommendationSnapshot, error)
+	GetRecommendationSnapshotByID(ctx context.Context, id int64) (store.RecommendationSnapshot, error)
+	ListBetsByStatus(ctx context.Context, arg store.ListBetsByStatusParams) ([]store.Bet, error)
+	ListOpenBets(ctx context.Context) ([]store.Bet, error)
+	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (store.Bet, error)
 }
 
 type App struct {
@@ -41,6 +51,9 @@ type App struct {
 		Ping(context.Context) error
 	}
 	queries                   readQueries
+	pgxPool                   *pgxpool.Pool
+	placementOrchestrator     *execution.PlacementOrchestrator
+	nhlPredictionService      *prediction.NHLPredictionService
 	oddsPollingEnabled        bool
 	oddsPollingDisabledReason string
 }
@@ -58,12 +71,20 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 	})
 
 	oddsPollingEnabled, oddsPollingDisabledReason := cfg.OddsPollingRuntime()
+
+	var adapter execution.BookAdapter
+	adapter = paper.New()
+	// TODO: wire live adapters when PaperMode is false
+
 	instance := &App{
 		app:                       app,
 		cfg:                       cfg,
 		logger:                    appLogger,
 		pool:                      pool,
 		queries:                   store.New(pool),
+		pgxPool:                   pool,
+		placementOrchestrator:     execution.NewPlacementOrchestrator(pool, adapter),
+		nhlPredictionService:      prediction.NewNHLPredictionService(pool, appLogger),
 		oddsPollingEnabled:        oddsPollingEnabled,
 		oddsPollingDisabledReason: oddsPollingDisabledReason,
 	}
@@ -121,6 +142,11 @@ func (a *App) routes() {
 	a.app.Get("/partials/topbar-status", a.handlePartialTopbarStatus)
 	a.app.Get("/partials/pipeline-status", a.handlePartialPipelineStatus)
 	a.app.Get("/partials/odds-table", a.handlePartialOddsTable)
+
+	a.app.Post("/predictions/run", a.handlePredictionsRun)
+
+	a.app.Post("/execution/place", a.handleExecutionPlace)
+	a.app.Get("/execution/bets", a.handleExecutionBets)
 }
 
 func (a *App) handleHome(c fiber.Ctx) error {

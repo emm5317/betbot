@@ -114,6 +114,7 @@ These rules are **never** violated. If a change would break an invariant, stop a
 2. **Bankroll is an explicit ledger.** Balance is computed from the `bankroll_ledger` table, not inferred. Every state transition (Available → Pending → Placed → Settled) creates a ledger entry.
 3. **No in-memory-only financial state.** If the process crashes mid-operation, recovery reads from Postgres. All financial state survives restart.
 4. **Hard limits are enforced in the decision engine, not the execution layer.** The execution layer trusts the ticket it receives. The decision engine is the gatekeeper.
+5. **Recommendation stake sizing is deterministic and ledger-backed.** Kelly fractions, caps, and bankroll gating must be reproducible from persisted inputs and current `bankroll_ledger` balance.
 
 ### Data Integrity
 
@@ -192,9 +193,12 @@ docker compose -f deploy/docker/docker-compose.yml down
 | `BETBOT_HTTP_ADDR` | HTTP listen address | `:8080` |
 | `BETBOT_DB_CONNECT_TIMEOUT` | Database reachability timeout | `5s` |
 | `BETBOT_ODDS_API_KEY` | The Odds API key | required for ingestion |
-| `BETBOT_KELLY_FRACTION` | Fractional Kelly multiplier | `0.25` |
+| `BETBOT_KELLY_FRACTION` | Global fractional Kelly override (`0` = use sport defaults) | `0` |
 | `BETBOT_EV_THRESHOLD` | Minimum EV edge to place bet | `0.02` |
-| `BETBOT_MAX_BET_FRACTION` | Max single bet as fraction of bankroll | `0.03` |
+| `BETBOT_MAX_BET_FRACTION` | Global max bet fraction override (`0` = use sport defaults) | `0` |
+| `BETBOT_CORRELATION_MAX_PICKS_PER_GAME` | Recommendation correlation guard max retained picks per `sport|game_id` (`0` unsupported; must be >= 1) | `1` |
+| `BETBOT_CORRELATION_MAX_STAKE_FRACTION_PER_GAME` | Recommendation correlation guard max summed stake fraction per `sport|game_id` | `0.03` |
+| `BETBOT_CORRELATION_MAX_PICKS_PER_SPORT_DAY` | Optional recommendation correlation guard cap across `sport|event_date` (`0` disables this scope) | `0` |
 | `BETBOT_DAILY_LOSS_STOP` | Daily loss halt threshold | `0.05` |
 | `BETBOT_WEEKLY_LOSS_STOP` | Weekly loss halt threshold | `0.10` |
 | `BETBOT_DRAWDOWN_BREAKER` | Drawdown % from peak to halt | `0.15` |

@@ -22,6 +22,58 @@ func (q *Queries) GetBankrollBalanceCents(ctx context.Context) (int64, error) {
 	return balance_cents, err
 }
 
+const getBankrollCircuitMetrics = `-- name: GetBankrollCircuitMetrics :one
+WITH anchor AS (
+    SELECT
+        NOW() AS now_ts,
+        DATE_TRUNC('day', NOW()) AS day_start_ts,
+        DATE_TRUNC('week', NOW()) AS week_start_ts
+),
+ledger_totals AS (
+    SELECT
+        COALESCE(SUM(amount_cents), 0)::BIGINT AS current_balance_cents,
+        COALESCE(SUM(amount_cents) FILTER (WHERE created_at < (SELECT day_start_ts FROM anchor)), 0)::BIGINT AS day_start_balance_cents,
+        COALESCE(SUM(amount_cents) FILTER (WHERE created_at < (SELECT week_start_ts FROM anchor)), 0)::BIGINT AS week_start_balance_cents
+    FROM bankroll_ledger
+),
+running_balance AS (
+    SELECT
+        SUM(amount_cents) OVER (ORDER BY created_at ASC, id ASC) AS balance_after_cents
+    FROM bankroll_ledger
+),
+peak_balance AS (
+    SELECT
+        COALESCE(MAX(balance_after_cents), 0)::BIGINT AS peak_balance_cents
+    FROM running_balance
+)
+SELECT
+    l.current_balance_cents,
+    l.day_start_balance_cents,
+    l.week_start_balance_cents,
+    p.peak_balance_cents
+FROM ledger_totals l
+CROSS JOIN peak_balance p
+`
+
+type GetBankrollCircuitMetricsRow struct {
+	CurrentBalanceCents   int64 `json:"current_balance_cents"`
+	DayStartBalanceCents  int64 `json:"day_start_balance_cents"`
+	WeekStartBalanceCents int64 `json:"week_start_balance_cents"`
+	PeakBalanceCents      int64 `json:"peak_balance_cents"`
+}
+
+func (q *Queries) GetBankrollCircuitMetrics(ctx context.Context) (GetBankrollCircuitMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getBankrollCircuitMetrics)
+	var i GetBankrollCircuitMetricsRow
+	err := row.Scan(
+		&i.CurrentBalanceCents,
+		&i.DayStartBalanceCents,
+		&i.WeekStartBalanceCents,
+		&i.PeakBalanceCents,
+	)
+	return i, err
+}
+
 const insertBankrollEntry = `-- name: InsertBankrollEntry :one
 INSERT INTO bankroll_ledger (
     entry_type,

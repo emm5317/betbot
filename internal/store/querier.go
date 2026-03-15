@@ -14,34 +14,46 @@ type Querier interface {
 	CompletePollRun(ctx context.Context, arg CompletePollRunParams) error
 	CountModelPredictions(ctx context.Context) (int64, error)
 	CountMoneypuckGoalieGames(ctx context.Context) (int64, error)
+	CountMoneypuckLineGames(ctx context.Context) (int64, error)
 	CountMoneypuckTeamGames(ctx context.Context) (int64, error)
 	CountOddsHistoryRows(ctx context.Context) (int64, error)
 	// Finds a MoneyPuck game_id by matching team abbreviation and game date.
 	FindMoneypuckGameID(ctx context.Context, arg FindMoneypuckGameIDParams) (string, error)
 	GetBankrollBalanceCents(ctx context.Context) (int64, error)
+	GetBankrollCircuitMetrics(ctx context.Context) (GetBankrollCircuitMetricsRow, error)
+	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (Bet, error)
 	GetDashboardSummary(ctx context.Context) (GetDashboardSummaryRow, error)
 	// Returns goals for/against from the "all" situation for both teams in a game.
 	// Two rows returned: one per team, with home_or_away indicating side.
 	GetGameResult(ctx context.Context, gameID string) ([]GetGameResultRow, error)
 	// Returns cumulative 5on5 GSAx for a goalie in a season before a given date.
 	GetGoalieSeasonGSAx(ctx context.Context, arg GetGoalieSeasonGSAxParams) (GetGoalieSeasonGSAxRow, error)
+	GetLatestMarketProbabilityForGame(ctx context.Context, gameID int64) (float64, error)
 	GetLatestPollRun(ctx context.Context) (PollRun, error)
 	GetLatestSnapshotHash(ctx context.Context, arg GetLatestSnapshotHashParams) (string, error)
 	GetOddsArchiveSummary(ctx context.Context, sport *string) (GetOddsArchiveSummaryRow, error)
+	GetRecommendationSnapshotByID(ctx context.Context, id int64) (RecommendationSnapshot, error)
 	// Returns the goalie with the most 5on5 icetime for a team in a given game.
 	GetStartingGoalie(ctx context.Context, arg GetStartingGoalieParams) (GetStartingGoalieRow, error)
 	// Returns the last N 5on5 games for a team strictly before a given date, ordered newest first.
 	// The caller computes rolling averages from these rows.
 	GetTeamRolling5on5Stats(ctx context.Context, arg GetTeamRolling5on5StatsParams) ([]GetTeamRolling5on5StatsRow, error)
 	InsertBankrollEntry(ctx context.Context, arg InsertBankrollEntryParams) (BankrollLedger, error)
+	InsertBet(ctx context.Context, arg InsertBetParams) (Bet, error)
 	InsertOddsSnapshot(ctx context.Context, arg InsertOddsSnapshotParams) (OddsHistory, error)
 	InsertPollRun(ctx context.Context, arg InsertPollRunParams) (PollRun, error)
 	InsertRecommendationCalibrationAlertRun(ctx context.Context, arg InsertRecommendationCalibrationAlertRunParams) (int64, error)
 	InsertRecommendationOutcomeIfChanged(ctx context.Context, arg InsertRecommendationOutcomeIfChangedParams) (int64, error)
 	InsertRecommendationSnapshot(ctx context.Context, arg InsertRecommendationSnapshotParams) (RecommendationSnapshot, error)
 	ListBacktestReplayRows(ctx context.Context, arg ListBacktestReplayRowsParams) ([]ListBacktestReplayRowsRow, error)
+	ListBetsByStatus(ctx context.Context, arg ListBetsByStatusParams) ([]Bet, error)
 	ListLatestOdds(ctx context.Context, arg ListLatestOddsParams) ([]ListLatestOddsRow, error)
+	ListLatestOddsForUpcoming(ctx context.Context, arg ListLatestOddsForUpcomingParams) ([]ListLatestOddsForUpcomingRow, error)
 	ListModelPredictionsForSportSeason(ctx context.Context, arg ListModelPredictionsForSportSeasonParams) ([]ModelPrediction, error)
+	ListOpenBets(ctx context.Context) ([]Bet, error)
+	// Returns all regular-season home games across a season range for outcome-based backtesting.
+	// One row per game (home perspective to avoid double-counting).
+	ListOutcomeBacktestGames(ctx context.Context, arg ListOutcomeBacktestGamesParams) ([]ListOutcomeBacktestGamesRow, error)
 	ListRecommendationCalibrationAlertRuns(ctx context.Context, arg ListRecommendationCalibrationAlertRunsParams) ([]RecommendationCalibrationAlertRun, error)
 	ListRecommendationPerformanceSnapshots(ctx context.Context, arg ListRecommendationPerformanceSnapshotsParams) ([]ListRecommendationPerformanceSnapshotsRow, error)
 	ListRecommendationSnapshots(ctx context.Context, arg ListRecommendationSnapshotsParams) ([]RecommendationSnapshot, error)
@@ -50,13 +62,18 @@ type Querier interface {
 	// Returns all games for a team in a season (all situation), ordered by date.
 	ListSeasonTeamGames(ctx context.Context, arg ListSeasonTeamGamesParams) ([]ListSeasonTeamGamesRow, error)
 	ListUpcomingGames(ctx context.Context, limit int32) ([]Game, error)
+	ListUpcomingGamesForSport(ctx context.Context, sport string) ([]Game, error)
 	ListUpcomingWeatherGames(ctx context.Context, arg ListUpcomingWeatherGamesParams) ([]Game, error)
+	UpdateBetFailed(ctx context.Context, arg UpdateBetFailedParams) error
+	UpdateBetPlaced(ctx context.Context, arg UpdateBetPlacedParams) error
+	UpdateBetSettled(ctx context.Context, arg UpdateBetSettledParams) error
 	UpsertGame(ctx context.Context, arg UpsertGameParams) (Game, error)
 	UpsertGameWeatherSnapshot(ctx context.Context, arg UpsertGameWeatherSnapshotParams) error
 	UpsertMLBPitcherStats(ctx context.Context, arg UpsertMLBPitcherStatsParams) error
 	UpsertMLBTeamStats(ctx context.Context, arg UpsertMLBTeamStatsParams) error
 	UpsertModelPrediction(ctx context.Context, arg UpsertModelPredictionParams) (ModelPrediction, error)
 	UpsertMoneypuckGoalieGame(ctx context.Context, arg UpsertMoneypuckGoalieGameParams) error
+	UpsertMoneypuckLineGame(ctx context.Context, arg UpsertMoneypuckLineGameParams) error
 	UpsertMoneypuckTeamGame(ctx context.Context, arg UpsertMoneypuckTeamGameParams) error
 	UpsertNBATeamStats(ctx context.Context, arg UpsertNBATeamStatsParams) error
 	UpsertNFLTeamStats(ctx context.Context, arg UpsertNFLTeamStatsParams) error

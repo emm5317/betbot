@@ -49,6 +49,45 @@ func (q *Queries) ListUpcomingGames(ctx context.Context, limit int32) ([]Game, e
 	return items, nil
 }
 
+const listUpcomingGamesForSport = `-- name: ListUpcomingGamesForSport :many
+SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
+FROM games
+WHERE sport = $1
+  AND commence_time > NOW()
+  AND commence_time < NOW() + INTERVAL '48 hours'
+ORDER BY commence_time ASC
+`
+
+func (q *Queries) ListUpcomingGamesForSport(ctx context.Context, sport string) ([]Game, error) {
+	rows, err := q.db.Query(ctx, listUpcomingGamesForSport, sport)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Game
+	for rows.Next() {
+		var i Game
+		if err := rows.Scan(
+			&i.ID,
+			&i.Source,
+			&i.ExternalID,
+			&i.Sport,
+			&i.HomeTeam,
+			&i.AwayTeam,
+			&i.CommenceTime,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertGame = `-- name: UpsertGame :one
 INSERT INTO games (
     source,

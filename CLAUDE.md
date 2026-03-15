@@ -40,7 +40,7 @@ These values are the current repo baseline and should stay aligned with the actu
 | In-container app port | `8080` |
 | Local health endpoint | `GET /health` |
 | Local compose file | `deploy/docker/docker-compose.yml` |
-| Current server | Fiber v3 operational + recommendation-only API surface (`/recommendations`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`) |
+| Current server | Fiber v3 operational + recommendation-only API surface (`/recommendations`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`) |
 
 ---
 
@@ -56,6 +56,7 @@ betbot/
     domain/         → core types: Game, Odds, Bet, Bankroll, Prediction
     ingestion/      → odds poller, stats ETL, injury scraper
     modeling/       → EV calc, Elo system, feature engineering
+    prediction/     → live prediction services (bridge between modeling and decision)
     decision/       → recommendation-only decision logic, calibration, drift alerts, rolling trends
     execution/      → book adapters, placement, idempotency, audit
     store/          → sqlc-generated queries (DO NOT EDIT GENERATED FILES)
@@ -94,6 +95,38 @@ betbot/
 - All jobs must be idempotent. If a job runs twice with the same args, the second run is a no-op.
 - Use `river.JobInsertOpts` for scheduling: `ScheduledAt` for future execution, `UniqueOpts` for dedup.
 
+### Live Prediction Bridge
+
+The live prediction bridge closes the gap between offline backtesting and live recommendations. It runs sport-specific models on upcoming games and persists results to `model_predictions` so `GET /recommendations` can find them.
+
+**Architecture:**
+```
+River periodic job (every 15 min) → PredictionService.PredictUpcomingGames()
+  → ListUpcomingGamesForSport(sport)   // games table, next 48h
+  → skip if recent prediction exists   // 15-min stale threshold
+  → GetLatestMarketProbabilityForGame() // odds_history, latest h2h home implied prob
+  → BuildFeatures() from backtest pkg  // reuses existing feature builder
+  → Model.Predict()                    // sport-specific model
+  → UpsertModelPrediction(source="live") // persist to model_predictions
+  → GET /recommendations now finds predictions via ListLatestOddsForUpcoming
+```
+
+**Key files:**
+- `internal/prediction/nhl.go` — NHL prediction service (canonical example for new sports)
+- `internal/worker/prediction_job.go` — River job, registered in `worker.go`
+- `internal/server/predictions.go` — `POST /predictions/run` manual trigger
+- `sql/queries/games.sql` — `ListUpcomingGamesForSport` query
+- `sql/queries/odds_history.sql` — `GetLatestMarketProbabilityForGame`, `ListLatestOddsForUpcoming`
+
+**Adding a new sport's live prediction bridge:**
+1. Create `internal/prediction/<sport>.go` with a `<Sport>PredictionService` following the NHL pattern
+2. The service needs: a model (from `internal/modeling/<sport>/`), a feature builder (from `internal/backtest/`), and the DB pool
+3. Implement `PredictGame()` and `PredictUpcomingGames()` — same contract as NHL
+4. The games table stores normalized sport names (`"MLB"`, `"NBA"`, `"NHL"`, `"NFL"`), not Odds API keys (`"icehockey_nhl"`) — use the normalized name in `ListUpcomingGamesForSport`
+5. Add a case to `PredictionWorker.Work()` in `internal/worker/prediction_job.go`
+6. Add a periodic job in `internal/worker/worker.go` (follow the `nhl-prediction` pattern)
+7. Run `go test ./...` — update `fakeReadQueries` in `server_test.go` if the `readQueries` interface changes
+
 ### Naming
 
 - Package names: lowercase, single word (`ingestion`, `decision`, `execution`).
@@ -114,6 +147,7 @@ These rules are **never** violated. If a change would break an invariant, stop a
 2. **Bankroll is an explicit ledger.** Balance is computed from the `bankroll_ledger` table, not inferred. Every state transition (Available → Pending → Placed → Settled) creates a ledger entry.
 3. **No in-memory-only financial state.** If the process crashes mid-operation, recovery reads from Postgres. All financial state survives restart.
 4. **Hard limits are enforced in the decision engine, not the execution layer.** The execution layer trusts the ticket it receives. The decision engine is the gatekeeper.
+5. **Recommendation stake sizing is deterministic and ledger-backed.** Kelly fractions, caps, and bankroll gating must be reproducible from persisted inputs and current `bankroll_ledger` balance.
 
 ### Data Integrity
 
@@ -160,6 +194,12 @@ go run cmd/worker/main.go
 # Run backtester against historical data
 go run cmd/backtest/main.go --sport nfl --season 2025 --model elo-v1
 
+# Trigger live predictions manually (server must be running)
+curl -X POST http://127.0.0.1:18080/predictions/run
+
+# Get live recommendations
+curl http://127.0.0.1:18080/recommendations?sport=icehockey_nhl
+
 # Run tests
 go test ./...
 go test -race ./...
@@ -192,9 +232,12 @@ docker compose -f deploy/docker/docker-compose.yml down
 | `BETBOT_HTTP_ADDR` | HTTP listen address | `:8080` |
 | `BETBOT_DB_CONNECT_TIMEOUT` | Database reachability timeout | `5s` |
 | `BETBOT_ODDS_API_KEY` | The Odds API key | required for ingestion |
-| `BETBOT_KELLY_FRACTION` | Fractional Kelly multiplier | `0.25` |
+| `BETBOT_KELLY_FRACTION` | Global fractional Kelly override (`0` = use sport defaults) | `0` |
 | `BETBOT_EV_THRESHOLD` | Minimum EV edge to place bet | `0.02` |
-| `BETBOT_MAX_BET_FRACTION` | Max single bet as fraction of bankroll | `0.03` |
+| `BETBOT_MAX_BET_FRACTION` | Global max bet fraction override (`0` = use sport defaults) | `0` |
+| `BETBOT_CORRELATION_MAX_PICKS_PER_GAME` | Recommendation correlation guard max retained picks per `sport|game_id` (`0` unsupported; must be >= 1) | `1` |
+| `BETBOT_CORRELATION_MAX_STAKE_FRACTION_PER_GAME` | Recommendation correlation guard max summed stake fraction per `sport|game_id` | `0.03` |
+| `BETBOT_CORRELATION_MAX_PICKS_PER_SPORT_DAY` | Optional recommendation correlation guard cap across `sport|event_date` (`0` disables this scope) | `0` |
 | `BETBOT_DAILY_LOSS_STOP` | Daily loss halt threshold | `0.05` |
 | `BETBOT_WEEKLY_LOSS_STOP` | Weekly loss halt threshold | `0.10` |
 | `BETBOT_DRAWDOWN_BREAKER` | Drawdown % from peak to halt | `0.15` |

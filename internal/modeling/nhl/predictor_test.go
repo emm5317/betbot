@@ -78,6 +78,38 @@ func TestPredictProbabilityBoundsAndSums(t *testing.T) {
 	}
 }
 
+func TestPredictIncorporatesOffenseAndCorsi(t *testing.T) {
+	model := NewDefaultXGGoalieModel()
+
+	// Home team has better offense and corsi
+	strong := baseMatchupInput()
+	strong.HomeTeam.GoalsForPerGame = 3.60
+	strong.AwayTeam.GoalsForPerGame = 2.70
+	strong.HomeTeam.CorsiShare = 0.56
+	strong.AwayTeam.CorsiShare = 0.44
+
+	// Neutral offense and corsi
+	neutral := baseMatchupInput()
+	neutral.HomeTeam.GoalsForPerGame = 3.10
+	neutral.AwayTeam.GoalsForPerGame = 3.10
+	neutral.HomeTeam.CorsiShare = 0.50
+	neutral.AwayTeam.CorsiShare = 0.50
+
+	strongPred, err := model.Predict(strong)
+	if err != nil {
+		t.Fatalf("Predict(strong) error = %v", err)
+	}
+	neutralPred, err := model.Predict(neutral)
+	if err != nil {
+		t.Fatalf("Predict(neutral) error = %v", err)
+	}
+
+	if strongPred.HomeWinProbability <= neutralPred.HomeWinProbability {
+		t.Fatalf("strong home %.4f should exceed neutral %.4f when offense and corsi favor home",
+			strongPred.HomeWinProbability, neutralPred.HomeWinProbability)
+	}
+}
+
 func baseMatchupInput() MatchupInput {
 	return MatchupInput{
 		HomeTeam: TeamProfile{
@@ -87,6 +119,7 @@ func baseMatchupInput() MatchupInput {
 			GoalsAgainstPerGame: 2.72,
 			GoalieGSAx:          14.2,
 			PDO:                 0.994,
+			CorsiShare:          0.54,
 		},
 		AwayTeam: TeamProfile{
 			Name:                "Pittsburgh Penguins",
@@ -95,6 +128,7 @@ func baseMatchupInput() MatchupInput {
 			GoalsAgainstPerGame: 3.12,
 			GoalieGSAx:          -2.0,
 			PDO:                 1.013,
+			CorsiShare:          0.48,
 		},
 	}
 }

@@ -22,6 +22,17 @@ func (q *Queries) CountMoneypuckGoalieGames(ctx context.Context) (int64, error) 
 	return column_1, err
 }
 
+const countMoneypuckLineGames = `-- name: CountMoneypuckLineGames :one
+SELECT COUNT(*)::BIGINT FROM moneypuck_line_games
+`
+
+func (q *Queries) CountMoneypuckLineGames(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countMoneypuckLineGames)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countMoneypuckTeamGames = `-- name: CountMoneypuckTeamGames :one
 SELECT COUNT(*)::BIGINT FROM moneypuck_team_games
 `
@@ -281,6 +292,61 @@ func (q *Queries) GetTeamRolling5on5Stats(ctx context.Context, arg GetTeamRollin
 	return items, nil
 }
 
+const listOutcomeBacktestGames = `-- name: ListOutcomeBacktestGames :many
+SELECT game_id, season, team AS home_team, opponent AS away_team, game_date,
+       goals_for AS home_goals, goals_against AS away_goals
+FROM moneypuck_team_games
+WHERE situation = 'all' AND home_or_away = 'HOME' AND is_playoff = FALSE
+  AND (season >= $1::INTEGER OR $1 IS NULL)
+  AND (season <= $2::INTEGER OR $2 IS NULL)
+ORDER BY game_date ASC, game_id ASC
+`
+
+type ListOutcomeBacktestGamesParams struct {
+	SeasonStart *int32 `json:"season_start"`
+	SeasonEnd   *int32 `json:"season_end"`
+}
+
+type ListOutcomeBacktestGamesRow struct {
+	GameID    string      `json:"game_id"`
+	Season    int32       `json:"season"`
+	HomeTeam  string      `json:"home_team"`
+	AwayTeam  string      `json:"away_team"`
+	GameDate  pgtype.Date `json:"game_date"`
+	HomeGoals *float64    `json:"home_goals"`
+	AwayGoals *float64    `json:"away_goals"`
+}
+
+// Returns all regular-season home games across a season range for outcome-based backtesting.
+// One row per game (home perspective to avoid double-counting).
+func (q *Queries) ListOutcomeBacktestGames(ctx context.Context, arg ListOutcomeBacktestGamesParams) ([]ListOutcomeBacktestGamesRow, error) {
+	rows, err := q.db.Query(ctx, listOutcomeBacktestGames, arg.SeasonStart, arg.SeasonEnd)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOutcomeBacktestGamesRow
+	for rows.Next() {
+		var i ListOutcomeBacktestGamesRow
+		if err := rows.Scan(
+			&i.GameID,
+			&i.Season,
+			&i.HomeTeam,
+			&i.AwayTeam,
+			&i.GameDate,
+			&i.HomeGoals,
+			&i.AwayGoals,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSeasonGameDates = `-- name: ListSeasonGameDates :many
 SELECT DISTINCT game_date
 FROM moneypuck_team_games
@@ -424,6 +490,81 @@ func (q *Queries) UpsertMoneypuckGoalieGame(ctx context.Context, arg UpsertMoney
 		arg.ShotsAgainst,
 		arg.HighDangerXgoals,
 		arg.HighDangerGoals,
+	)
+	return err
+}
+
+const upsertMoneypuckLineGame = `-- name: UpsertMoneypuckLineGame :exec
+INSERT INTO moneypuck_line_games (
+    line_id, name, game_id, season, team, opponent, home_or_away, game_date,
+    position, situation, icetime, ice_time_rank,
+    xgoals_percentage, corsi_percentage, fenwick_percentage,
+    xgoals_for, xgoals_against, goals_for, goals_against
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+)
+ON CONFLICT (game_id, line_id, situation) DO UPDATE SET
+    name = EXCLUDED.name,
+    season = EXCLUDED.season,
+    team = EXCLUDED.team,
+    opponent = EXCLUDED.opponent,
+    home_or_away = EXCLUDED.home_or_away,
+    game_date = EXCLUDED.game_date,
+    position = EXCLUDED.position,
+    icetime = EXCLUDED.icetime,
+    ice_time_rank = EXCLUDED.ice_time_rank,
+    xgoals_percentage = EXCLUDED.xgoals_percentage,
+    corsi_percentage = EXCLUDED.corsi_percentage,
+    fenwick_percentage = EXCLUDED.fenwick_percentage,
+    xgoals_for = EXCLUDED.xgoals_for,
+    xgoals_against = EXCLUDED.xgoals_against,
+    goals_for = EXCLUDED.goals_for,
+    goals_against = EXCLUDED.goals_against
+`
+
+type UpsertMoneypuckLineGameParams struct {
+	LineID            string      `json:"line_id"`
+	Name              string      `json:"name"`
+	GameID            string      `json:"game_id"`
+	Season            int32       `json:"season"`
+	Team              string      `json:"team"`
+	Opponent          string      `json:"opponent"`
+	HomeOrAway        string      `json:"home_or_away"`
+	GameDate          pgtype.Date `json:"game_date"`
+	Position          string      `json:"position"`
+	Situation         string      `json:"situation"`
+	Icetime           *float64    `json:"icetime"`
+	IceTimeRank       *float64    `json:"ice_time_rank"`
+	XgoalsPercentage  *float64    `json:"xgoals_percentage"`
+	CorsiPercentage   *float64    `json:"corsi_percentage"`
+	FenwickPercentage *float64    `json:"fenwick_percentage"`
+	XgoalsFor         *float64    `json:"xgoals_for"`
+	XgoalsAgainst     *float64    `json:"xgoals_against"`
+	GoalsFor          *float64    `json:"goals_for"`
+	GoalsAgainst      *float64    `json:"goals_against"`
+}
+
+func (q *Queries) UpsertMoneypuckLineGame(ctx context.Context, arg UpsertMoneypuckLineGameParams) error {
+	_, err := q.db.Exec(ctx, upsertMoneypuckLineGame,
+		arg.LineID,
+		arg.Name,
+		arg.GameID,
+		arg.Season,
+		arg.Team,
+		arg.Opponent,
+		arg.HomeOrAway,
+		arg.GameDate,
+		arg.Position,
+		arg.Situation,
+		arg.Icetime,
+		arg.IceTimeRank,
+		arg.XgoalsPercentage,
+		arg.CorsiPercentage,
+		arg.FenwickPercentage,
+		arg.XgoalsFor,
+		arg.XgoalsAgainst,
+		arg.GoalsFor,
+		arg.GoalsAgainst,
 	)
 	return err
 }

@@ -42,7 +42,9 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Recommendation correlation guard now enforces deterministic same-game exposure caps in `GET /recommendations` with audit fields (`correlation_check_pass`, `correlation_check_reason`, `correlation_group_key`) and persisted snapshot metadata blocks (done 2026-03-14)
 - Recommendation circuit breaker gating now enforces deterministic daily/weekly/drawdown loss stops in `GET /recommendations` from ledger-derived balances, with per-row audit fields (`circuit_check_pass`, `circuit_check_reason`) and persisted snapshot metadata blocks (done 2026-03-15)
 
-The current implementation target is now early Phase 4 decision-engine implementation, with execution still explicitly deferred to later phases.
+- Live prediction bridge now connects offline models to the recommendation surface: `internal/prediction/nhl.go` runs the XGGoalieModel on upcoming games every 15 minutes via a River periodic job, persists to `model_predictions` with `source="live"`, and `GET /recommendations` joins those predictions to upcoming odds via `ListLatestOddsForUpcoming`. Manual trigger available at `POST /predictions/run`. Pattern documented in CLAUDE.md for adding new sports.
+
+The current implementation target is Phase 4 decision-engine completion, with execution still explicitly deferred to later phases.
 
 ---
 
@@ -165,6 +167,7 @@ Goal: turn model output into risk-checked bet tickets.
 | P4-010 | Add recommendation calibration monitoring by sport + rank bucket | ✅ DONE | P0 | Added `GET /recommendations/calibration` with filter echo, deterministic rank-percentile bucketing (1..20), settled/excluded handling, per-bucket observed/expected rates, calibration gap, Brier, mean CLV, plus overall observed/expected, Brier, and ECE summary metrics (done 2026-03-14) |
 | P4-011 | Add recommendation calibration drift alerts with sample guardrails | ✅ DONE | P0 | Added `GET /recommendations/calibration/alerts` with current vs baseline windows, configurable thresholds, minimum settled overall/per-bucket guardrails, deterministic reason ordering, and per-bucket delta metrics (done 2026-03-14) |
 | P4-012 | Add calibration drift history and rolling trend windows | ✅ DONE | P0 | Added append-only `recommendation_calibration_alert_runs` persistence, `GET /recommendations/calibration/alerts/history`, and `mode=rolling` support on `GET /recommendations/calibration/alerts` with deterministic per-step trend rows and persisted run metadata (done 2026-03-14) |
+| P4-013 | Build live prediction bridge (NHL first) | ✅ DONE | P0 | Added `internal/prediction` package with `NHLPredictionService`, River periodic job (15-min), `POST /predictions/run` manual trigger, `ListUpcomingGamesForSport` + `GetLatestMarketProbabilityForGame` + `ListLatestOddsForUpcoming` sqlc queries, and server wiring so `GET /recommendations` returns live NHL candidates. Validated end-to-end with real Odds API data. Pattern is documented for adding new sports. (done 2026-03-15) |
 
 ---
 
