@@ -2,7 +2,7 @@
 
 Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸️ DEFERRED`
 
-**Last updated:** 2026-03-14
+**Last updated:** 2026-03-15
 **Current phase:** Phase 4 — Decision Engine
 
 ---
@@ -38,6 +38,9 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Recommendation calibration monitoring is now live via `GET /recommendations/calibration`, with deterministic rank-percentile buckets, settled/excluded accounting, per-bucket observed vs expected win rates, Brier scores, mean CLV, and overall ECE (done 2026-03-14)
 - Recommendation calibration drift alerting is now live via `GET /recommendations/calibration/alerts`, with sport-scoped baseline/current window comparison, minimum-sample guardrails, deterministic alert reason ordering, and per-bucket calibration-gap/Brier deltas (done 2026-03-14)
 - Recommendation calibration drift history and rolling trend visibility are now live via `GET /recommendations/calibration/alerts/history` plus rolling mode on `GET /recommendations/calibration/alerts`, with append-only alert-run persistence, deterministic trend ordering, and auditable per-step metadata (done 2026-03-14)
+- Recommendation stake sizing now computes deterministic odds-aware Kelly fractions with hard cap + ledger-backed bankroll gating in `GET /recommendations`, including raw/applied/capped fractions, pre/post bankroll stake values, and deterministic sizing reasons (done 2026-03-14)
+- Recommendation correlation guard now enforces deterministic same-game exposure caps in `GET /recommendations` with audit fields (`correlation_check_pass`, `correlation_check_reason`, `correlation_group_key`) and persisted snapshot metadata blocks (done 2026-03-14)
+- Recommendation circuit breaker gating now enforces deterministic daily/weekly/drawdown loss stops in `GET /recommendations` from ledger-derived balances, with per-row audit fields (`circuit_check_pass`, `circuit_check_reason`) and persisted snapshot metadata blocks (done 2026-03-15)
 
 The current implementation target is now early Phase 4 decision-engine implementation, with execution still explicitly deferred to later phases.
 
@@ -152,11 +155,11 @@ Goal: turn model output into risk-checked bet tickets.
 |----|------|--------|----------|-------|
 | P4-001 | Implement EV threshold filter | ✅ DONE | P0 | Shared rule with sport-aware defaults, override support, and decision-engine filter wiring (done 2026-03-14) |
 | P4-002 | Implement line shopping | ✅ DONE | P0 | Best available odds across books implemented in `internal/decision/lineshopper.go` with deterministic tie-break and validation coverage (done 2026-03-14) |
-| P4-003 | Implement Kelly sizer | ⬜ TODO | P0 | Fractional and capped |
-| P4-004 | Implement bankroll availability checks | ⬜ TODO | P0 | Ledger-backed |
-| P4-005 | Implement correlation guard | ⬜ TODO | P0 | Same-game exposure control |
-| P4-006 | Implement circuit breakers | ⬜ TODO | P0 | Daily, weekly, drawdown |
-| P4-007 | Build decision-engine integration tests | ⬜ TODO | P1 | Prediction to ticket flow |
+| P4-003 | Implement Kelly sizer | ✅ DONE | P0 | Added deterministic odds-aware Kelly sizing with sport defaults + optional overrides, exposing raw/applied/capped fractions and deterministic reason codes in recommendation responses (done 2026-03-14) |
+| P4-004 | Implement bankroll availability checks | ✅ DONE | P0 | Added ledger-backed bankroll gate on recommendation sizing, deterministic insufficient-funds handling via available-balance cap, and persisted sizing audit metadata on snapshots (done 2026-03-14) |
+| P4-005 | Implement correlation guard | ✅ DONE | P0 | Deterministic same-game exposure control via max picks + max summed stake fraction, optional sport/day cap, response audit fields, and snapshot metadata persistence (done 2026-03-14) |
+| P4-006 | Implement circuit breakers | ✅ DONE | P0 | Deterministic recommendation gating on daily loss stop, weekly loss stop, and peak drawdown from ledger-derived balances, with response/snapshot audit fields (done 2026-03-15) |
+| P4-007 | Build decision-engine integration tests | ✅ DONE | P1 | Added deterministic decision/server integration coverage for EV->line->sizing->correlation->circuit flow, tie-order invariants, and retained-only snapshot metadata assertions (done 2026-03-15) |
 | P4-008 | Build recommendation-only best-bets pull surface | ✅ DONE | P0 | Added `GET /recommendations` with sport/date/limit filters, ranked decision assembly, and append-only `recommendation_snapshots` persistence (done 2026-03-14) |
 | P4-009 | Add recommendation performance + CLV monitoring surface | ✅ DONE | P0 | Added append-only `recommendation_outcomes`, pure CLV/outcome computation, and `GET /recommendations/performance` with filter validation, deterministic rows, and aggregate summary metrics (done 2026-03-14) |
 | P4-010 | Add recommendation calibration monitoring by sport + rank bucket | ✅ DONE | P0 | Added `GET /recommendations/calibration` with filter echo, deterministic rank-percentile bucketing (1..20), settled/excluded handling, per-bucket observed/expected rates, calibration gap, Brier, mean CLV, plus overall observed/expected, Brier, and ECE summary metrics (done 2026-03-14) |

@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +38,8 @@ type fakeReadQueries struct {
 	modelPredictionsErr            error
 	bankrollBalanceCents           int64
 	bankrollBalanceErr             error
+	bankrollCircuitMetrics         *store.GetBankrollCircuitMetricsRow
+	bankrollCircuitMetricsErr      error
 	insertCalibrationAlertRunCalls []store.InsertRecommendationCalibrationAlertRunParams
 	insertCalibrationAlertRunErr   error
 	insertOutcomeCalls             []store.InsertRecommendationOutcomeIfChangedParams
@@ -117,6 +120,24 @@ func (f *fakeReadQueries) GetBankrollBalanceCents(context.Context) (int64, error
 	return f.bankrollBalanceCents, nil
 }
 
+func (f *fakeReadQueries) GetBankrollCircuitMetrics(context.Context) (store.GetBankrollCircuitMetricsRow, error) {
+	if f.bankrollCircuitMetricsErr != nil {
+		return store.GetBankrollCircuitMetricsRow{}, f.bankrollCircuitMetricsErr
+	}
+	if f.bankrollBalanceErr != nil {
+		return store.GetBankrollCircuitMetricsRow{}, f.bankrollBalanceErr
+	}
+	if f.bankrollCircuitMetrics != nil {
+		return *f.bankrollCircuitMetrics, nil
+	}
+	return store.GetBankrollCircuitMetricsRow{
+		CurrentBalanceCents:   f.bankrollBalanceCents,
+		DayStartBalanceCents:  f.bankrollBalanceCents,
+		WeekStartBalanceCents: f.bankrollBalanceCents,
+		PeakBalanceCents:      f.bankrollBalanceCents,
+	}, nil
+}
+
 func (f *fakeReadQueries) InsertRecommendationOutcomeIfChanged(_ context.Context, arg store.InsertRecommendationOutcomeIfChangedParams) (int64, error) {
 	f.insertOutcomeCalls = append(f.insertOutcomeCalls, arg)
 	if f.insertOutcomeErr != nil {
@@ -139,6 +160,22 @@ func (f *fakeReadQueries) InsertRecommendationSnapshot(_ context.Context, arg st
 		return store.RecommendationSnapshot{}, f.insertSnapshotErr
 	}
 	return store.RecommendationSnapshot{}, nil
+}
+
+func (f *fakeReadQueries) GetRecommendationSnapshotByID(_ context.Context, _ int64) (store.RecommendationSnapshot, error) {
+	return store.RecommendationSnapshot{}, nil
+}
+
+func (f *fakeReadQueries) ListBetsByStatus(_ context.Context, _ store.ListBetsByStatusParams) ([]store.Bet, error) {
+	return nil, nil
+}
+
+func (f *fakeReadQueries) ListOpenBets(_ context.Context) ([]store.Bet, error) {
+	return nil, nil
+}
+
+func (f *fakeReadQueries) GetBetByIdempotencyKey(_ context.Context, _ string) (store.Bet, error) {
+	return store.Bet{}, pgx.ErrNoRows
 }
 
 func TestHandleOddsWithoutSportFilterUsesAllSports(t *testing.T) {
@@ -411,11 +448,554 @@ func TestHandleRecommendationsReturnsRankedJSONAndPersistsSnapshots(t *testing.T
 	if got := body[0]["best_book"].(string); got != "book-c" {
 		t.Fatalf("body[0].best_book = %q, want book-c", got)
 	}
+	if _, ok := body[0]["raw_kelly_fraction"].(float64); !ok {
+		t.Fatalf("body[0].raw_kelly_fraction missing or non-numeric: %+v", body[0]["raw_kelly_fraction"])
+	}
+	if _, ok := body[0]["applied_fractional_kelly"].(float64); !ok {
+		t.Fatalf("body[0].applied_fractional_kelly missing or non-numeric: %+v", body[0]["applied_fractional_kelly"])
+	}
+	if _, ok := body[0]["capped_fraction"].(float64); !ok {
+		t.Fatalf("body[0].capped_fraction missing or non-numeric: %+v", body[0]["capped_fraction"])
+	}
+	if _, ok := body[0]["pre_bankroll_stake_cents"].(float64); !ok {
+		t.Fatalf("body[0].pre_bankroll_stake_cents missing or non-numeric: %+v", body[0]["pre_bankroll_stake_cents"])
+	}
+	if _, ok := body[0]["bankroll_available_cents"].(float64); !ok {
+		t.Fatalf("body[0].bankroll_available_cents missing or non-numeric: %+v", body[0]["bankroll_available_cents"])
+	}
+	if reasons, ok := body[0]["sizing_reasons"].([]any); !ok || len(reasons) == 0 {
+		t.Fatalf("body[0].sizing_reasons missing or empty: %+v", body[0]["sizing_reasons"])
+	}
+	if pass, ok := body[0]["correlation_check_pass"].(bool); !ok || !pass {
+		t.Fatalf("body[0].correlation_check_pass missing or false: %+v", body[0]["correlation_check_pass"])
+	}
+	if reason, ok := body[0]["correlation_check_reason"].(string); !ok || reason == "" {
+		t.Fatalf("body[0].correlation_check_reason missing: %+v", body[0]["correlation_check_reason"])
+	}
+	if key, ok := body[0]["correlation_group_key"].(string); !ok || key == "" {
+		t.Fatalf("body[0].correlation_group_key missing: %+v", body[0]["correlation_group_key"])
+	}
+	if pass, ok := body[0]["circuit_check_pass"].(bool); !ok || !pass {
+		t.Fatalf("body[0].circuit_check_pass missing or false: %+v", body[0]["circuit_check_pass"])
+	}
+	if reason, ok := body[0]["circuit_check_reason"].(string); !ok || reason == "" {
+		t.Fatalf("body[0].circuit_check_reason missing: %+v", body[0]["circuit_check_reason"])
+	}
 	if len(queries.insertSnapshotCalls) != 2 {
 		t.Fatalf("snapshot inserts = %d, want 2", len(queries.insertSnapshotCalls))
 	}
+	var snapshotMetadata map[string]any
+	if err := json.Unmarshal(queries.insertSnapshotCalls[0].Metadata, &snapshotMetadata); err != nil {
+		t.Fatalf("decode snapshot metadata: %v", err)
+	}
+	sizing, ok := snapshotMetadata["sizing"].(map[string]any)
+	if !ok {
+		t.Fatalf("snapshot metadata missing sizing block: %+v", snapshotMetadata)
+	}
+	if _, ok := sizing["reasons"].([]any); !ok {
+		t.Fatalf("snapshot metadata sizing.reasons missing: %+v", sizing)
+	}
+	correlation, ok := snapshotMetadata["correlation"].(map[string]any)
+	if !ok {
+		t.Fatalf("snapshot metadata missing correlation block: %+v", snapshotMetadata)
+	}
+	if _, ok := correlation["check_passed"].(bool); !ok {
+		t.Fatalf("snapshot metadata correlation.check_passed missing: %+v", correlation)
+	}
+	if _, ok := correlation["check_reason"].(string); !ok {
+		t.Fatalf("snapshot metadata correlation.check_reason missing: %+v", correlation)
+	}
+	if _, ok := correlation["group_key"].(string); !ok {
+		t.Fatalf("snapshot metadata correlation.group_key missing: %+v", correlation)
+	}
+	circuit, ok := snapshotMetadata["circuit"].(map[string]any)
+	if !ok {
+		t.Fatalf("snapshot metadata missing circuit block: %+v", snapshotMetadata)
+	}
+	if _, ok := circuit["check_passed"].(bool); !ok {
+		t.Fatalf("snapshot metadata circuit.check_passed missing: %+v", circuit)
+	}
+	if _, ok := circuit["check_reason"].(string); !ok {
+		t.Fatalf("snapshot metadata circuit.check_reason missing: %+v", circuit)
+	}
+	if _, ok := circuit["daily_loss_stop"].(float64); !ok {
+		t.Fatalf("snapshot metadata circuit.daily_loss_stop missing: %+v", circuit)
+	}
 	if len(queries.modelPredictionsCalls) != 1 || queries.modelPredictionsCalls[0].Sport != "MLB" {
 		t.Fatalf("model predictions calls = %+v, want one MLB call", queries.modelPredictionsCalls)
+	}
+}
+
+func TestHandleRecommendationsDeterministicTieOrderAndSnapshotMetadataContext(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 125000,
+		bankrollCircuitMetrics: &store.GetBankrollCircuitMetricsRow{
+			CurrentBalanceCents:   125000,
+			DayStartBalanceCents:  130000,
+			WeekStartBalanceCents: 130000,
+			PeakBalanceCents:      130000,
+		},
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{
+					ID:                   101,
+					GameID:               3001,
+					Sport:                "MLB",
+					MarketKey:            "totals",
+					PredictedProbability: 0.60,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
+				},
+				{
+					ID:                   102,
+					GameID:               3001,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.60,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
+				},
+				{
+					ID:                   103,
+					GameID:               3002,
+					Sport:                "MLB",
+					MarketKey:            "totals",
+					PredictedProbability: 0.60,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 19, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 3001, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 3001, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -120},
+			{GameID: 3001, BookKey: "book-c", BookName: "book-c", MarketKey: "totals", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 3001, BookKey: "book-c", BookName: "book-c", MarketKey: "totals", OutcomeSide: "away", PriceAmerican: -120},
+			{GameID: 3002, BookKey: "book-d", BookName: "book-d", MarketKey: "totals", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 3002, BookKey: "book-d", BookName: "book-d", MarketKey: "totals", OutcomeSide: "away", PriceAmerican: -120},
+		},
+	}
+	app := newTestServerApp(t, queries)
+	app.cfg.EVThreshold = 0.02
+	app.cfg.KellyFraction = 0.20
+	app.cfg.MaxBetFraction = 0.04
+	app.cfg.CorrelationMaxPicksPerGame = 3
+	app.cfg.CorrelationMaxStakeFractionPerGame = 0.10
+	app.cfg.DailyLossStop = 0.05
+	app.cfg.WeeklyLossStop = 0.10
+	app.cfg.DrawdownBreaker = 0.15
+
+	resp := doRequest(t, app.app, "/recommendations?sport=baseball_mlb&date=2026-03-16&limit=10")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations status = %d, want 200", resp.StatusCode)
+	}
+
+	var body []map[string]any
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &body); err != nil {
+		t.Fatalf("decode recommendations: %v", err)
+	}
+	if len(body) != 3 {
+		t.Fatalf("len(body) = %d, want 3", len(body))
+	}
+
+	expectedOrder := []string{"3001|h2h", "3001|totals", "3002|totals"}
+	for i := range expectedOrder {
+		key := strconv.Itoa(int(body[i]["game_id"].(float64))) + "|" + body[i]["market"].(string)
+		if key != expectedOrder[i] {
+			t.Fatalf("body[%d] order key = %q, want %q", i, key, expectedOrder[i])
+		}
+		assertRecommendationAuditFields(t, body[i])
+	}
+
+	if len(queries.insertSnapshotCalls) != 3 {
+		t.Fatalf("snapshot inserts = %d, want 3", len(queries.insertSnapshotCalls))
+	}
+	for i, expected := range expectedOrder {
+		key := strconv.FormatInt(queries.insertSnapshotCalls[i].GameID, 10) + "|" + queries.insertSnapshotCalls[i].MarketKey
+		if key != expected {
+			t.Fatalf("insertSnapshotCalls[%d] key = %q, want %q", i, key, expected)
+		}
+	}
+
+	var metadata map[string]any
+	if err := json.Unmarshal(queries.insertSnapshotCalls[0].Metadata, &metadata); err != nil {
+		t.Fatalf("decode snapshot metadata: %v", err)
+	}
+	if got, ok := metadata["mode"].(string); !ok || got != "recommendation-only" {
+		t.Fatalf("metadata.mode = %v, want recommendation-only", metadata["mode"])
+	}
+	if got, ok := metadata["ev_threshold"].(float64); !ok || math.Abs(got-0.02) > 1e-9 {
+		t.Fatalf("metadata.ev_threshold = %v, want 0.02", metadata["ev_threshold"])
+	}
+	if got, ok := metadata["kelly_fraction_override"].(float64); !ok || math.Abs(got-0.20) > 1e-9 {
+		t.Fatalf("metadata.kelly_fraction_override = %v, want 0.20", metadata["kelly_fraction_override"])
+	}
+	if got, ok := metadata["max_bet_fraction_override"].(float64); !ok || math.Abs(got-0.04) > 1e-9 {
+		t.Fatalf("metadata.max_bet_fraction_override = %v, want 0.04", metadata["max_bet_fraction_override"])
+	}
+
+	sizing, ok := metadata["sizing"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata.sizing missing: %+v", metadata)
+	}
+	if _, ok := sizing["reasons"].([]any); !ok {
+		t.Fatalf("metadata.sizing.reasons missing: %+v", sizing)
+	}
+	if _, ok := sizing["bankroll_check_reason"].(string); !ok {
+		t.Fatalf("metadata.sizing.bankroll_check_reason missing: %+v", sizing)
+	}
+
+	correlation, ok := metadata["correlation"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata.correlation missing: %+v", metadata)
+	}
+	if got, ok := correlation["check_reason"].(string); !ok || got == "" {
+		t.Fatalf("metadata.correlation.check_reason = %v, want non-empty string", correlation["check_reason"])
+	}
+	if _, ok := correlation["group_key"].(string); !ok {
+		t.Fatalf("metadata.correlation.group_key missing: %+v", correlation)
+	}
+
+	circuit, ok := metadata["circuit"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata.circuit missing: %+v", metadata)
+	}
+	if got, ok := circuit["daily_loss_stop"].(float64); !ok || math.Abs(got-0.05) > 1e-9 {
+		t.Fatalf("metadata.circuit.daily_loss_stop = %v, want 0.05", circuit["daily_loss_stop"])
+	}
+	if got, ok := circuit["weekly_loss_stop"].(float64); !ok || math.Abs(got-0.10) > 1e-9 {
+		t.Fatalf("metadata.circuit.weekly_loss_stop = %v, want 0.10", circuit["weekly_loss_stop"])
+	}
+	if got, ok := circuit["drawdown_breaker"].(float64); !ok || math.Abs(got-0.15) > 1e-9 {
+		t.Fatalf("metadata.circuit.drawdown_breaker = %v, want 0.15", circuit["drawdown_breaker"])
+	}
+	if got, ok := circuit["current_balance_cents"].(float64); !ok || int64(got) != 125000 {
+		t.Fatalf("metadata.circuit.current_balance_cents = %v, want 125000", circuit["current_balance_cents"])
+	}
+	if got, ok := circuit["day_start_balance_cents"].(float64); !ok || int64(got) != 130000 {
+		t.Fatalf("metadata.circuit.day_start_balance_cents = %v, want 130000", circuit["day_start_balance_cents"])
+	}
+	if got, ok := circuit["week_start_balance_cents"].(float64); !ok || int64(got) != 130000 {
+		t.Fatalf("metadata.circuit.week_start_balance_cents = %v, want 130000", circuit["week_start_balance_cents"])
+	}
+	if got, ok := circuit["peak_balance_cents"].(float64); !ok || int64(got) != 130000 {
+		t.Fatalf("metadata.circuit.peak_balance_cents = %v, want 130000", circuit["peak_balance_cents"])
+	}
+}
+
+func TestHandleRecommendationsDeterministicCorrelationFilteringSameGame(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 100000,
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{
+					ID:                   20,
+					GameID:               200,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.60,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
+				},
+				{
+					ID:                   21,
+					GameID:               200,
+					Sport:                "MLB",
+					MarketKey:            "totals",
+					PredictedProbability: 0.59,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
+				},
+				{
+					ID:                   22,
+					GameID:               201,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.58,
+					MarketProbability:    0.52,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 20, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 200, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 108},
+			{GameID: 200, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -120},
+			{GameID: 200, BookKey: "book-a", BookName: "book-a", MarketKey: "totals", OutcomeSide: "home", PriceAmerican: 105},
+			{GameID: 200, BookKey: "book-a", BookName: "book-a", MarketKey: "totals", OutcomeSide: "away", PriceAmerican: -118},
+			{GameID: 201, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 104},
+			{GameID: 201, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -116},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations?sport=baseball_mlb&date=2026-03-16&limit=10")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations status = %d, want 200", resp.StatusCode)
+	}
+
+	var body []map[string]any
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &body); err != nil {
+		t.Fatalf("decode recommendations: %v", err)
+	}
+	if len(body) != 2 {
+		t.Fatalf("len(body) = %d, want 2 after same-game correlation drop", len(body))
+	}
+	if got := int(body[0]["game_id"].(float64)); got != 200 {
+		t.Fatalf("body[0].game_id = %d, want 200", got)
+	}
+	if got := body[0]["market"].(string); got != "h2h" {
+		t.Fatalf("body[0].market = %q, want h2h", got)
+	}
+	if got := int(body[1]["game_id"].(float64)); got != 201 {
+		t.Fatalf("body[1].game_id = %d, want 201", got)
+	}
+	if got := body[0]["correlation_check_reason"].(string); got != "retained_within_limits" {
+		t.Fatalf("body[0].correlation_check_reason = %q, want retained_within_limits", got)
+	}
+	if got := body[1]["correlation_check_reason"].(string); got != "retained_within_limits" {
+		t.Fatalf("body[1].correlation_check_reason = %q, want retained_within_limits", got)
+	}
+	if len(queries.insertSnapshotCalls) != 2 {
+		t.Fatalf("snapshot inserts = %d, want 2 (only retained recommendations)", len(queries.insertSnapshotCalls))
+	}
+	inserted := map[string]struct{}{}
+	for i := range queries.insertSnapshotCalls {
+		key := strconv.FormatInt(queries.insertSnapshotCalls[i].GameID, 10) + "|" + queries.insertSnapshotCalls[i].MarketKey
+		inserted[key] = struct{}{}
+	}
+	if _, ok := inserted["200|h2h"]; !ok {
+		t.Fatalf("inserted snapshots missing 200|h2h: %+v", inserted)
+	}
+	if _, ok := inserted["201|h2h"]; !ok {
+		t.Fatalf("inserted snapshots missing 201|h2h: %+v", inserted)
+	}
+	if _, ok := inserted["200|totals"]; ok {
+		t.Fatalf("inserted snapshots unexpectedly include dropped market 200|totals: %+v", inserted)
+	}
+}
+
+func TestHandleRecommendationsCircuitBreakerDropsPositiveStakeRows(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 100000,
+		bankrollCircuitMetrics: &store.GetBankrollCircuitMetricsRow{
+			CurrentBalanceCents:   80000,
+			DayStartBalanceCents:  100000,
+			WeekStartBalanceCents: 100000,
+			PeakBalanceCents:      100000,
+		},
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{
+					ID:                   100,
+					GameID:               9001,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.60,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
+				},
+				{
+					ID:                   101,
+					GameID:               9002,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.59,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 19, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 9001, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 105},
+			{GameID: 9001, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -118},
+			{GameID: 9002, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 104},
+			{GameID: 9002, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -117},
+		},
+	}
+	app := newTestServerApp(t, queries)
+	app.cfg.DailyLossStop = 0.05
+	app.cfg.WeeklyLossStop = 0.10
+	app.cfg.DrawdownBreaker = 0.15
+
+	resp := doRequest(t, app.app, "/recommendations?sport=baseball_mlb&date=2026-03-16&limit=10")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations status = %d, want 200", resp.StatusCode)
+	}
+
+	var body []map[string]any
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &body); err != nil {
+		t.Fatalf("decode recommendations: %v", err)
+	}
+	if len(body) != 0 {
+		t.Fatalf("len(body) = %d, want 0 when circuit breaker blocks positive-stake rows", len(body))
+	}
+	if len(queries.insertSnapshotCalls) != 0 {
+		t.Fatalf("snapshot inserts = %d, want 0 when circuit breaker drops all rows", len(queries.insertSnapshotCalls))
+	}
+}
+
+func TestHandleRecommendationsCircuitTriggeredRetainsOnlyZeroStakeAndPersistsRetainedRows(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 100000,
+		bankrollCircuitMetrics: &store.GetBankrollCircuitMetricsRow{
+			CurrentBalanceCents:   95000,
+			DayStartBalanceCents:  100000,
+			WeekStartBalanceCents: 100000,
+			PeakBalanceCents:      100000,
+		},
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{
+					ID:                   201,
+					GameID:               9101,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.60,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
+				},
+				{
+					ID:                   202,
+					GameID:               9102,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.55,
+					MarketProbability:    0.52,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 19, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 9101, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 9101, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -120},
+			{GameID: 9102, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: -400},
+			{GameID: 9102, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: 350},
+		},
+	}
+	app := newTestServerApp(t, queries)
+	app.cfg.DailyLossStop = 0.05
+	app.cfg.WeeklyLossStop = 0.10
+	app.cfg.DrawdownBreaker = 0.15
+
+	resp := doRequest(t, app.app, "/recommendations?sport=baseball_mlb&date=2026-03-16&limit=10")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations status = %d, want 200", resp.StatusCode)
+	}
+
+	var body []map[string]any
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &body); err != nil {
+		t.Fatalf("decode recommendations: %v", err)
+	}
+	if len(body) != 1 {
+		t.Fatalf("len(body) = %d, want 1 zero-stake row retained", len(body))
+	}
+	if got := int(body[0]["game_id"].(float64)); got != 9102 {
+		t.Fatalf("body[0].game_id = %d, want 9102", got)
+	}
+	if got := int64(body[0]["suggested_stake_cents"].(float64)); got != 0 {
+		t.Fatalf("body[0].suggested_stake_cents = %d, want 0", got)
+	}
+	if got := body[0]["correlation_check_reason"].(string); got != "retained_zero_stake" {
+		t.Fatalf("body[0].correlation_check_reason = %q, want retained_zero_stake", got)
+	}
+	if got := body[0]["circuit_check_reason"].(string); got != "retained_zero_stake" {
+		t.Fatalf("body[0].circuit_check_reason = %q, want retained_zero_stake", got)
+	}
+	assertRecommendationAuditFields(t, body[0])
+
+	if len(queries.insertSnapshotCalls) != 1 {
+		t.Fatalf("snapshot inserts = %d, want 1 retained row only", len(queries.insertSnapshotCalls))
+	}
+	if queries.insertSnapshotCalls[0].GameID != 9102 {
+		t.Fatalf("inserted snapshot game_id = %d, want 9102", queries.insertSnapshotCalls[0].GameID)
+	}
+	if queries.insertSnapshotCalls[0].SuggestedStakeCents != 0 {
+		t.Fatalf("inserted snapshot suggested_stake_cents = %d, want 0", queries.insertSnapshotCalls[0].SuggestedStakeCents)
+	}
+
+	var metadata map[string]any
+	if err := json.Unmarshal(queries.insertSnapshotCalls[0].Metadata, &metadata); err != nil {
+		t.Fatalf("decode snapshot metadata: %v", err)
+	}
+	sizing, ok := metadata["sizing"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata.sizing missing: %+v", metadata)
+	}
+	if reasons, ok := sizing["reasons"].([]any); !ok || len(reasons) == 0 {
+		t.Fatalf("metadata.sizing.reasons missing or empty: %+v", sizing["reasons"])
+	}
+	circuit, ok := metadata["circuit"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata.circuit missing: %+v", metadata)
+	}
+	if got, ok := circuit["check_reason"].(string); !ok || got != "retained_zero_stake" {
+		t.Fatalf("metadata.circuit.check_reason = %v, want retained_zero_stake", circuit["check_reason"])
+	}
+}
+
+func TestHandleRecommendationsAppliesDeterministicSizingReasonsWithSmallBankroll(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 500,
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{
+					ID:                   10,
+					GameID:               101,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.60,
+					MarketProbability:    0.53,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 19, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 101, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 101, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -130},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations?sport=baseball_mlb&date=2026-03-16&limit=1")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations status = %d, want 200", resp.StatusCode)
+	}
+
+	var body []struct {
+		SuggestedStakeCents int64    `json:"suggested_stake_cents"`
+		BankrollCheckPass   bool     `json:"bankroll_check_pass"`
+		BankrollCheckReason string   `json:"bankroll_check_reason"`
+		SizingReasons       []string `json:"sizing_reasons"`
+	}
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &body); err != nil {
+		t.Fatalf("decode recommendations: %v", err)
+	}
+	if len(body) != 1 {
+		t.Fatalf("len(body) = %d, want 1", len(body))
+	}
+	if body[0].SuggestedStakeCents != 15 {
+		t.Fatalf("SuggestedStakeCents = %d, want 15", body[0].SuggestedStakeCents)
+	}
+	if !body[0].BankrollCheckPass {
+		t.Fatal("BankrollCheckPass = false, want true")
+	}
+	if body[0].BankrollCheckReason != "ok" {
+		t.Fatalf("BankrollCheckReason = %q, want ok", body[0].BankrollCheckReason)
+	}
+	expectedReasons := []string{
+		"capped_by_max_fraction",
+		"sized",
+	}
+	if len(body[0].SizingReasons) != len(expectedReasons) {
+		t.Fatalf("SizingReasons len = %d, want %d", len(body[0].SizingReasons), len(expectedReasons))
+	}
+	for i := range expectedReasons {
+		if body[0].SizingReasons[i] != expectedReasons[i] {
+			t.Fatalf("SizingReasons[%d] = %q, want %q", i, body[0].SizingReasons[i], expectedReasons[i])
+		}
+	}
+	if len(queries.insertSnapshotCalls) != 1 {
+		t.Fatalf("snapshot inserts = %d, want 1", len(queries.insertSnapshotCalls))
 	}
 }
 
@@ -1440,6 +2020,52 @@ func assertContains(t *testing.T, body, substring string) {
 	t.Helper()
 	if !strings.Contains(body, substring) {
 		t.Fatalf("response body missing %q: %q", substring, body)
+	}
+}
+
+func assertRecommendationAuditFields(t *testing.T, row map[string]any) {
+	t.Helper()
+	if _, ok := row["suggested_stake_fraction"].(float64); !ok {
+		t.Fatalf("suggested_stake_fraction missing or non-numeric: %+v", row["suggested_stake_fraction"])
+	}
+	if _, ok := row["raw_kelly_fraction"].(float64); !ok {
+		t.Fatalf("raw_kelly_fraction missing or non-numeric: %+v", row["raw_kelly_fraction"])
+	}
+	if _, ok := row["applied_fractional_kelly"].(float64); !ok {
+		t.Fatalf("applied_fractional_kelly missing or non-numeric: %+v", row["applied_fractional_kelly"])
+	}
+	if _, ok := row["capped_fraction"].(float64); !ok {
+		t.Fatalf("capped_fraction missing or non-numeric: %+v", row["capped_fraction"])
+	}
+	if _, ok := row["pre_bankroll_stake_cents"].(float64); !ok {
+		t.Fatalf("pre_bankroll_stake_cents missing or non-numeric: %+v", row["pre_bankroll_stake_cents"])
+	}
+	if _, ok := row["bankroll_available_cents"].(float64); !ok {
+		t.Fatalf("bankroll_available_cents missing or non-numeric: %+v", row["bankroll_available_cents"])
+	}
+	if _, ok := row["bankroll_check_pass"].(bool); !ok {
+		t.Fatalf("bankroll_check_pass missing or non-bool: %+v", row["bankroll_check_pass"])
+	}
+	if reason, ok := row["bankroll_check_reason"].(string); !ok || reason == "" {
+		t.Fatalf("bankroll_check_reason missing: %+v", row["bankroll_check_reason"])
+	}
+	if reasons, ok := row["sizing_reasons"].([]any); !ok || len(reasons) == 0 {
+		t.Fatalf("sizing_reasons missing or empty: %+v", row["sizing_reasons"])
+	}
+	if _, ok := row["correlation_check_pass"].(bool); !ok {
+		t.Fatalf("correlation_check_pass missing or non-bool: %+v", row["correlation_check_pass"])
+	}
+	if reason, ok := row["correlation_check_reason"].(string); !ok || reason == "" {
+		t.Fatalf("correlation_check_reason missing: %+v", row["correlation_check_reason"])
+	}
+	if key, ok := row["correlation_group_key"].(string); !ok || key == "" {
+		t.Fatalf("correlation_group_key missing: %+v", row["correlation_group_key"])
+	}
+	if _, ok := row["circuit_check_pass"].(bool); !ok {
+		t.Fatalf("circuit_check_pass missing or non-bool: %+v", row["circuit_check_pass"])
+	}
+	if reason, ok := row["circuit_check_reason"].(string); !ok || reason == "" {
+		t.Fatalf("circuit_check_reason missing: %+v", row["circuit_check_reason"])
 	}
 }
 
