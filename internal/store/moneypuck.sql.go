@@ -33,6 +33,29 @@ func (q *Queries) CountMoneypuckTeamGames(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
+const findMoneypuckGameID = `-- name: FindMoneypuckGameID :one
+SELECT game_id
+FROM moneypuck_team_games
+WHERE team = $1
+  AND game_date = $2
+  AND situation = 'all'
+  AND home_or_away = 'HOME'
+LIMIT 1
+`
+
+type FindMoneypuckGameIDParams struct {
+	Team     string      `json:"team"`
+	GameDate pgtype.Date `json:"game_date"`
+}
+
+// Finds a MoneyPuck game_id by matching team abbreviation and game date.
+func (q *Queries) FindMoneypuckGameID(ctx context.Context, arg FindMoneypuckGameIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, findMoneypuckGameID, arg.Team, arg.GameDate)
+	var game_id string
+	err := row.Scan(&game_id)
+	return game_id, err
+}
+
 const getGameResult = `-- name: GetGameResult :many
 SELECT
     team, opponent, home_or_away, goals_for, goals_against

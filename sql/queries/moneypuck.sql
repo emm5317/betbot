@@ -135,6 +135,16 @@ WHERE team = $1
   AND is_playoff = FALSE
 ORDER BY game_date ASC;
 
+-- name: FindMoneypuckGameID :one
+-- Finds a MoneyPuck game_id by matching team abbreviation and game date.
+SELECT game_id
+FROM moneypuck_team_games
+WHERE team = $1
+  AND game_date = $2
+  AND situation = 'all'
+  AND home_or_away = 'HOME'
+LIMIT 1;
+
 -- name: CountMoneypuckTeamGames :one
 SELECT COUNT(*)::BIGINT FROM moneypuck_team_games;
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"betbot/internal/domain"
+	"betbot/internal/ingestion/moneypuck"
 	"betbot/internal/modeling"
 	"betbot/internal/modeling/features"
 	modelmlb "betbot/internal/modeling/mlb"
@@ -80,6 +81,11 @@ type Outcome struct {
 	RecommendedStakeFraction   float64      `json:"recommended_stake_fraction"`
 	RecommendedStakeDollars    float64      `json:"recommended_stake_dollars"`
 	VirtualBankrollBalancePost float64      `json:"virtual_bankroll_balance_post"`
+	HasRealFeatures            bool         `json:"has_real_features"`
+	ActualHomeGoals            *float64     `json:"actual_home_goals,omitempty"`
+	ActualAwayGoals            *float64     `json:"actual_away_goals,omitempty"`
+	ActualHomeWin              *bool        `json:"actual_home_win,omitempty"`
+	OutcomeCalibrationError    *float64     `json:"outcome_calibration_error,omitempty"`
 }
 
 type WalkForwardFold struct {
@@ -131,6 +137,7 @@ type PipelineArtifact struct {
 
 type Engine struct {
 	store    ReplayStore
+	mpStore  MoneyPuckStore // optional: enables real NHL features
 	registry features.Registry
 
 	mlbModel modelmlb.PitcherMatchupModel
@@ -139,7 +146,7 @@ type Engine struct {
 	nflModel modelnfl.EPADVOAModel
 }
 
-func NewEngine(storeSink ReplayStore) (Engine, error) {
+func NewEngine(storeSink ReplayStore, opts ...EngineOption) (Engine, error) {
 	if storeSink == nil {
 		return Engine{}, errors.New("replay store is required")
 	}
@@ -148,14 +155,28 @@ func NewEngine(storeSink ReplayStore) (Engine, error) {
 		return Engine{}, fmt.Errorf("create feature registry: %w", err)
 	}
 
-	return Engine{
+	e := Engine{
 		store:    storeSink,
 		registry: registry,
 		mlbModel: modelmlb.NewDefaultPitcherMatchupModel(),
 		nbaModel: modelnba.NewDefaultNetRatingModel(),
 		nhlModel: modelnhl.NewDefaultXGGoalieModel(),
 		nflModel: modelnfl.NewDefaultEPADVOAModel(),
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(&e)
+	}
+	return e, nil
+}
+
+// EngineOption configures optional Engine behavior.
+type EngineOption func(*Engine)
+
+// WithMoneyPuckStore enables real NHL features from MoneyPuck data.
+func WithMoneyPuckStore(s MoneyPuckStore) EngineOption {
+	return func(e *Engine) {
+		e.mpStore = s
+	}
 }
 
 func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error) {
@@ -233,7 +254,20 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 			return PipelineArtifact{}, fmt.Errorf("closing home probability out of range for game %d", row.GameID)
 		}
 
-		req := deterministicBuildRequest(row, sport)
+		var req features.BuildRequest
+		hasRealFeatures := false
+		if sport == domain.SportNHL && e.mpStore != nil {
+			nhlResult, nhlErr := BuildNHLFeatures(ctx, e.mpStore,
+				row.HomeTeam, row.AwayTeam, commenceAt, nhlSeasonFromDate(commenceAt), row.OpeningHomeImpliedProbability)
+			if nhlErr == nil {
+				req = nhlResult.Request
+				hasRealFeatures = nhlResult.HasReal
+			} else {
+				req = deterministicBuildRequest(row, sport)
+			}
+		} else {
+			req = deterministicBuildRequest(row, sport)
+		}
 		vector, err := e.registry.Build(req)
 		if err != nil {
 			return PipelineArtifact{}, fmt.Errorf("build features for game %d: %w", row.GameID, err)
@@ -281,7 +315,7 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 		}
 		virtualBankroll.ApplyCLV(sizing.StakeDollars, clvDelta)
 
-		outcomes = append(outcomes, Outcome{
+		outcome := Outcome{
 			GameID:                     row.GameID,
 			Source:                     row.Source,
 			ExternalID:                 row.ExternalID,
@@ -302,12 +336,37 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 			ModelEdge:                  modelEdge,
 			CLVDelta:                   clvDelta,
 			CalibrationError:           predictedHome - row.ClosingHomeImpliedProbability,
+			HasRealFeatures:            hasRealFeatures,
 			KellyFraction:              sizing.KellyFraction,
 			MaxStakeFraction:           sizing.MaxBetFraction,
 			RecommendedStakeFraction:   sizing.StakeFraction,
 			RecommendedStakeDollars:    sizing.StakeDollars,
 			VirtualBankrollBalancePost: virtualBankroll.Balance(),
-		})
+		}
+
+		// Outcome-based calibration: look up actual game result if MoneyPuck data available
+		if e.mpStore != nil && sport == domain.SportNHL {
+			tm := moneypuck.NewTeamMap()
+			homeAbbr, _ := tm.FromOddsAPIName(row.HomeTeam)
+			mpGID, _ := e.mpStore.FindMoneypuckGameID(ctx, store.FindMoneypuckGameIDParams{
+				Team:     homeAbbr,
+				GameDate: pgtype.Date{Time: commenceAt, Valid: true},
+			})
+			gameResult, resErr := LookupGameOutcome(ctx, e.mpStore, mpGID)
+			if resErr == nil && gameResult.Available {
+				outcome.ActualHomeGoals = &gameResult.HomeGoals
+				outcome.ActualAwayGoals = &gameResult.AwayGoals
+				outcome.ActualHomeWin = &gameResult.HomeWin
+				actualBinary := 0.0
+				if gameResult.HomeWin {
+					actualBinary = 1.0
+				}
+				outcomeCalErr := predictedHome - actualBinary
+				outcome.OutcomeCalibrationError = &outcomeCalErr
+			}
+		}
+
+		outcomes = append(outcomes, outcome)
 
 		binaryOutcome := 0.0
 		if row.ClosingHomeImpliedProbability >= 0.5 {
