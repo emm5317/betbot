@@ -327,7 +327,7 @@ func importOdds(ctx context.Context, r io.Reader, q *store.Queries, tm moneypuck
 		game, err := q.UpsertGame(ctx, store.UpsertGameParams{
 			Source:     "odds-csv",
 			ExternalID: externalID,
-			Sport:      "icehockey_nhl",
+			Sport:      "NHL",
 			HomeTeam:   homeOddsAPI,
 			AwayTeam:   awayOddsAPI,
 			CommenceTime: pgtype.Timestamptz{
@@ -513,7 +513,7 @@ func importAsPlayed(ctx context.Context, r io.Reader, q *store.Queries, tm money
 		game, err := q.UpsertGame(ctx, store.UpsertGameParams{
 			Source:     "asplayed-csv",
 			ExternalID: externalID,
-			Sport:      "icehockey_nhl",
+			Sport:      "NHL",
 			HomeTeam:   homeOddsAPI,
 			AwayTeam:   awayOddsAPI,
 			CommenceTime: pgtype.Timestamptz{

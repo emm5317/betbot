@@ -38,7 +38,8 @@ func main() {
 	}
 	defer pool.Close()
 
-	engine, err := backtest.NewEngine(store.New(pool))
+	queries := store.New(pool)
+	engine, err := backtest.NewEngine(queries, backtest.WithMoneyPuckStore(queries))
 	if err != nil {
 		log.Fatalf("create backtest engine: %v", err)
 	}

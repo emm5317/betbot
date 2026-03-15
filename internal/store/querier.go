@@ -16,6 +16,8 @@ type Querier interface {
 	CountMoneypuckGoalieGames(ctx context.Context) (int64, error)
 	CountMoneypuckTeamGames(ctx context.Context) (int64, error)
 	CountOddsHistoryRows(ctx context.Context) (int64, error)
+	// Finds a MoneyPuck game_id by matching team abbreviation and game date.
+	FindMoneypuckGameID(ctx context.Context, arg FindMoneypuckGameIDParams) (string, error)
 	GetBankrollBalanceCents(ctx context.Context) (int64, error)
 	GetDashboardSummary(ctx context.Context) (GetDashboardSummaryRow, error)
 	// Returns goals for/against from the "all" situation for both teams in a game.
