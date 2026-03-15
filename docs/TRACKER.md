@@ -43,8 +43,9 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Recommendation circuit breaker gating now enforces deterministic daily/weekly/drawdown loss stops in `GET /recommendations` from ledger-derived balances, with per-row audit fields (`circuit_check_pass`, `circuit_check_reason`) and persisted snapshot metadata blocks (done 2026-03-15)
 
 - Live prediction bridge now connects offline models to the recommendation surface: `internal/prediction/nhl.go` runs the XGGoalieModel on upcoming games every 15 minutes via a River periodic job, persists to `model_predictions` with `source="live"`, and `GET /recommendations` joins those predictions to upcoming odds via `ListLatestOddsForUpcoming`. Manual trigger available at `POST /predictions/run`. Pattern documented in CLAUDE.md for adding new sports.
+- Execution layer foundations are now in place: `BookAdapter` interface, paper adapter, `PlacementOrchestrator` with idempotency + locking, settlement with CLV capture, audit trail, `bets` table migration, and `POST /execution/place` + `GET /execution/bets` server endpoints.
 
-The current implementation target is Phase 4 decision-engine completion, with execution still explicitly deferred to later phases.
+The current implementation target is Phase 5 sustained paper-mode validation — auto-placement and auto-settlement River jobs to close the recommendation→placement→settlement loop.
 
 ---
 
@@ -177,12 +178,12 @@ Goal: add exactly-once execution semantics and prove the pipeline in paper mode.
 
 | ID | Task | Status | Priority | Notes |
 |----|------|--------|----------|-------|
-| P5-001 | Define `BookAdapter` interface | ⬜ TODO | P0 | Shared across books |
-| P5-002 | Implement paper adapter | ⬜ TODO | P0 | First execution target |
-| P5-003 | Implement placement idempotency and locking | ⬜ TODO | P0 | Financial safety first |
-| P5-004 | Implement placement audit trail | ⬜ TODO | P0 | Full request/response metadata |
-| P5-005 | Implement settlement and CLV capture | ⬜ TODO | P1 | End-to-end paper accounting |
-| P5-006 | Run sustained paper-mode validation | ⬜ TODO | P0 | Confirm no duplicate placement path |
+| P5-001 | Define `BookAdapter` interface | ✅ DONE | P0 | `internal/execution/adapter.go` with `PlaceBet` + `CheckBetStatus` contract shared across books (done 2026-03-15) |
+| P5-002 | Implement paper adapter | ✅ DONE | P0 | `internal/execution/adapters/paper/` with deterministic accept behavior and unit tests (done 2026-03-15) |
+| P5-003 | Implement placement idempotency and locking | ✅ DONE | P0 | `internal/execution/idempotency.go` + `placement.go` with `PlacementOrchestrator`, idempotency key generation, distributed locking, and read-back verification (done 2026-03-15) |
+| P5-004 | Implement placement audit trail | ✅ DONE | P0 | `internal/execution/audit.go` with full request/response metadata persistence, wired to `POST /execution/place` and `GET /execution/bets` endpoints (done 2026-03-15) |
+| P5-005 | Implement settlement and CLV capture | ✅ DONE | P1 | `internal/execution/settlement.go` + `clvcapture.go` with closing-line delta computation and unit tests (done 2026-03-15) |
+| P5-006 | Run sustained paper-mode validation | ⬜ TODO | P0 | Needs auto-placement + auto-settlement River jobs to close the loop |
 
 ---
 
