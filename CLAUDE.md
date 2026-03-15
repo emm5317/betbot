@@ -40,7 +40,7 @@ These values are the current repo baseline and should stay aligned with the actu
 | In-container app port | `8080` |
 | Local health endpoint | `GET /health` |
 | Local compose file | `deploy/docker/docker-compose.yml` |
-| Current server | Fiber v3 operational + recommendation-only API surface (`/recommendations`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`) |
+| Current server | Fiber v3 operational + recommendation + execution API surface (`/recommendations`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`, `/execution/place`, `/execution/bets`) |
 
 ---
 
