@@ -44,8 +44,10 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 
 - Live prediction bridge now connects offline models to the recommendation surface: `internal/prediction/nhl.go` runs the XGGoalieModel on upcoming games every 15 minutes via a River periodic job, persists to `model_predictions` with `source="live"`, and `GET /recommendations` joins those predictions to upcoming odds via `ListLatestOddsForUpcoming`. Manual trigger available at `POST /predictions/run`. Pattern documented in CLAUDE.md for adding new sports.
 - Execution layer foundations are now in place: `BookAdapter` interface, paper adapter, `PlacementOrchestrator` with idempotency + locking, settlement with CLV capture, audit trail, `bets` table migration, and `POST /execution/place` + `GET /execution/bets` server endpoints.
+- Recommendation auto-placement is now live: a River periodic worker (`auto_placement`) runs every 15 minutes (and on startup), reads unplaced recommendation snapshots in deterministic rank order, and places via the shared `PlacementOrchestrator` path using deterministic snapshot-scoped idempotency keys (done 2026-03-15).
+- Manual bet tracking now includes automatic settlement: a River periodic worker (`auto_settlement`) runs every 30 minutes, fetches completed game scores from The Odds API, settles matching open `h2h` bets deterministically, and writes settlement ledger entries via shared execution settlement/audit helpers (done 2026-03-15).
 
-The current implementation target is Phase 5 sustained paper-mode validation — auto-placement and auto-settlement River jobs to close the recommendation→placement→settlement loop.
+The current implementation target is Phase 5 sustained paper-mode validation — recommendation→placement→settlement is now automated in paper mode, and remaining work is sustained validation and operational hardening.
 
 ---
 
@@ -183,7 +185,7 @@ Goal: add exactly-once execution semantics and prove the pipeline in paper mode.
 | P5-003 | Implement placement idempotency and locking | ✅ DONE | P0 | `internal/execution/idempotency.go` + `placement.go` with `PlacementOrchestrator`, idempotency key generation, distributed locking, and read-back verification (done 2026-03-15) |
 | P5-004 | Implement placement audit trail | ✅ DONE | P0 | `internal/execution/audit.go` with full request/response metadata persistence, wired to `POST /execution/place` and `GET /execution/bets` endpoints (done 2026-03-15) |
 | P5-005 | Implement settlement and CLV capture | ✅ DONE | P1 | `internal/execution/settlement.go` + `clvcapture.go` with closing-line delta computation and unit tests (done 2026-03-15) |
-| P5-006 | Run sustained paper-mode validation | ⬜ TODO | P0 | Needs auto-placement + auto-settlement River jobs to close the loop |
+| P5-006 | Run sustained paper-mode validation | ⬜ TODO | P0 | Auto-placement and auto-settlement River jobs are now live; remaining work is sustained runbook validation, monitoring review cadence, and threshold tuning under paper traffic |
 
 ---
 

@@ -143,6 +143,76 @@ func (q *Queries) InsertRecommendationSnapshot(ctx context.Context, arg InsertRe
 	return i, err
 }
 
+const listPlaceableRecommendationSnapshots = `-- name: ListPlaceableRecommendationSnapshots :many
+SELECT
+    rs.id AS snapshot_id,
+    rs.game_id,
+    rs.sport,
+    rs.market_key,
+    rs.recommended_side,
+    rs.best_book,
+    rs.best_american_odds,
+    rs.suggested_stake_cents,
+    rs.model_probability,
+    rs.market_probability,
+    rs.edge
+FROM recommendation_snapshots AS rs
+WHERE rs.suggested_stake_cents > 0
+  AND NOT EXISTS (
+      SELECT 1
+      FROM bets AS b
+      WHERE b.snapshot_id = rs.id
+  )
+ORDER BY rs.rank_score DESC, rs.id ASC
+LIMIT $1
+`
+
+type ListPlaceableRecommendationSnapshotsRow struct {
+	SnapshotID          int64   `json:"snapshot_id"`
+	GameID              int64   `json:"game_id"`
+	Sport               string  `json:"sport"`
+	MarketKey           string  `json:"market_key"`
+	RecommendedSide     string  `json:"recommended_side"`
+	BestBook            string  `json:"best_book"`
+	BestAmericanOdds    int32   `json:"best_american_odds"`
+	SuggestedStakeCents int64   `json:"suggested_stake_cents"`
+	ModelProbability    float64 `json:"model_probability"`
+	MarketProbability   float64 `json:"market_probability"`
+	Edge                float64 `json:"edge"`
+}
+
+func (q *Queries) ListPlaceableRecommendationSnapshots(ctx context.Context, rowLimit int32) ([]ListPlaceableRecommendationSnapshotsRow, error) {
+	rows, err := q.db.Query(ctx, listPlaceableRecommendationSnapshots, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPlaceableRecommendationSnapshotsRow
+	for rows.Next() {
+		var i ListPlaceableRecommendationSnapshotsRow
+		if err := rows.Scan(
+			&i.SnapshotID,
+			&i.GameID,
+			&i.Sport,
+			&i.MarketKey,
+			&i.RecommendedSide,
+			&i.BestBook,
+			&i.BestAmericanOdds,
+			&i.SuggestedStakeCents,
+			&i.ModelProbability,
+			&i.MarketProbability,
+			&i.Edge,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRecommendationSnapshots = `-- name: ListRecommendationSnapshots :many
 SELECT
     id,

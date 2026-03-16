@@ -25,6 +25,7 @@ type Querier interface {
 	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (GetBetByIdempotencyKeyRow, error)
 	GetBetPnLSummary(ctx context.Context, sport string) (GetBetPnLSummaryRow, error)
 	GetDashboardSummary(ctx context.Context) (GetDashboardSummaryRow, error)
+	GetGameByExternalID(ctx context.Context, arg GetGameByExternalIDParams) (Game, error)
 	GetGameByID(ctx context.Context, id int64) (Game, error)
 	// Returns goals for/against from the "all" situation for both teams in a game.
 	// Two rows returned: one per team, with home_or_away indicating side.
@@ -57,9 +58,11 @@ type Querier interface {
 	ListLatestOddsForUpcoming(ctx context.Context, arg ListLatestOddsForUpcomingParams) ([]ListLatestOddsForUpcomingRow, error)
 	ListModelPredictionsForSportSeason(ctx context.Context, arg ListModelPredictionsForSportSeasonParams) ([]ModelPrediction, error)
 	ListOpenBets(ctx context.Context) ([]ListOpenBetsRow, error)
+	ListOpenBetsWithGame(ctx context.Context) ([]ListOpenBetsWithGameRow, error)
 	// Returns all regular-season home games across a season range for outcome-based backtesting.
 	// One row per game (home perspective to avoid double-counting).
 	ListOutcomeBacktestGames(ctx context.Context, arg ListOutcomeBacktestGamesParams) ([]ListOutcomeBacktestGamesRow, error)
+	ListPlaceableRecommendationSnapshots(ctx context.Context, rowLimit int32) ([]ListPlaceableRecommendationSnapshotsRow, error)
 	ListRecommendationCalibrationAlertRuns(ctx context.Context, arg ListRecommendationCalibrationAlertRunsParams) ([]RecommendationCalibrationAlertRun, error)
 	ListRecommendationPerformanceSnapshots(ctx context.Context, arg ListRecommendationPerformanceSnapshotsParams) ([]ListRecommendationPerformanceSnapshotsRow, error)
 	ListRecommendationSnapshots(ctx context.Context, arg ListRecommendationSnapshotsParams) ([]RecommendationSnapshot, error)
@@ -67,7 +70,7 @@ type Querier interface {
 	ListSeasonGameDates(ctx context.Context, season int32) ([]pgtype.Date, error)
 	// Returns all games for a team in a season (all situation), ordered by date.
 	ListSeasonTeamGames(ctx context.Context, arg ListSeasonTeamGamesParams) ([]ListSeasonTeamGamesRow, error)
-	ListUpcomingGames(ctx context.Context, limit int32) ([]Game, error)
+	ListUpcomingGames(ctx context.Context, rowLimit int32) ([]Game, error)
 	ListUpcomingGamesForSport(ctx context.Context, sport string) ([]Game, error)
 	ListUpcomingWeatherGames(ctx context.Context, arg ListUpcomingWeatherGamesParams) ([]Game, error)
 	UpdateBetFailed(ctx context.Context, arg UpdateBetFailedParams) error
