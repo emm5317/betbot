@@ -1,1 +1,41 @@
-<!-- betbot stub -->
+<tr>
+    <td><span class="timestamp" data-timestamp="{{.PlacedAt}}">{{.PlacedAt}}</span></td>
+    <td>{{.HomeTeam}} vs {{.AwayTeam}}</td>
+    <td>{{.Side}}</td>
+    <td>{{.BookKey}}</td>
+    <td style="font-family:monospace;">{{.AmericanOdds}}</td>
+    <td>{{.StakeDollars}}</td>
+    <td>
+        {{if eq .Status "placed"}}<span class="status-pill status-pill--warn">open</span>
+        {{else if eq .Status "settled"}}
+            {{if eq .SettlementResult "win"}}<span class="status-pill status-pill--ok">win</span>
+            {{else if eq .SettlementResult "loss"}}<span class="status-pill status-pill--degraded">loss</span>
+            {{else}}<span class="status-pill">push</span>
+            {{end}}
+        {{else if eq .Status "voided"}}<span class="status-pill status-pill--stale">voided</span>
+        {{end}}
+    </td>
+    <td>{{.PayoutDollars}}</td>
+    <td>{{.PnLDollars}}</td>
+    <td>
+        {{if eq .Status "placed"}}
+        <div class="btn-group">
+            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
+                <input type="hidden" name="result" value="win">
+                <button type="submit" class="btn btn--sm btn--ok">Win</button>
+            </form>
+            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
+                <input type="hidden" name="result" value="loss">
+                <button type="submit" class="btn btn--sm btn--danger">Loss</button>
+            </form>
+            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
+                <input type="hidden" name="result" value="push">
+                <button type="submit" class="btn btn--sm">Push</button>
+            </form>
+            <form method="post" action="/bets/{{.ID}}/void" style="display:inline;">
+                <button type="submit" class="btn btn--sm btn--muted">Void</button>
+            </form>
+        </div>
+        {{end}}
+    </td>
+</tr>

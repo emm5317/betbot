@@ -42,8 +42,8 @@ func (s *SettlementProcessor) SettleBet(ctx context.Context, bet store.Bet, inpu
 
 	// Compute CLV delta if closing probability available
 	var clvDelta *float64
-	if input.CloseProb != nil {
-		d := bet.ModelProbability - *input.CloseProb
+	if input.CloseProb != nil && bet.ModelProbability != nil {
+		d := *bet.ModelProbability - *input.CloseProb
 		clvDelta = &d
 	}
 

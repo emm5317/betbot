@@ -64,3 +64,36 @@
         window.setInterval(() => syncTimestamps(), 30000);
     });
 })();
+
+// Alpine.js payout calculator for bet entry form
+function payoutCalc() {
+    return {
+        odds: '',
+        stake: '',
+        potentialWin: 0,
+        potentialProfit: 0,
+        calc() {
+            const o = parseInt(this.odds, 10);
+            const s = parseFloat(this.stake);
+            if (!o || !s || s <= 0 || (o > -100 && o < 100)) {
+                this.potentialWin = 0;
+                this.potentialProfit = 0;
+                return;
+            }
+            let profit;
+            if (o > 0) {
+                profit = s * (o / 100);
+            } else {
+                profit = s * (100 / Math.abs(o));
+            }
+            this.potentialProfit = Math.round(profit * 100) / 100;
+            this.potentialWin = Math.round((s + profit) * 100) / 100;
+        },
+        updateSport(event) {
+            const option = event.target.selectedOptions[0];
+            if (option && option.dataset.sport) {
+                document.getElementById('sport').value = option.dataset.sport;
+            }
+        }
+    };
+}

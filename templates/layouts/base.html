@@ -7,6 +7,7 @@
     <meta name="description" content="betbot operational surface for Phase 1 odds ingestion and pipeline visibility.">
     <link rel="stylesheet" href="/static/css/app.css">
     <script defer src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
     <script defer src="/static/js/app.js"></script>
 </head>
 <body>
@@ -26,6 +27,8 @@
                     <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/{{.SelectedSportQuery}}">Overview</a>
                     <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds{{.SelectedSportQuery}}">Odds</a>
                     <a class="nav-link {{if eq .ActiveNav "pipeline"}}is-active{{end}}" href="/pipeline/health{{.SelectedSportQuery}}">Pipeline</a>
+                    <a class="nav-link {{if eq .ActiveNav "bets"}}is-active{{end}}" href="/bets">Bets</a>
+                    <a class="nav-link {{if eq .ActiveNav "bankroll"}}is-active{{end}}" href="/bankroll">Bankroll</a>
                 </nav>
 
                 {{template "partials/topbar_status" .}}

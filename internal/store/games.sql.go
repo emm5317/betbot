@@ -11,6 +11,29 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getGameByID = `-- name: GetGameByID :one
+SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
+FROM games
+WHERE id = $1
+`
+
+func (q *Queries) GetGameByID(ctx context.Context, id int64) (Game, error) {
+	row := q.db.QueryRow(ctx, getGameByID, id)
+	var i Game
+	err := row.Scan(
+		&i.ID,
+		&i.Source,
+		&i.ExternalID,
+		&i.Sport,
+		&i.HomeTeam,
+		&i.AwayTeam,
+		&i.CommenceTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listUpcomingGames = `-- name: ListUpcomingGames :many
 SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
 FROM games

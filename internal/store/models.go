@@ -71,7 +71,7 @@ type BankrollLedger struct {
 type Bet struct {
 	ID                 int64              `json:"id"`
 	IdempotencyKey     string             `json:"idempotency_key"`
-	SnapshotID         int64              `json:"snapshot_id"`
+	SnapshotID         *int64             `json:"snapshot_id"`
 	GameID             int64              `json:"game_id"`
 	Sport              string             `json:"sport"`
 	MarketKey          string             `json:"market_key"`
@@ -79,9 +79,9 @@ type Bet struct {
 	BookKey            string             `json:"book_key"`
 	AmericanOdds       int32              `json:"american_odds"`
 	StakeCents         int64              `json:"stake_cents"`
-	ModelProbability   float64            `json:"model_probability"`
-	MarketProbability  float64            `json:"market_probability"`
-	Edge               float64            `json:"edge"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
 	Status             BetStatus          `json:"status"`
 	ExternalBetID      *string            `json:"external_bet_id"`
 	AdapterName        string             `json:"adapter_name"`
@@ -95,6 +95,7 @@ type Bet struct {
 	Metadata           json.RawMessage    `json:"metadata"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	UserNotes          *string            `json:"user_notes"`
 }
 
 type Game struct {

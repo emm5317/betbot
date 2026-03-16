@@ -18,6 +18,11 @@ SET
     updated_at = NOW()
 RETURNING id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at;
 
+-- name: GetGameByID :one
+SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
+FROM games
+WHERE id = $1;
+
 -- name: ListUpcomingGames :many
 SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
 FROM games

@@ -37,9 +37,19 @@ type readQueries interface {
 	InsertRecommendationOutcomeIfChanged(ctx context.Context, arg store.InsertRecommendationOutcomeIfChangedParams) (int64, error)
 	InsertRecommendationSnapshot(ctx context.Context, arg store.InsertRecommendationSnapshotParams) (store.RecommendationSnapshot, error)
 	GetRecommendationSnapshotByID(ctx context.Context, id int64) (store.RecommendationSnapshot, error)
-	ListBetsByStatus(ctx context.Context, arg store.ListBetsByStatusParams) ([]store.Bet, error)
-	ListOpenBets(ctx context.Context) ([]store.Bet, error)
-	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (store.Bet, error)
+	ListBetsByStatus(ctx context.Context, arg store.ListBetsByStatusParams) ([]store.ListBetsByStatusRow, error)
+	ListOpenBets(ctx context.Context) ([]store.ListOpenBetsRow, error)
+	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (store.GetBetByIdempotencyKeyRow, error)
+	GetBetByID(ctx context.Context, id int64) (store.GetBetByIDRow, error)
+	InsertManualBet(ctx context.Context, arg store.InsertManualBetParams) (store.InsertManualBetRow, error)
+	ListBetsWithFilters(ctx context.Context, arg store.ListBetsWithFiltersParams) ([]store.ListBetsWithFiltersRow, error)
+	GetBetPnLSummary(ctx context.Context, sport string) (store.GetBetPnLSummaryRow, error)
+	VoidBet(ctx context.Context, id int64) error
+	ListBankrollEntries(ctx context.Context, rowLimit int32) ([]store.BankrollLedger, error)
+	InsertBankrollEntry(ctx context.Context, arg store.InsertBankrollEntryParams) (store.BankrollLedger, error)
+	UpdateBetSettled(ctx context.Context, arg store.UpdateBetSettledParams) error
+	ListUpcomingGames(ctx context.Context, limit int32) ([]store.Game, error)
+	GetGameByID(ctx context.Context, id int64) (store.Game, error)
 }
 
 type App struct {
@@ -147,6 +157,15 @@ func (a *App) routes() {
 
 	a.app.Post("/execution/place", a.handleExecutionPlace)
 	a.app.Get("/execution/bets", a.handleExecutionBets)
+
+	a.app.Get("/bets", a.handleBetsPage)
+	a.app.Get("/bets/new", a.handleBetsNewPage)
+	a.app.Post("/bets", a.handleBetsCreate)
+	a.app.Post("/bets/:id/settle", a.handleBetsSettle)
+	a.app.Post("/bets/:id/void", a.handleBetsVoid)
+
+	a.app.Get("/bankroll", a.handleBankrollPage)
+	a.app.Post("/bankroll/deposit", a.handleBankrollDeposit)
 }
 
 func (a *App) handleHome(c fiber.Ctx) error {

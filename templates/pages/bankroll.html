@@ -1,1 +1,62 @@
-<!-- betbot stub -->
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Bankroll Management</p>
+        <h2>Bankroll</h2>
+    </div>
+</div>
+
+<div class="status-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="stat-card stat-card--accent">
+        <span class="stat-card__label">Current Balance</span>
+        <span class="stat-card__value">{{.Balance}}</span>
+    </div>
+
+    <div class="stat-card">
+        <span class="stat-card__label">Deposit Funds</span>
+        <form method="post" action="/bankroll/deposit" style="display:flex;gap:8px;align-items:flex-end;margin-top:8px;">
+            <input type="number" name="amount_dollars" class="form-input" step="0.01" min="0.01" placeholder="100.00" required style="max-width:160px;">
+            <button type="submit" class="filter-form__submit">Deposit</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <h3>Ledger Entries</h3>
+    <div class="table-shell" style="margin-top:14px;">
+        <table class="data-table data-table--dense">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Reference</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{if .Entries}}
+                {{range .Entries}}
+                <tr>
+                    <td><span class="timestamp" data-timestamp="{{.CreatedAt}}">{{.CreatedAt}}</span></td>
+                    <td>
+                        {{if eq .EntryType "deposit"}}<span class="status-pill status-pill--ok">deposit</span>
+                        {{else if eq .EntryType "bet_stake_reserved"}}<span class="status-pill status-pill--warn">stake reserved</span>
+                        {{else if eq .EntryType "bet_stake_released"}}<span class="status-pill">stake released</span>
+                        {{else if eq .EntryType "bet_settlement_win"}}<span class="status-pill status-pill--ok">win</span>
+                        {{else if eq .EntryType "bet_settlement_loss"}}<span class="status-pill status-pill--degraded">loss</span>
+                        {{else if eq .EntryType "bet_settlement_push"}}<span class="status-pill">push</span>
+                        {{else}}<span class="status-pill">{{.EntryType}}</span>
+                        {{end}}
+                    </td>
+                    <td style="font-family:monospace;{{if .AmountPositive}}color:var(--ok);{{else}}color:var(--degraded);{{end}}">{{.AmountDollars}}</td>
+                    <td class="muted">{{.ReferenceType}}: {{.ReferenceID}}</td>
+                </tr>
+                {{end}}
+                {{else}}
+                <tr>
+                    <td colspan="4" class="empty-state">No ledger entries yet. Deposit funds to get started.</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>

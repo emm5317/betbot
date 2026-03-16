@@ -81,9 +81,10 @@ func (o *PlacementOrchestrator) Place(ctx context.Context, input PlaceInput) (Pl
 
 	txQueries := store.New(tx1)
 
+	snapshotID := input.SnapshotID
 	bet, err := txQueries.InsertBet(ctx, store.InsertBetParams{
 		IdempotencyKey:    input.IdempotencyKey,
-		SnapshotID:        input.SnapshotID,
+		SnapshotID:        &snapshotID,
 		GameID:            input.GameID,
 		Sport:             input.Sport,
 		MarketKey:         input.MarketKey,
@@ -91,9 +92,9 @@ func (o *PlacementOrchestrator) Place(ctx context.Context, input PlaceInput) (Pl
 		BookKey:           input.BookKey,
 		AmericanOdds:      int32(input.AmericanOdds),
 		StakeCents:        input.StakeCents,
-		ModelProbability:  input.ModelProbability,
-		MarketProbability: input.MarketProbability,
-		Edge:              input.Edge,
+		ModelProbability:  &input.ModelProbability,
+		MarketProbability: &input.MarketProbability,
+		Edge:              &input.Edge,
 		AdapterName:       o.adapter.Name(),
 		Metadata:          json.RawMessage(`{}`),
 	})

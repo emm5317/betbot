@@ -193,16 +193,56 @@ func (f *fakeReadQueries) GetRecommendationSnapshotByID(_ context.Context, _ int
 	return store.RecommendationSnapshot{}, nil
 }
 
-func (f *fakeReadQueries) ListBetsByStatus(_ context.Context, _ store.ListBetsByStatusParams) ([]store.Bet, error) {
+func (f *fakeReadQueries) ListBetsByStatus(_ context.Context, _ store.ListBetsByStatusParams) ([]store.ListBetsByStatusRow, error) {
 	return nil, nil
 }
 
-func (f *fakeReadQueries) ListOpenBets(_ context.Context) ([]store.Bet, error) {
+func (f *fakeReadQueries) ListOpenBets(_ context.Context) ([]store.ListOpenBetsRow, error) {
 	return nil, nil
 }
 
-func (f *fakeReadQueries) GetBetByIdempotencyKey(_ context.Context, _ string) (store.Bet, error) {
-	return store.Bet{}, pgx.ErrNoRows
+func (f *fakeReadQueries) GetBetByIdempotencyKey(_ context.Context, _ string) (store.GetBetByIdempotencyKeyRow, error) {
+	return store.GetBetByIdempotencyKeyRow{}, pgx.ErrNoRows
+}
+
+func (f *fakeReadQueries) GetBetByID(_ context.Context, _ int64) (store.GetBetByIDRow, error) {
+	return store.GetBetByIDRow{}, pgx.ErrNoRows
+}
+
+func (f *fakeReadQueries) InsertManualBet(_ context.Context, _ store.InsertManualBetParams) (store.InsertManualBetRow, error) {
+	return store.InsertManualBetRow{}, nil
+}
+
+func (f *fakeReadQueries) ListBetsWithFilters(_ context.Context, _ store.ListBetsWithFiltersParams) ([]store.ListBetsWithFiltersRow, error) {
+	return nil, nil
+}
+
+func (f *fakeReadQueries) GetBetPnLSummary(_ context.Context, _ string) (store.GetBetPnLSummaryRow, error) {
+	return store.GetBetPnLSummaryRow{}, nil
+}
+
+func (f *fakeReadQueries) VoidBet(_ context.Context, _ int64) error {
+	return nil
+}
+
+func (f *fakeReadQueries) ListBankrollEntries(_ context.Context, _ int32) ([]store.BankrollLedger, error) {
+	return nil, nil
+}
+
+func (f *fakeReadQueries) InsertBankrollEntry(_ context.Context, _ store.InsertBankrollEntryParams) (store.BankrollLedger, error) {
+	return store.BankrollLedger{}, nil
+}
+
+func (f *fakeReadQueries) UpdateBetSettled(_ context.Context, _ store.UpdateBetSettledParams) error {
+	return nil
+}
+
+func (f *fakeReadQueries) ListUpcomingGames(_ context.Context, _ int32) ([]store.Game, error) {
+	return nil, nil
+}
+
+func (f *fakeReadQueries) GetGameByID(_ context.Context, _ int64) (store.Game, error) {
+	return store.Game{}, pgx.ErrNoRows
 }
 
 func TestHandleOddsWithoutSportFilterUsesAllSports(t *testing.T) {

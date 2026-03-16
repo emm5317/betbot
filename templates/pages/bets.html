@@ -1,1 +1,126 @@
-<!-- betbot stub -->
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Manual Tracking</p>
+        <h2>Bet Ledger</h2>
+    </div>
+    <a class="filter-form__submit" href="/bets/new">+ Record Bet</a>
+</div>
+
+<div class="status-grid" style="grid-template-columns: repeat(4, 1fr);">
+    <div class="stat-card">
+        <span class="stat-card__label">Total Staked</span>
+        <span class="stat-card__value">{{.TotalStaked}}</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-card__label">Total Returned</span>
+        <span class="stat-card__value">{{.TotalReturned}}</span>
+    </div>
+    <div class="stat-card {{if .NetPnLPositive}}stat-card--accent{{end}}">
+        <span class="stat-card__label">Net P&amp;L</span>
+        <span class="stat-card__value">{{.NetPnL}}</span>
+        <span class="muted" style="font-size:0.82rem;">ROI: {{.ROI}}</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-card__label">Bets</span>
+        <span class="stat-card__value">{{.OpenBets}} open / {{.SettledBets}} settled</span>
+        <span class="muted" style="font-size:0.82rem;">{{.VoidedBets}} voided</span>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel__header panel__header--dense">
+        <h3>Bets</h3>
+        <form class="filter-form" method="get" action="/bets">
+            <div class="filter-form__controls">
+                <select name="sport" class="filter-form__select">
+                    <option value="">All Sports</option>
+                    <option value="NHL" {{if eq .SportFilter "NHL"}}selected{{end}}>NHL</option>
+                    <option value="NFL" {{if eq .SportFilter "NFL"}}selected{{end}}>NFL</option>
+                    <option value="NBA" {{if eq .SportFilter "NBA"}}selected{{end}}>NBA</option>
+                    <option value="MLB" {{if eq .SportFilter "MLB"}}selected{{end}}>MLB</option>
+                </select>
+                <select name="status" class="filter-form__select">
+                    <option value="">All Status</option>
+                    <option value="placed" {{if eq .StatusFilter "placed"}}selected{{end}}>Open</option>
+                    <option value="settled" {{if eq .StatusFilter "settled"}}selected{{end}}>Settled</option>
+                    <option value="voided" {{if eq .StatusFilter "voided"}}selected{{end}}>Voided</option>
+                </select>
+                <button type="submit" class="filter-form__submit">Filter</button>
+                {{if or .SportFilter .StatusFilter}}
+                <a href="/bets" class="filter-form__clear">Clear</a>
+                {{end}}
+            </div>
+        </form>
+    </div>
+
+    <div class="table-shell" style="margin-top:14px;">
+        <table class="data-table data-table--dense">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Game</th>
+                    <th>Side</th>
+                    <th>Book</th>
+                    <th>Odds</th>
+                    <th>Stake</th>
+                    <th>Result</th>
+                    <th>Payout</th>
+                    <th>P&amp;L</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{if .Bets}}
+                {{range .Bets}}
+                <tr>
+                    <td><span class="timestamp" data-timestamp="{{.PlacedAt}}">{{.PlacedAt}}</span></td>
+                    <td>{{.HomeTeam}} vs {{.AwayTeam}}</td>
+                    <td>{{.Side}}</td>
+                    <td>{{.BookKey}}</td>
+                    <td style="font-family:monospace;">{{.AmericanOdds}}</td>
+                    <td>{{.StakeDollars}}</td>
+                    <td>
+                        {{if eq .Status "placed"}}<span class="status-pill status-pill--warn">open</span>
+                        {{else if eq .Status "settled"}}
+                            {{if eq .SettlementResult "win"}}<span class="status-pill status-pill--ok">win</span>
+                            {{else if eq .SettlementResult "loss"}}<span class="status-pill status-pill--degraded">loss</span>
+                            {{else}}<span class="status-pill">push</span>
+                            {{end}}
+                        {{else if eq .Status "voided"}}<span class="status-pill status-pill--stale">voided</span>
+                        {{else}}<span class="status-pill">{{.Status}}</span>
+                        {{end}}
+                    </td>
+                    <td>{{.PayoutDollars}}</td>
+                    <td>{{.PnLDollars}}</td>
+                    <td>
+                        {{if eq .Status "placed"}}
+                        <div class="btn-group">
+                            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
+                                <input type="hidden" name="result" value="win">
+                                <button type="submit" class="btn btn--sm btn--ok">Win</button>
+                            </form>
+                            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
+                                <input type="hidden" name="result" value="loss">
+                                <button type="submit" class="btn btn--sm btn--danger">Loss</button>
+                            </form>
+                            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
+                                <input type="hidden" name="result" value="push">
+                                <button type="submit" class="btn btn--sm">Push</button>
+                            </form>
+                            <form method="post" action="/bets/{{.ID}}/void" style="display:inline;">
+                                <button type="submit" class="btn btn--sm btn--muted">Void</button>
+                            </form>
+                        </div>
+                        {{end}}
+                    </td>
+                </tr>
+                {{end}}
+                {{else}}
+                <tr>
+                    <td colspan="10" class="empty-state">No bets recorded yet. <a href="/bets/new" class="text-link">Record your first bet</a>.</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>

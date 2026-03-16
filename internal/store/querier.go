@@ -21,8 +21,11 @@ type Querier interface {
 	FindMoneypuckGameID(ctx context.Context, arg FindMoneypuckGameIDParams) (string, error)
 	GetBankrollBalanceCents(ctx context.Context) (int64, error)
 	GetBankrollCircuitMetrics(ctx context.Context) (GetBankrollCircuitMetricsRow, error)
-	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (Bet, error)
+	GetBetByID(ctx context.Context, id int64) (GetBetByIDRow, error)
+	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (GetBetByIdempotencyKeyRow, error)
+	GetBetPnLSummary(ctx context.Context, sport string) (GetBetPnLSummaryRow, error)
 	GetDashboardSummary(ctx context.Context) (GetDashboardSummaryRow, error)
+	GetGameByID(ctx context.Context, id int64) (Game, error)
 	// Returns goals for/against from the "all" situation for both teams in a game.
 	// Two rows returned: one per team, with home_or_away indicating side.
 	GetGameResult(ctx context.Context, gameID string) ([]GetGameResultRow, error)
@@ -39,18 +42,21 @@ type Querier interface {
 	// The caller computes rolling averages from these rows.
 	GetTeamRolling5on5Stats(ctx context.Context, arg GetTeamRolling5on5StatsParams) ([]GetTeamRolling5on5StatsRow, error)
 	InsertBankrollEntry(ctx context.Context, arg InsertBankrollEntryParams) (BankrollLedger, error)
-	InsertBet(ctx context.Context, arg InsertBetParams) (Bet, error)
+	InsertBet(ctx context.Context, arg InsertBetParams) (InsertBetRow, error)
+	InsertManualBet(ctx context.Context, arg InsertManualBetParams) (InsertManualBetRow, error)
 	InsertOddsSnapshot(ctx context.Context, arg InsertOddsSnapshotParams) (OddsHistory, error)
 	InsertPollRun(ctx context.Context, arg InsertPollRunParams) (PollRun, error)
 	InsertRecommendationCalibrationAlertRun(ctx context.Context, arg InsertRecommendationCalibrationAlertRunParams) (int64, error)
 	InsertRecommendationOutcomeIfChanged(ctx context.Context, arg InsertRecommendationOutcomeIfChangedParams) (int64, error)
 	InsertRecommendationSnapshot(ctx context.Context, arg InsertRecommendationSnapshotParams) (RecommendationSnapshot, error)
 	ListBacktestReplayRows(ctx context.Context, arg ListBacktestReplayRowsParams) ([]ListBacktestReplayRowsRow, error)
-	ListBetsByStatus(ctx context.Context, arg ListBetsByStatusParams) ([]Bet, error)
+	ListBankrollEntries(ctx context.Context, rowLimit int32) ([]BankrollLedger, error)
+	ListBetsByStatus(ctx context.Context, arg ListBetsByStatusParams) ([]ListBetsByStatusRow, error)
+	ListBetsWithFilters(ctx context.Context, arg ListBetsWithFiltersParams) ([]ListBetsWithFiltersRow, error)
 	ListLatestOdds(ctx context.Context, arg ListLatestOddsParams) ([]ListLatestOddsRow, error)
 	ListLatestOddsForUpcoming(ctx context.Context, arg ListLatestOddsForUpcomingParams) ([]ListLatestOddsForUpcomingRow, error)
 	ListModelPredictionsForSportSeason(ctx context.Context, arg ListModelPredictionsForSportSeasonParams) ([]ModelPrediction, error)
-	ListOpenBets(ctx context.Context) ([]Bet, error)
+	ListOpenBets(ctx context.Context) ([]ListOpenBetsRow, error)
 	// Returns all regular-season home games across a season range for outcome-based backtesting.
 	// One row per game (home perspective to avoid double-counting).
 	ListOutcomeBacktestGames(ctx context.Context, arg ListOutcomeBacktestGamesParams) ([]ListOutcomeBacktestGamesRow, error)
@@ -79,6 +85,7 @@ type Querier interface {
 	UpsertNFLTeamStats(ctx context.Context, arg UpsertNFLTeamStatsParams) error
 	UpsertNHLTeamStats(ctx context.Context, arg UpsertNHLTeamStatsParams) error
 	UpsertPlayerInjuryReport(ctx context.Context, arg UpsertPlayerInjuryReportParams) error
+	VoidBet(ctx context.Context, id int64) error
 }
 
 var _ Querier = (*Queries)(nil)
