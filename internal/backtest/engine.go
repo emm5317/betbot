@@ -136,13 +136,13 @@ type SportCalibrationArtifact struct {
 
 // SeasonCalibration holds per-season calibration metrics for outcome-based backtests.
 type SeasonCalibration struct {
-	Season                int     `json:"season"`
-	Samples               int     `json:"samples"`
-	RealFeatureRate       float64 `json:"real_feature_rate"`
-	MeanAbsoluteError     float64 `json:"mean_absolute_error"`
-	BrierScore            float64 `json:"brier_score"`
-	HomeWinRate           float64 `json:"home_win_rate"`
-	PredictedHomeWinRate  float64 `json:"predicted_home_win_rate"`
+	Season               int     `json:"season"`
+	Samples              int     `json:"samples"`
+	RealFeatureRate      float64 `json:"real_feature_rate"`
+	MeanAbsoluteError    float64 `json:"mean_absolute_error"`
+	BrierScore           float64 `json:"brier_score"`
+	HomeWinRate          float64 `json:"home_win_rate"`
+	PredictedHomeWinRate float64 `json:"predicted_home_win_rate"`
 }
 
 type PipelineArtifact struct {
@@ -161,6 +161,7 @@ type PipelineArtifact struct {
 	WalkForward             []WalkForwardFold          `json:"walk_forward"`
 	CLV                     CLVReport                  `json:"clv"`
 	Calibration             CalibrationReport          `json:"calibration"`
+	OutcomeCalibration      CalibrationReport          `json:"outcome_calibration,omitempty"`
 	SportCalibrations       []SportCalibrationArtifact `json:"sport_calibrations"`
 	SeasonCalibrations      []SeasonCalibration        `json:"season_calibrations,omitempty"`
 }
@@ -374,8 +375,25 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 			VirtualBankrollBalancePost: virtualBankroll.Balance(),
 		}
 
+		if row.HasActualResult && row.ActualHomeScore != nil && row.ActualAwayScore != nil {
+			actualHome := float64(*row.ActualHomeScore)
+			actualAway := float64(*row.ActualAwayScore)
+			actualWin := row.ActualHomeWin
+
+			outcome.ActualHomeGoals = &actualHome
+			outcome.ActualAwayGoals = &actualAway
+			outcome.ActualHomeWin = &actualWin
+
+			actualBinary := 0.0
+			if actualWin {
+				actualBinary = 1.0
+			}
+			outcomeCalErr := predictedHome - actualBinary
+			outcome.OutcomeCalibrationError = &outcomeCalErr
+		}
+
 		// Outcome-based calibration: look up actual game result if MoneyPuck data available
-		if e.mpStore != nil && sport == domain.SportNHL {
+		if outcome.ActualHomeWin == nil && e.mpStore != nil && sport == domain.SportNHL {
 			tm := moneypuck.NewTeamMap()
 			homeAbbr, _ := tm.FromOddsAPIName(row.HomeTeam)
 			mpGID, _ := e.mpStore.FindMoneypuckGameID(ctx, store.FindMoneypuckGameIDParams{
@@ -399,7 +417,11 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 		outcomes = append(outcomes, outcome)
 
 		binaryOutcome := 0.0
-		if row.ClosingHomeImpliedProbability >= 0.5 {
+		if outcome.ActualHomeWin != nil {
+			if *outcome.ActualHomeWin {
+				binaryOutcome = 1.0
+			}
+		} else if row.ClosingHomeImpliedProbability >= 0.5 {
 			binaryOutcome = 1.0
 		}
 		samplesBySport[sport] = append(samplesBySport[sport], features.CalibrationSample{
@@ -420,6 +442,7 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 	})
 
 	calibration := computeCalibrationReport(outcomes)
+	outcomeCalibration := computeOutcomeCalibrationReport(outcomes)
 	clv := computeCLVReport(outcomes)
 	walkForward, err := computeWalkForward(outcomes, resolved)
 	if err != nil {
@@ -455,6 +478,7 @@ func (e Engine) Run(ctx context.Context, cfg RunConfig) (PipelineArtifact, error
 		WalkForward:             walkForward,
 		CLV:                     clv,
 		Calibration:             calibration,
+		OutcomeCalibration:      outcomeCalibration,
 		SportCalibrations:       sportCalibrations,
 	}, nil
 }
@@ -573,8 +597,8 @@ func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (P
 			OpeningCapturedAtUTC:     gameDate,
 			ClosingCapturedAtUTC:     gameDate,
 			PredictedHomeProbability: predictedHome,
-			HasRealFeatures:         hasRealFeatures,
-			CalibrationError:        outcomeCalErr,
+			HasRealFeatures:          hasRealFeatures,
+			CalibrationError:         outcomeCalErr,
 			ActualHomeGoals:          &homeGoals,
 			ActualAwayGoals:          &awayGoals,
 			ActualHomeWin:            &homeWin,
@@ -653,6 +677,7 @@ func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (P
 		Outcomes:           outcomes,
 		WalkForward:        walkForward,
 		Calibration:        calibration,
+		OutcomeCalibration: calibration,
 		SeasonCalibrations: seasonCalibrations,
 	}, nil
 }

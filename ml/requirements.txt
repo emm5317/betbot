@@ -1,1 +1,11 @@
-# betbot ML sidecar requirements stub
+# betbot data + ML sidecar dependencies
+
+# Database access for Python ingestion utilities.
+psycopg[binary]==3.2.10
+
+# Local workbook ingestion.
+openpyxl==3.1.5
+
+# Free MLB data sources requested for historical/stat imports.
+pybaseball==2.2.7
+MLB-StatsAPI==1.9.0

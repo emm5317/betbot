@@ -89,6 +89,20 @@ close_rows AS (
     SELECT *
     FROM home_snapshots
     WHERE rn_close = 1
+),
+latest_final_results AS (
+    SELECT DISTINCT ON (gr.game_id)
+        gr.game_id,
+        gr.home_score,
+        gr.away_score
+    FROM game_results AS gr
+    WHERE lower(gr.status) = 'final'
+      AND gr.home_score IS NOT NULL
+      AND gr.away_score IS NOT NULL
+    ORDER BY
+        gr.game_id,
+        gr.captured_at DESC,
+        gr.id DESC
 )
 SELECT
     o.game_id,
@@ -103,12 +117,18 @@ SELECT
     o.home_implied_probability AS opening_home_implied_probability,
     c.home_implied_probability AS closing_home_implied_probability,
     o.captured_at AS opening_captured_at,
-    c.captured_at AS closing_captured_at
+    c.captured_at AS closing_captured_at,
+    lr.home_score AS actual_home_score,
+    lr.away_score AS actual_away_score,
+    (lr.game_id IS NOT NULL)::boolean AS has_actual_result,
+    COALESCE((lr.home_score > lr.away_score)::boolean, false)::boolean AS actual_home_win
 FROM open_rows AS o
 JOIN close_rows AS c
   ON c.game_id = o.game_id
  AND c.book_key = o.book_key
  AND c.market_key = o.market_key
+LEFT JOIN latest_final_results AS lr
+  ON lr.game_id = o.game_id
 WHERE c.captured_at >= o.captured_at
 ORDER BY
     o.commence_time ASC,

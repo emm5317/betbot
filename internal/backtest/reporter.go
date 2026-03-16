@@ -67,6 +67,10 @@ func WriteArtifacts(outputDir string, artifact PipelineArtifact) (ArtifactPaths,
 		"recommended_stake_fraction",
 		"recommended_stake_dollars",
 		"virtual_bankroll_balance_post",
+		"actual_home_goals",
+		"actual_away_goals",
+		"actual_home_win",
+		"outcome_calibration_error",
 	}
 	if err := writer.Write(header); err != nil {
 		return ArtifactPaths{}, fmt.Errorf("write outcomes csv header: %w", err)
@@ -99,6 +103,10 @@ func WriteArtifacts(outputDir string, artifact PipelineArtifact) (ArtifactPaths,
 			strconv.FormatFloat(outcome.RecommendedStakeFraction, 'f', 6, 64),
 			strconv.FormatFloat(outcome.RecommendedStakeDollars, 'f', 6, 64),
 			strconv.FormatFloat(outcome.VirtualBankrollBalancePost, 'f', 6, 64),
+			formatOptionalFloat(outcome.ActualHomeGoals),
+			formatOptionalFloat(outcome.ActualAwayGoals),
+			formatOptionalBool(outcome.ActualHomeWin),
+			formatOptionalFloat(outcome.OutcomeCalibrationError),
 		}
 		if err := writer.Write(record); err != nil {
 			return ArtifactPaths{}, fmt.Errorf("write outcomes csv row: %w", err)
@@ -110,4 +118,18 @@ func WriteArtifacts(outputDir string, artifact PipelineArtifact) (ArtifactPaths,
 	}
 
 	return ArtifactPaths{PipelineJSON: pipelinePath, OutcomesCSV: outcomesPath}, nil
+}
+
+func formatOptionalFloat(value *float64) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*value, 'f', 6, 64)
+}
+
+func formatOptionalBool(value *bool) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.FormatBool(*value)
 }

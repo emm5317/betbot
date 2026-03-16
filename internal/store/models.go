@@ -110,6 +110,20 @@ type Game struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type GameResult struct {
+	ID         int64              `json:"id"`
+	GameID     int64              `json:"game_id"`
+	Source     string             `json:"source"`
+	ExternalID string             `json:"external_id"`
+	Status     string             `json:"status"`
+	HomeScore  *int32             `json:"home_score"`
+	AwayScore  *int32             `json:"away_score"`
+	ResultHash string             `json:"result_hash"`
+	RawJson    json.RawMessage    `json:"raw_json"`
+	CapturedAt pgtype.Timestamptz `json:"captured_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type GameWeatherSnapshot struct {
 	ID                       int64              `json:"id"`
 	GameID                   int64              `json:"game_id"`

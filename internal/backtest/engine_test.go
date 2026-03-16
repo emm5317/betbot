@@ -195,3 +195,41 @@ func TestResolveRunConfigRejectsInvalidBankrollFractions(t *testing.T) {
 		t.Fatal("expected invalid max stake fraction error")
 	}
 }
+
+func TestEngineRunUsesActualOutcomesWhenAvailable(t *testing.T) {
+	rows := makeReplayRows(domain.SportMLB, 4)
+	for i := range rows {
+		rows[i].HasActualResult = true
+		rows[i].ActualHomeScore = int32Ptr(5)
+		rows[i].ActualAwayScore = int32Ptr(3)
+		rows[i].ActualHomeWin = true
+	}
+
+	fake := &fakeReplayStore{rows: rows}
+	engine, err := NewEngine(fake)
+	if err != nil {
+		t.Fatalf("NewEngine() error = %v", err)
+	}
+
+	sport := domain.SportMLB
+	artifact, err := engine.Run(context.Background(), RunConfig{Sport: &sport, WalkForwardTrain: 2, WalkForwardValidation: 1, WalkForwardStep: 1})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if artifact.OutcomeCalibration.Samples != len(rows) {
+		t.Fatalf("outcome calibration samples = %d, want %d", artifact.OutcomeCalibration.Samples, len(rows))
+	}
+	for i, outcome := range artifact.Outcomes {
+		if outcome.ActualHomeWin == nil || !*outcome.ActualHomeWin {
+			t.Fatalf("outcome[%d] expected actual home win", i)
+		}
+		if outcome.OutcomeCalibrationError == nil {
+			t.Fatalf("outcome[%d] expected outcome calibration error", i)
+		}
+	}
+}
+
+func int32Ptr(v int32) *int32 {
+	return &v
+}

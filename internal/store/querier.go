@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	CompletePollRun(ctx context.Context, arg CompletePollRunParams) error
+	CountGameResultRows(ctx context.Context) (int64, error)
 	CountModelPredictions(ctx context.Context) (int64, error)
 	CountMoneypuckGoalieGames(ctx context.Context) (int64, error)
 	CountMoneypuckLineGames(ctx context.Context) (int64, error)
@@ -32,6 +33,7 @@ type Querier interface {
 	GetGameResult(ctx context.Context, gameID string) ([]GetGameResultRow, error)
 	// Returns cumulative 5on5 GSAx for a goalie in a season before a given date.
 	GetGoalieSeasonGSAx(ctx context.Context, arg GetGoalieSeasonGSAxParams) (GetGoalieSeasonGSAxRow, error)
+	GetLatestFinalGameResultForGame(ctx context.Context, gameID int64) (GameResult, error)
 	GetLatestMarketProbabilityForGame(ctx context.Context, gameID int64) (float64, error)
 	GetLatestPollRun(ctx context.Context) (PollRun, error)
 	GetLatestSnapshotHash(ctx context.Context, arg GetLatestSnapshotHashParams) (string, error)
@@ -44,6 +46,7 @@ type Querier interface {
 	GetTeamRolling5on5Stats(ctx context.Context, arg GetTeamRolling5on5StatsParams) ([]GetTeamRolling5on5StatsRow, error)
 	InsertBankrollEntry(ctx context.Context, arg InsertBankrollEntryParams) (BankrollLedger, error)
 	InsertBet(ctx context.Context, arg InsertBetParams) (InsertBetRow, error)
+	InsertGameResultSnapshot(ctx context.Context, arg InsertGameResultSnapshotParams) error
 	InsertManualBet(ctx context.Context, arg InsertManualBetParams) (InsertManualBetRow, error)
 	InsertOddsSnapshot(ctx context.Context, arg InsertOddsSnapshotParams) (OddsHistory, error)
 	InsertPollRun(ctx context.Context, arg InsertPollRunParams) (PollRun, error)

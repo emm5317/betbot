@@ -228,6 +228,43 @@ Current entrypoints:
 - `cmd/worker`
 - `cmd/backtest`
 
+### Free MLB Historical Backfill (2025-first)
+
+The repository now includes free-source Python importers for MLB historical replay inputs:
+
+- `scripts/import_historical_odds.py`
+  - imports local workbook odds (default `C:\Users\Admin\Downloads\mlb-odds.xlsx`)
+  - optional normalized scraper CSVs (`--scraped-csv`) for free-source gap fill
+  - source precedence is deterministic: `mlb-odds.xlsx` first, then `sportsbookreview-scraper`, then `mlb-odds-scraper`
+- `scripts/import_game_results.py`
+  - imports final MLB game outcomes via `MLB-StatsAPI` into `game_results`
+- `scripts/import_mlb_features_pybaseball.py`
+  - imports season team/pitcher stat snapshots from `pybaseball`
+- `scripts/import_scraped_odds.py`
+  - wrapper for normalized outputs from `mlb-odds-scraper` / `sportsbookreview-scraper`
+
+Install dependencies:
+
+```bash
+python -m pip install -r ml/requirements.txt
+```
+
+Typical flow:
+
+```bash
+# 1) odds snapshots (xlsx + optional scraped CSV)
+python scripts/import_historical_odds.py --xlsx "C:\Users\Admin\Downloads\mlb-odds.xlsx"
+
+# 2) final scores / outcomes
+python scripts/import_game_results.py --season 2025
+
+# 3) pybaseball stats snapshots (optional, model feature foundations)
+python scripts/import_mlb_features_pybaseball.py --season 2025
+
+# 4) run MLB replay
+go run cmd/backtest/main.go --sport MLB --season 2025 --market h2h --mode odds
+```
+
 ### Operator sport filters (read views)
 
 Read views accept an optional `sport` query parameter for operator scoping. If omitted, views stay in all-sports mode.
