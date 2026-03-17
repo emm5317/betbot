@@ -168,6 +168,7 @@ func parseFlags() (parsedFlags, error) {
 	outcomeCfg := backtest.OutcomeRunConfig{
 		RollingWindow:         rollingWindow,
 		ModelVersion:          strings.TrimSpace(modelVersion),
+		MarketKey:             strings.TrimSpace(marketKey),
 		WalkForwardTrain:      trainWindow,
 		WalkForwardValidation: validationWindow,
 		WalkForwardStep:       step,

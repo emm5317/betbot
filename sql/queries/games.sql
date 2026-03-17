@@ -21,19 +21,25 @@ RETURNING id, source, external_id, sport, home_team, away_team, commence_time, c
 -- name: GetGameByID :one
 SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
 FROM games
-WHERE id = $1;
+WHERE id = @id;
+
+-- name: GetGameByExternalID :one
+SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
+FROM games
+WHERE source = @source
+  AND external_id = @external_id;
 
 -- name: ListUpcomingGames :many
 SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
 FROM games
 WHERE commence_time >= NOW() - INTERVAL '12 hours'
 ORDER BY commence_time ASC
-LIMIT $1;
+LIMIT @row_limit;
 
 -- name: ListUpcomingGamesForSport :many
 SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
 FROM games
-WHERE sport = $1
+WHERE sport = @sport
   AND commence_time > NOW()
   AND commence_time < NOW() + INTERVAL '48 hours'
 ORDER BY commence_time ASC;

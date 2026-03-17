@@ -11,6 +11,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getGameByExternalID = `-- name: GetGameByExternalID :one
+SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
+FROM games
+WHERE source = $1
+  AND external_id = $2
+`
+
+type GetGameByExternalIDParams struct {
+	Source     string `json:"source"`
+	ExternalID string `json:"external_id"`
+}
+
+func (q *Queries) GetGameByExternalID(ctx context.Context, arg GetGameByExternalIDParams) (Game, error) {
+	row := q.db.QueryRow(ctx, getGameByExternalID, arg.Source, arg.ExternalID)
+	var i Game
+	err := row.Scan(
+		&i.ID,
+		&i.Source,
+		&i.ExternalID,
+		&i.Sport,
+		&i.HomeTeam,
+		&i.AwayTeam,
+		&i.CommenceTime,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getGameByID = `-- name: GetGameByID :one
 SELECT id, source, external_id, sport, home_team, away_team, commence_time, created_at, updated_at
 FROM games
@@ -42,8 +71,8 @@ ORDER BY commence_time ASC
 LIMIT $1
 `
 
-func (q *Queries) ListUpcomingGames(ctx context.Context, limit int32) ([]Game, error) {
-	rows, err := q.db.Query(ctx, listUpcomingGames, limit)
+func (q *Queries) ListUpcomingGames(ctx context.Context, rowLimit int32) ([]Game, error) {
+	rows, err := q.db.Query(ctx, listUpcomingGames, rowLimit)
 	if err != nil {
 		return nil, err
 	}

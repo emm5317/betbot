@@ -81,6 +81,21 @@ WHERE team = $1
 ORDER BY game_date DESC
 LIMIT $4;
 
+-- name: GetTeamRollingAllSituationStats :many
+-- Returns the last N all-situation games for a team strictly before a given date.
+-- All-situation goals reflect actual game totals (5v5 + PP + SH), needed for totals prediction.
+SELECT
+    game_id, game_date, opponent, home_or_away,
+    goals_for, goals_against
+FROM moneypuck_team_games
+WHERE team = $1
+  AND situation = 'all'
+  AND game_date < $2
+  AND season = $3
+  AND is_playoff = FALSE
+ORDER BY game_date DESC
+LIMIT $4;
+
 -- name: GetGameResult :many
 -- Returns goals for/against from the "all" situation for both teams in a game.
 -- Two rows returned: one per team, with home_or_away indicating side.

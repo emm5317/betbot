@@ -80,6 +80,41 @@ func (q *Queries) GetLatestSnapshotHash(ctx context.Context, arg GetLatestSnapsh
 	return snapshot_hash, err
 }
 
+const getLatestTotalsLineForGame = `-- name: GetLatestTotalsLineForGame :one
+SELECT point
+FROM odds_history
+WHERE game_id = $1
+  AND market_key = 'totals'
+  AND outcome_side = 'over'
+  AND point IS NOT NULL
+ORDER BY captured_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestTotalsLineForGame(ctx context.Context, gameID int64) (*float64, error) {
+	row := q.db.QueryRow(ctx, getLatestTotalsLineForGame, gameID)
+	var point *float64
+	err := row.Scan(&point)
+	return point, err
+}
+
+const getLatestTotalsOverProbForGame = `-- name: GetLatestTotalsOverProbForGame :one
+SELECT implied_probability
+FROM odds_history
+WHERE game_id = $1
+  AND market_key = 'totals'
+  AND outcome_side = 'over'
+ORDER BY captured_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestTotalsOverProbForGame(ctx context.Context, gameID int64) (float64, error) {
+	row := q.db.QueryRow(ctx, getLatestTotalsOverProbForGame, gameID)
+	var implied_probability float64
+	err := row.Scan(&implied_probability)
+	return implied_probability, err
+}
+
 const insertOddsSnapshot = `-- name: InsertOddsSnapshot :one
 INSERT INTO odds_history (
     game_id,

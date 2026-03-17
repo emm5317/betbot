@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"betbot/internal/execution"
 	"betbot/internal/store"
 
 	"github.com/gofiber/fiber/v3"
@@ -35,20 +36,20 @@ func (a *App) handleBetsPage(c fiber.Ctx) error {
 	betRows := make([]map[string]any, 0, len(bets))
 	for _, b := range bets {
 		row := map[string]any{
-			"ID":              b.ID,
-			"Sport":           b.Sport,
-			"HomeTeam":        b.HomeTeam,
-			"AwayTeam":        b.AwayTeam,
-			"CommenceTime":    formatTimestamp(b.CommenceTime, "—"),
-			"Side":            b.RecommendedSide,
-			"BookKey":         b.BookKey,
-			"AmericanOdds":    formatAmericanOdds(b.AmericanOdds),
-			"StakeDollars":    formatCents(b.StakeCents),
-			"Status":          string(b.Status),
+			"ID":               b.ID,
+			"Sport":            b.Sport,
+			"HomeTeam":         b.HomeTeam,
+			"AwayTeam":         b.AwayTeam,
+			"CommenceTime":     formatTimestamp(b.CommenceTime, "—"),
+			"Side":             b.RecommendedSide,
+			"BookKey":          b.BookKey,
+			"AmericanOdds":     formatAmericanOdds(b.AmericanOdds),
+			"StakeDollars":     formatCents(b.StakeCents),
+			"Status":           string(b.Status),
 			"SettlementResult": "",
-			"PayoutDollars":   "—",
-			"PnLDollars":      "—",
-			"PlacedAt":        formatTimestamp(b.PlacedAt, "—"),
+			"PayoutDollars":    "—",
+			"PnLDollars":       "—",
+			"PlacedAt":         formatTimestamp(b.PlacedAt, "—"),
 		}
 		if b.SettlementResult != nil {
 			row["SettlementResult"] = *b.SettlementResult
@@ -266,7 +267,7 @@ func (a *App) handleBetsSettle(c fiber.Ctx) error {
 	var payoutCents int64
 	switch result {
 	case "win":
-		payoutCents = bet.StakeCents + calculateWinnings(bet.StakeCents, int(bet.AmericanOdds))
+		payoutCents = bet.StakeCents + execution.CalculateWinnings(bet.StakeCents, int(bet.AmericanOdds))
 	case "push":
 		payoutCents = bet.StakeCents
 	case "loss":
@@ -290,25 +291,10 @@ func (a *App) handleBetsSettle(c fiber.Ctx) error {
 		return fmt.Errorf("update bet settled: %w", err)
 	}
 
-	// Write ledger entry
-	ledgerAmt := settlementLedgerAmount(result, bet.StakeCents, payoutCents)
-	entryType := "bet_settlement_loss"
-	switch result {
-	case "win":
-		entryType = "bet_settlement_win"
-	case "push":
-		entryType = "bet_settlement_push"
-	}
-
-	_, err = txQueries.InsertBankrollEntry(c.Context(), store.InsertBankrollEntryParams{
-		EntryType:     entryType,
-		AmountCents:   ledgerAmt,
-		Currency:      "USD",
-		ReferenceType: "bet",
-		ReferenceID:   bet.IdempotencyKey,
-		Metadata:      json.RawMessage(fmt.Sprintf(`{"bet_id":%d,"result":"%s"}`, betID, result)),
-	})
-	if err != nil {
+	if err := execution.WriteSettlementLedgerEntry(c.Context(), txQueries, store.Bet{
+		ID:             bet.ID,
+		IdempotencyKey: bet.IdempotencyKey,
+	}, result, execution.SettlementLedgerAmount(result, bet.StakeCents, payoutCents)); err != nil {
 		return fmt.Errorf("write settlement ledger: %w", err)
 	}
 
@@ -364,30 +350,6 @@ func (a *App) handleBetsVoid(c fiber.Ctx) error {
 	}
 
 	return c.Redirect().To("/bets")
-}
-
-// calculateWinnings computes the profit from a winning bet given American odds.
-func calculateWinnings(stakeCents int64, americanOdds int) int64 {
-	var multiplier float64
-	if americanOdds > 0 {
-		multiplier = float64(americanOdds) / 100.0
-	} else {
-		multiplier = 100.0 / math.Abs(float64(americanOdds))
-	}
-	return int64(math.Round(float64(stakeCents) * multiplier))
-}
-
-// settlementLedgerAmount returns the amount to credit back to bankroll.
-// Win: +payout (stake + profit). Loss: 0. Push: +stake refund.
-func settlementLedgerAmount(result string, stakeCents, payoutCents int64) int64 {
-	switch result {
-	case "win":
-		return payoutCents
-	case "push":
-		return stakeCents
-	default:
-		return 0
-	}
 }
 
 func formatCents(cents int64) string {

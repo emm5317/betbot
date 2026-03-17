@@ -37,6 +37,8 @@ type Querier interface {
 	GetLatestMarketProbabilityForGame(ctx context.Context, gameID int64) (float64, error)
 	GetLatestPollRun(ctx context.Context) (PollRun, error)
 	GetLatestSnapshotHash(ctx context.Context, arg GetLatestSnapshotHashParams) (string, error)
+	GetLatestTotalsLineForGame(ctx context.Context, gameID int64) (*float64, error)
+	GetLatestTotalsOverProbForGame(ctx context.Context, gameID int64) (float64, error)
 	GetOddsArchiveSummary(ctx context.Context, sport *string) (GetOddsArchiveSummaryRow, error)
 	GetRecommendationSnapshotByID(ctx context.Context, id int64) (RecommendationSnapshot, error)
 	// Returns the goalie with the most 5on5 icetime for a team in a given game.
@@ -44,6 +46,9 @@ type Querier interface {
 	// Returns the last N 5on5 games for a team strictly before a given date, ordered newest first.
 	// The caller computes rolling averages from these rows.
 	GetTeamRolling5on5Stats(ctx context.Context, arg GetTeamRolling5on5StatsParams) ([]GetTeamRolling5on5StatsRow, error)
+	// Returns the last N all-situation games for a team strictly before a given date.
+	// All-situation goals reflect actual game totals (5v5 + PP + SH), needed for totals prediction.
+	GetTeamRollingAllSituationStats(ctx context.Context, arg GetTeamRollingAllSituationStatsParams) ([]GetTeamRollingAllSituationStatsRow, error)
 	InsertBankrollEntry(ctx context.Context, arg InsertBankrollEntryParams) (BankrollLedger, error)
 	InsertBet(ctx context.Context, arg InsertBetParams) (InsertBetRow, error)
 	InsertGameResultSnapshot(ctx context.Context, arg InsertGameResultSnapshotParams) error

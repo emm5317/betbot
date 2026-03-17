@@ -49,6 +49,19 @@ FROM bets
 WHERE status = 'placed'
 ORDER BY created_at ASC;
 
+-- name: ListOpenBetsWithGame :many
+SELECT b.id, b.idempotency_key, b.snapshot_id, b.game_id, b.sport, b.market_key,
+    b.recommended_side, b.book_key, b.american_odds, b.stake_cents,
+    b.model_probability, b.market_probability, b.edge, b.status, b.external_bet_id,
+    b.adapter_name, b.placed_at, b.settled_at, b.settlement_result, b.payout_cents,
+    b.clv_delta, b.closing_probability, b.error_message, b.user_notes, b.metadata,
+    b.created_at, b.updated_at,
+    g.source AS game_source, g.external_id AS game_external_id, g.home_team, g.away_team, g.sport AS game_sport
+FROM bets b
+JOIN games g ON g.id = b.game_id
+WHERE b.status = 'placed'
+ORDER BY b.created_at ASC;
+
 -- name: ListBetsByStatus :many
 SELECT id, idempotency_key, snapshot_id, game_id, sport, market_key,
     recommended_side, book_key, american_odds, stake_cents,

@@ -22,10 +22,10 @@ func NewSettlementProcessor(pool *pgxpool.Pool) *SettlementProcessor {
 
 // SettleInput contains the information needed to settle a bet.
 type SettleInput struct {
-	BetID      int64
-	HomeWin    bool
-	Push       bool
-	CloseProb  *float64 // closing probability for CLV capture
+	BetID     int64
+	HomeWin   bool
+	Push      bool
+	CloseProb *float64 // closing probability for CLV capture
 }
 
 // SettleBet settles a single bet, writing ledger entries and updating status.
@@ -58,7 +58,7 @@ func (s *SettlementProcessor) SettleBet(ctx context.Context, bet store.Bet, inpu
 	}
 
 	// Write ledger entry
-	if err := WriteSettlementLedgerEntry(ctx, queries, bet, result, ledgerAmount(result, bet.StakeCents, payoutCents)); err != nil {
+	if err := WriteSettlementLedgerEntry(ctx, queries, bet, result, SettlementLedgerAmount(result, bet.StakeCents, payoutCents)); err != nil {
 		return fmt.Errorf("write settlement ledger: %w", err)
 	}
 
@@ -79,15 +79,15 @@ func determineResult(bet store.Bet, input SettleInput) (string, int64) {
 	won := (betOnHome && input.HomeWin) || (!betOnHome && !input.HomeWin)
 
 	if won {
-		payout := bet.StakeCents + calculateWinnings(bet.StakeCents, int(bet.AmericanOdds))
+		payout := bet.StakeCents + CalculateWinnings(bet.StakeCents, int(bet.AmericanOdds))
 		return "win", payout
 	}
 
 	return "loss", 0
 }
 
-// calculateWinnings computes the profit from a winning bet given American odds.
-func calculateWinnings(stakeCents int64, americanOdds int) int64 {
+// CalculateWinnings computes the profit from a winning bet given American odds.
+func CalculateWinnings(stakeCents int64, americanOdds int) int64 {
 	var multiplier float64
 	if americanOdds > 0 {
 		multiplier = float64(americanOdds) / 100.0
@@ -97,11 +97,11 @@ func calculateWinnings(stakeCents int64, americanOdds int) int64 {
 	return int64(math.Round(float64(stakeCents) * multiplier))
 }
 
-// ledgerAmount returns the amount to write to the bankroll ledger for a settlement.
+// SettlementLedgerAmount returns the amount to write to the bankroll ledger for a settlement.
 // Win: +payout (includes returned stake + profit).
 // Loss: 0 (stake was already reserved).
 // Push: +original stake (refund).
-func ledgerAmount(result string, stakeCents, payoutCents int64) int64 {
+func SettlementLedgerAmount(result string, stakeCents, payoutCents int64) int64 {
 	switch result {
 	case "win":
 		return payoutCents

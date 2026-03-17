@@ -43,7 +43,16 @@ func NewNHLPredictionService(pool *pgxpool.Pool, logger *slog.Logger) *NHLPredic
 	}
 }
 
-// PredictGame runs the NHL model for a single game and persists the prediction.
+// NHLPredictionResult holds both h2h and totals predictions from a single model run.
+type NHLPredictionResult struct {
+	HomeWinProbability float64
+	ExpectedTotalGoals float64
+	OverProbability    float64 // P(total > line)
+	UnderProbability   float64 // P(total <= line)
+	TotalsLine         float64 // the line used (e.g. 5.5)
+}
+
+// PredictGame runs the NHL model for a single game and persists both h2h and totals predictions.
 func (s *NHLPredictionService) PredictGame(
 	ctx context.Context,
 	gameID int64,
@@ -52,13 +61,31 @@ func (s *NHLPredictionService) PredictGame(
 	season int32,
 	marketHomeProb float64,
 ) (float64, error) {
+	result, err := s.PredictGameFull(ctx, gameID, homeTeam, awayTeam, gameDate, season, marketHomeProb, 0)
+	if err != nil {
+		return 0, err
+	}
+	return result.HomeWinProbability, nil
+}
+
+// PredictGameFull runs the NHL model and persists both h2h and totals predictions.
+// If totalsLine is 0, totals odds are looked up from odds_history.
+func (s *NHLPredictionService) PredictGameFull(
+	ctx context.Context,
+	gameID int64,
+	homeTeam, awayTeam string,
+	gameDate time.Time,
+	season int32,
+	marketHomeProb float64,
+	totalsLine float64,
+) (NHLPredictionResult, error) {
 	q := store.New(s.pool)
 
 	nhlResult, err := backtest.BuildNHLFeatures(
 		ctx, q, homeTeam, awayTeam, gameDate, season, marketHomeProb, s.rollingWindow,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("build NHL features for game %d: %w", gameID, err)
+		return NHLPredictionResult{}, fmt.Errorf("build NHL features for game %d: %w", gameID, err)
 	}
 
 	input := modelnhl.MatchupInput{
@@ -84,7 +111,7 @@ func (s *NHLPredictionService) PredictGame(
 
 	pred, err := s.nhlModel.Predict(input)
 	if err != nil {
-		return 0, fmt.Errorf("predict game %d: %w", gameID, err)
+		return NHLPredictionResult{}, fmt.Errorf("predict game %d: %w", gameID, err)
 	}
 
 	featureVector := []float64{
@@ -102,6 +129,7 @@ func (s *NHLPredictionService) PredictGame(
 		nhlResult.Request.TeamQuality.AwayDefenseRating,
 	}
 
+	// Persist h2h prediction
 	_, err = q.UpsertModelPrediction(ctx, store.UpsertModelPredictionParams{
 		GameID:               gameID,
 		Source:               predictionSource,
@@ -117,21 +145,78 @@ func (s *NHLPredictionService) PredictGame(
 		EventTime:            store.Timestamptz(gameDate),
 	})
 	if err != nil {
-		return 0, fmt.Errorf("upsert prediction for game %d: %w", gameID, err)
+		return NHLPredictionResult{}, fmt.Errorf("upsert h2h prediction for game %d: %w", gameID, err)
 	}
 
-	s.logger.InfoContext(ctx, "NHL prediction generated",
+	// Determine totals line
+	result := NHLPredictionResult{
+		HomeWinProbability: pred.HomeWinProbability,
+		ExpectedTotalGoals: pred.ExpectedTotalGoals,
+	}
+
+	if totalsLine <= 0 {
+		// Look up from odds_history
+		linePtr, lineErr := q.GetLatestTotalsLineForGame(ctx, gameID)
+		if lineErr != nil || linePtr == nil {
+			// No totals line available — still return h2h result
+			s.logger.InfoContext(ctx, "NHL prediction generated (h2h only, no totals line)",
+				slog.Int64("game_id", gameID),
+				slog.String("home_team", homeTeam),
+				slog.Float64("predicted_home_prob", pred.HomeWinProbability),
+				slog.Float64("expected_total", pred.ExpectedTotalGoals),
+			)
+			return result, nil
+		}
+		totalsLine = *linePtr
+	}
+
+	overProb, underProb := pred.OverUnderProbability(totalsLine)
+	result.OverProbability = overProb
+	result.UnderProbability = underProb
+	result.TotalsLine = totalsLine
+
+	// Use over implied probability from the market as market_probability for the totals prediction.
+	// Convention: predicted_probability = over probability, market_probability = market over implied.
+	marketOverProb := 0.50 // default if no market data
+	marketOver, moErr := q.GetLatestTotalsOverProbForGame(ctx, gameID)
+	if moErr == nil {
+		marketOverProb = marketOver
+	}
+
+	_, err = q.UpsertModelPrediction(ctx, store.UpsertModelPredictionParams{
+		GameID:               gameID,
+		Source:               predictionSource,
+		Sport:                "NHL",
+		BookKey:              "consensus",
+		MarketKey:            "totals",
+		ModelFamily:          modelFamily,
+		ModelVersion:         modelVersion,
+		ManifestVersion:      manifestVersion,
+		FeatureVector:        append(featureVector, pred.ExpectedTotalGoals, totalsLine),
+		PredictedProbability: overProb,
+		MarketProbability:    marketOverProb,
+		EventTime:            store.Timestamptz(gameDate),
+	})
+	if err != nil {
+		return NHLPredictionResult{}, fmt.Errorf("upsert totals prediction for game %d: %w", gameID, err)
+	}
+
+	s.logger.InfoContext(ctx, "NHL prediction generated (h2h + totals)",
 		slog.Int64("game_id", gameID),
 		slog.String("home_team", homeTeam),
 		slog.String("away_team", awayTeam),
 		slog.Float64("predicted_home_prob", pred.HomeWinProbability),
 		slog.Float64("market_home_prob", marketHomeProb),
+		slog.Float64("expected_total", pred.ExpectedTotalGoals),
+		slog.Float64("totals_line", totalsLine),
+		slog.Float64("over_prob", overProb),
+		slog.Float64("under_prob", underProb),
 		slog.Bool("has_real_features", nhlResult.HasReal),
 		slog.String("home_goalie", nhlResult.HomeGoalie),
 		slog.String("away_goalie", nhlResult.AwayGoalie),
 	)
 
-	return pred.HomeWinProbability, nil
+	return result, nil
 }
 
 // PredictUpcomingGames scans upcoming NHL games and runs predictions for all that need them.

@@ -63,6 +63,8 @@ type OutcomeRunConfig struct {
 	SeasonEnd             *int
 	RollingWindow         int
 	ModelVersion          string
+	MarketKey             string // "outcome" (default/h2h), "totals", or "all"
+	TotalsLine            float64 // fixed totals line for backtest (e.g. 5.5); 0 = use league average
 	WalkForwardTrain      int
 	WalkForwardValidation int
 	WalkForwardStep       int
@@ -99,6 +101,12 @@ type Outcome struct {
 	ActualAwayGoals            *float64     `json:"actual_away_goals,omitempty"`
 	ActualHomeWin              *bool        `json:"actual_home_win,omitempty"`
 	OutcomeCalibrationError    *float64     `json:"outcome_calibration_error,omitempty"`
+	// Totals-specific fields (populated when MarketKey == "totals")
+	TotalsLine          *float64 `json:"totals_line,omitempty"`
+	ExpectedTotalGoals  *float64 `json:"expected_total_goals,omitempty"`
+	PredictedOverProb   *float64 `json:"predicted_over_prob,omitempty"`
+	ActualTotalGoals    *float64 `json:"actual_total_goals,omitempty"`
+	ActualOver          *bool    `json:"actual_over,omitempty"`
 }
 
 type WalkForwardFold struct {
@@ -512,6 +520,15 @@ func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (P
 		wfStep = defaultWalkForwardStep
 	}
 
+	marketKey := strings.TrimSpace(cfg.MarketKey)
+	if marketKey == "" {
+		marketKey = "outcome"
+	}
+	totalsLine := cfg.TotalsLine
+	if totalsLine <= 0 {
+		totalsLine = 5.5 // NHL league average ~6.0 goals, standard line is 5.5 or 6.5
+	}
+
 	var seasonStart, seasonEnd *int32
 	if cfg.SeasonStart != nil {
 		v := int32(*cfg.SeasonStart)
@@ -536,6 +553,9 @@ func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (P
 	outcomes := make([]Outcome, 0, len(rows))
 	seasonStats := make(map[int]*seasonAccumulator)
 
+	includeTotals := marketKey == "totals" || marketKey == "all"
+	includeH2H := marketKey == "outcome" || marketKey == "all"
+
 	for _, row := range rows {
 		gameDate := row.GameDate.Time
 		season := row.Season
@@ -543,11 +563,12 @@ func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (P
 		nhlResult, nhlErr := BuildNHLFeaturesFromAbbrev(ctx, e.mpStore,
 			row.HomeTeam, row.AwayTeam, gameDate, season, rollingWindow)
 
-		var predictedHome float64
+		var pred modelnhl.MatchupPrediction
 		hasRealFeatures := false
 		if nhlErr == nil {
 			hasRealFeatures = nhlResult.HasReal
-			pred, predErr := e.nhlModel.Predict(modelnhl.MatchupInput{
+			var predErr error
+			pred, predErr = e.nhlModel.Predict(modelnhl.MatchupInput{
 				HomeTeam: modelnhl.TeamProfile{
 					Name:                "home",
 					ExpectedGoalsShare:  nhlResult.Request.NHL.HomeXGShare,
@@ -568,60 +589,109 @@ func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (P
 				},
 			})
 			if predErr != nil {
-				return PipelineArtifact{}, fmt.Errorf("predict home probability for game %s: %w", row.GameID, predErr)
+				return PipelineArtifact{}, fmt.Errorf("predict for game %s: %w", row.GameID, predErr)
 			}
-			predictedHome = pred.HomeWinProbability
 		} else {
-			predictedHome = 0.50
+			pred = modelnhl.MatchupPrediction{
+				ExpectedHomeGoals:  3.05,
+				ExpectedAwayGoals:  3.05,
+				ExpectedTotalGoals: 6.10,
+				HomeWinProbability: 0.50,
+				AwayWinProbability: 0.50,
+			}
 		}
 
 		homeGoals := deref(row.HomeGoals, 0)
 		awayGoals := deref(row.AwayGoals, 0)
 		homeWin := homeGoals > awayGoals
-		actualBinary := 0.0
-		if homeWin {
-			actualBinary = 1.0
-		}
-		outcomeCalErr := predictedHome - actualBinary
 
-		outcome := Outcome{
-			GameID:                   0,
-			Source:                   "moneypuck",
-			ExternalID:               row.GameID,
-			Sport:                    domain.SportNHL,
-			HomeTeam:                 row.HomeTeam,
-			AwayTeam:                 row.AwayTeam,
-			BookKey:                  "none",
-			MarketKey:                "outcome",
-			CommenceTimeUTC:          gameDate,
-			OpeningCapturedAtUTC:     gameDate,
-			ClosingCapturedAtUTC:     gameDate,
-			PredictedHomeProbability: predictedHome,
-			HasRealFeatures:          hasRealFeatures,
-			CalibrationError:         outcomeCalErr,
-			ActualHomeGoals:          &homeGoals,
-			ActualAwayGoals:          &awayGoals,
-			ActualHomeWin:            &homeWin,
-			OutcomeCalibrationError:  &outcomeCalErr,
-		}
-		outcomes = append(outcomes, outcome)
+		// H2H outcome
+		if includeH2H {
+			actualBinary := 0.0
+			if homeWin {
+				actualBinary = 1.0
+			}
+			outcomeCalErr := pred.HomeWinProbability - actualBinary
 
-		// Per-season accumulation
-		acc, ok := seasonStats[int(season)]
-		if !ok {
-			acc = &seasonAccumulator{}
-			seasonStats[int(season)] = acc
+			outcome := Outcome{
+				GameID:                   0,
+				Source:                   "moneypuck",
+				ExternalID:               row.GameID,
+				Sport:                    domain.SportNHL,
+				HomeTeam:                 row.HomeTeam,
+				AwayTeam:                 row.AwayTeam,
+				BookKey:                  "none",
+				MarketKey:                "outcome",
+				CommenceTimeUTC:          gameDate,
+				OpeningCapturedAtUTC:     gameDate,
+				ClosingCapturedAtUTC:     gameDate,
+				PredictedHomeProbability: pred.HomeWinProbability,
+				HasRealFeatures:          hasRealFeatures,
+				CalibrationError:         outcomeCalErr,
+				ActualHomeGoals:          &homeGoals,
+				ActualAwayGoals:          &awayGoals,
+				ActualHomeWin:            &homeWin,
+				OutcomeCalibrationError:  &outcomeCalErr,
+			}
+			outcomes = append(outcomes, outcome)
+
+			acc, ok := seasonStats[int(season)]
+			if !ok {
+				acc = &seasonAccumulator{}
+				seasonStats[int(season)] = acc
+			}
+			acc.samples++
+			if hasRealFeatures {
+				acc.realFeatures++
+			}
+			acc.sumAbsErr += math.Abs(outcomeCalErr)
+			acc.sumBrier += outcomeCalErr * outcomeCalErr
+			if homeWin {
+				acc.homeWins++
+			}
+			acc.sumPredicted += pred.HomeWinProbability
 		}
-		acc.samples++
-		if hasRealFeatures {
-			acc.realFeatures++
+
+		// Totals outcome
+		if includeTotals {
+			actualTotal := homeGoals + awayGoals
+			actualOver := actualTotal > totalsLine
+			overProb, _ := pred.OverUnderProbability(totalsLine)
+			actualOverBinary := 0.0
+			if actualOver {
+				actualOverBinary = 1.0
+			}
+			totalsCalErr := overProb - actualOverBinary
+
+			etg := pred.ExpectedTotalGoals
+			tl := totalsLine
+			op := overProb
+			outcome := Outcome{
+				GameID:                   0,
+				Source:                   "moneypuck",
+				ExternalID:               row.GameID,
+				Sport:                    domain.SportNHL,
+				HomeTeam:                 row.HomeTeam,
+				AwayTeam:                 row.AwayTeam,
+				BookKey:                  "none",
+				MarketKey:                "totals",
+				CommenceTimeUTC:          gameDate,
+				OpeningCapturedAtUTC:     gameDate,
+				ClosingCapturedAtUTC:     gameDate,
+				PredictedHomeProbability: overProb,
+				HasRealFeatures:          hasRealFeatures,
+				CalibrationError:         totalsCalErr,
+				ActualHomeGoals:          &homeGoals,
+				ActualAwayGoals:          &awayGoals,
+				ActualOver:               &actualOver,
+				OutcomeCalibrationError:  &totalsCalErr,
+				TotalsLine:               &tl,
+				ExpectedTotalGoals:       &etg,
+				PredictedOverProb:        &op,
+				ActualTotalGoals:         &actualTotal,
+			}
+			outcomes = append(outcomes, outcome)
 		}
-		acc.sumAbsErr += math.Abs(outcomeCalErr)
-		acc.sumBrier += outcomeCalErr * outcomeCalErr
-		if homeWin {
-			acc.homeWins++
-		}
-		acc.sumPredicted += predictedHome
 	}
 
 	// Build per-season calibrations
@@ -672,7 +742,7 @@ func (e Engine) RunOutcomeBacktest(ctx context.Context, cfg OutcomeRunConfig) (P
 		RollingWindow:      rollingWindow,
 		SeasonStartFilter:  cfg.SeasonStart,
 		SeasonEndFilter:    cfg.SeasonEnd,
-		MarketKey:          "outcome",
+		MarketKey:          marketKey,
 		ModelVersion:       modelVersion,
 		Outcomes:           outcomes,
 		WalkForward:        walkForward,
@@ -710,6 +780,8 @@ func computeOutcomeCalibrationReport(outcomes []Outcome) CalibrationReport {
 		predicted := outcome.PredictedHomeProbability
 		actual := 0.0
 		if outcome.ActualHomeWin != nil && *outcome.ActualHomeWin {
+			actual = 1.0
+		} else if outcome.ActualOver != nil && *outcome.ActualOver {
 			actual = 1.0
 		}
 		predictions = append(predictions, predicted)

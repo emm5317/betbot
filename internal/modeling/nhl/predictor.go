@@ -36,6 +36,106 @@ type MatchupPrediction struct {
 	HomeGoalDifferential float64
 }
 
+// defaultGoalCorrelation is the empirical correlation between NHL team goal scoring
+// in the same game. NHL goals are positively correlated (~0.10-0.15) because trailing
+// teams pull goalies and play aggressively, generating more total goals.
+const defaultGoalCorrelation = 0.12
+
+// OverUnderProbability returns the probability that total goals exceed the given line.
+// Uses a bivariate Poisson model (Karlis & Ntzoufras, 2003) with a correlation parameter
+// to account for the positive goal dependency in hockey.
+//
+// The bivariate Poisson decomposes into: X = X_ind + Z, Y = Y_ind + Z
+// where X_ind ~ Poisson(λ₁-cov), Y_ind ~ Poisson(λ₂-cov), Z ~ Poisson(cov)
+// and cov = correlation * sqrt(λ₁ * λ₂).
+func (p MatchupPrediction) OverUnderProbability(line float64) (overProb, underProb float64) {
+	return bivariatePoisson(p.ExpectedHomeGoals, p.ExpectedAwayGoals, defaultGoalCorrelation, line)
+}
+
+// bivariatePoisson computes P(X+Y > line) where (X,Y) follow a bivariate Poisson
+// with means lambda1, lambda2 and correlation rho.
+func bivariatePoisson(lambda1, lambda2, rho, line float64) (overProb, underProb float64) {
+	// Compute covariance parameter: cov = rho * sqrt(λ₁ * λ₂)
+	cov := rho * math.Sqrt(lambda1*lambda2)
+	// Ensure independent components remain positive
+	if cov >= lambda1 {
+		cov = lambda1 * 0.9
+	}
+	if cov >= lambda2 {
+		cov = lambda2 * 0.9
+	}
+	if cov < 0 {
+		cov = 0
+	}
+
+	l1 := lambda1 - cov // independent home rate
+	l2 := lambda2 - cov // independent away rate
+
+	threshold := int(math.Floor(line))
+	maxGoals := threshold + 6
+	if maxGoals > 20 {
+		maxGoals = 20
+	}
+	maxZ := maxGoals / 2
+	if maxZ > 8 {
+		maxZ = 8
+	}
+
+	underCum := 0.0
+	for z := 0; z <= maxZ; z++ {
+		pZ := poissonPMF(cov, z)
+		if pZ < 1e-15 {
+			continue
+		}
+		for h := 0; h <= maxGoals-z; h++ {
+			pH := poissonPMF(l1, h)
+			if pH < 1e-15 {
+				continue
+			}
+			for a := 0; a <= maxGoals-z-h; a++ {
+				totalGoals := (h + z) + (a + z) // home=(h+z), away=(a+z)
+				if totalGoals > threshold {
+					continue // only summing under
+				}
+				pA := poissonPMF(l2, a)
+				underCum += pZ * pH * pA
+			}
+		}
+	}
+
+	underProb = clamp(underCum, minProbability, maxProbability)
+	overProb = clamp(1-underCum, minProbability, maxProbability)
+	return overProb, underProb
+}
+
+// poissonPMF computes P(X = k) for X ~ Poisson(lambda).
+func poissonPMF(lambda float64, k int) float64 {
+	if k < 0 {
+		return 0.0
+	}
+	if lambda <= 0 {
+		if k == 0 {
+			return 1.0
+		}
+		return 0.0
+	}
+	// Use log-space to avoid overflow: log(P) = k*log(lambda) - lambda - log(k!)
+	logP := float64(k)*math.Log(lambda) - lambda - logFactorial(k)
+	return math.Exp(logP)
+}
+
+// logFactorial returns ln(k!) computed exactly for k <= 20.
+func logFactorial(k int) float64 {
+	if k <= 1 {
+		return 0
+	}
+	result := 0.0
+	for i := 2; i <= k; i++ {
+		result += math.Log(float64(i))
+	}
+	return result
+}
+
 type Config struct {
 	LeagueGoalsPerTeam       float64
 	HomeIceGoalAdvantage     float64
@@ -58,13 +158,13 @@ func DefaultConfig() Config {
 	return Config{
 		LeagueGoalsPerTeam:       3.05,
 		HomeIceGoalAdvantage:     0.06,   // modern NHL home win ~50.5%
-		ExpectedGoalsShareWeight: 1.8,   // xG% edge; diff ~0.04-0.10 typical
-		GoalieGSAxWeight:         0.008, // GSAx edge; range -15 to +20 cumulative
-		GoalsAgainstWeight:       0.08,  // defensive edge; GA/game diff ~0.3-0.8
-		GoalsForWeight:           0.14,  // offensive edge; GF/game diff ~0.3-1.0
-		PDORegressionWeight:      0.35,  // luck regression; PDO diff ~0.01-0.04
-		CorsiShareWeight:         0.70,  // possession edge; Corsi diff ~0.02-0.08
-		WinProbabilitySlope:      1.40,  // sigmoid steepness
+		ExpectedGoalsShareWeight: 1.0,    // xG% edge; reduced from 1.8 to limit double-counting with GF/GA
+		GoalieGSAxWeight:         0.011,  // GSAx edge; range -15 to +20 cumulative; increased for totals
+		GoalsAgainstWeight:       0.25,   // defensive edge; moderate trust in 20-game rolling avg
+		GoalsForWeight:           0.35,   // offensive edge; moderate trust in 20-game rolling avg
+		PDORegressionWeight:      0.35,   // luck regression; PDO diff ~0.01-0.04
+		CorsiShareWeight:         0.55,   // possession/pace edge; reduced to limit overlap with GF/GA
+		WinProbabilitySlope:      0.90,   // sigmoid steepness; reduced for larger goal differentials
 		MinTeamGoals:             0.8,
 		MaxTeamGoals:             6.8,
 	}
@@ -86,22 +186,49 @@ func (m XGGoalieModel) Predict(input MatchupInput) (MatchupPrediction, error) {
 		return MatchupPrediction{}, err
 	}
 
-	xgEdge := (input.HomeTeam.ExpectedGoalsShare - input.AwayTeam.ExpectedGoalsShare) * m.cfg.ExpectedGoalsShareWeight
-	goalieEdge := (input.HomeTeam.GoalieGSAx - input.AwayTeam.GoalieGSAx) * m.cfg.GoalieGSAxWeight
-	defenseEdge := (input.AwayTeam.GoalsAgainstPerGame - input.HomeTeam.GoalsAgainstPerGame) * m.cfg.GoalsAgainstWeight
-	offenseEdge := (input.HomeTeam.GoalsForPerGame - input.AwayTeam.GoalsForPerGame) * m.cfg.GoalsForWeight
-	pdoRegressionEdge := ((1.0 - input.HomeTeam.PDO) - (1.0 - input.AwayTeam.PDO)) * m.cfg.PDORegressionWeight
-	corsiEdge := (input.HomeTeam.CorsiShare - input.AwayTeam.CorsiShare) * m.cfg.CorsiShareWeight
+	// --- Level-based expected goals per team ---
+	// Each team's goals = f(own offense, opponent defense, opponent goalie, pace, luck regression)
+	// This produces independent estimates that DON'T cancel to a constant total.
 
-	totalEdge := xgEdge + goalieEdge + defenseEdge + offenseEdge + pdoRegressionEdge + corsiEdge
+	league := m.cfg.LeagueGoalsPerTeam // 3.05
+
+	// Offensive contribution: how much better/worse than league average a team scores.
+	homeOffAdj := (input.HomeTeam.GoalsForPerGame - league) * m.cfg.GoalsForWeight
+	awayOffAdj := (input.AwayTeam.GoalsForPerGame - league) * m.cfg.GoalsForWeight
+
+	// Defensive contribution: opponent's GA/game tells us how porous their defense is.
+	// High GA = opponent lets in more goals = good for the attacking team.
+	homeDefOppAdj := (input.AwayTeam.GoalsAgainstPerGame - league) * m.cfg.GoalsAgainstWeight
+	awayDefOppAdj := (input.HomeTeam.GoalsAgainstPerGame - league) * m.cfg.GoalsAgainstWeight
+
+	// xG share: team's underlying shot quality dominance.
+	homeXGAdj := (input.HomeTeam.ExpectedGoalsShare - 0.50) * m.cfg.ExpectedGoalsShareWeight
+	awayXGAdj := (input.AwayTeam.ExpectedGoalsShare - 0.50) * m.cfg.ExpectedGoalsShareWeight
+
+	// Opponent goalie: good opposing goalie reduces goals scored.
+	// Negative GSAx = bad goalie = more goals conceded.
+	homeGoalieOppAdj := -input.AwayTeam.GoalieGSAx * m.cfg.GoalieGSAxWeight
+	awayGoalieOppAdj := -input.HomeTeam.GoalieGSAx * m.cfg.GoalieGSAxWeight
+
+	// Pace: combined Corsi share reflects shot generation environment.
+	// Two high-Corsi teams = more shots on both sides = more total goals.
+	combinedPace := (input.HomeTeam.CorsiShare + input.AwayTeam.CorsiShare) - 1.0 // 0 when both at 0.50
+	homePaceAdj := combinedPace * m.cfg.CorsiShareWeight * 0.5
+	awayPaceAdj := combinedPace * m.cfg.CorsiShareWeight * 0.5
+
+	// PDO regression: teams above 1.0 are "lucky" (high shooting + save %).
+	// Expect their OPPONENTS to score more (their save % regresses down).
+	// Expect THEM to score less (their shooting % regresses down).
+	homePDOAdj := (1.0 - input.HomeTeam.PDO) * m.cfg.PDORegressionWeight  // home team's luck regresses
+	awayPDOAdj := (1.0 - input.AwayTeam.PDO) * m.cfg.PDORegressionWeight
 
 	homeGoals := clamp(
-		m.cfg.LeagueGoalsPerTeam+m.cfg.HomeIceGoalAdvantage+totalEdge,
+		league+m.cfg.HomeIceGoalAdvantage+homeOffAdj+homeDefOppAdj+homeXGAdj+homeGoalieOppAdj+homePaceAdj+homePDOAdj,
 		m.cfg.MinTeamGoals,
 		m.cfg.MaxTeamGoals,
 	)
 	awayGoals := clamp(
-		m.cfg.LeagueGoalsPerTeam-totalEdge,
+		league+awayOffAdj+awayDefOppAdj+awayXGAdj+awayGoalieOppAdj+awayPaceAdj+awayPDOAdj,
 		m.cfg.MinTeamGoals,
 		m.cfg.MaxTeamGoals,
 	)
