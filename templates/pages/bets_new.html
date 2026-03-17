@@ -1,0 +1,101 @@
+<div class="page-header">
+    <div>
+        <p class="eyebrow">Manual Tracking</p>
+        <h2>Record a Bet</h2>
+    </div>
+    <a class="filter-form__clear" href="/bets">Back to Ledger</a>
+</div>
+
+{{if .PrefilledEdge}}
+<div class="detail-strip" style="margin-bottom:8px;">
+    <div>
+        <span class="detail-strip__label">Recommendation</span>
+        <span>Snapshot #{{.SnapshotID}}</span>
+    </div>
+    <div>
+        <span class="detail-strip__label">Model Edge</span>
+        <span>{{.PrefilledEdge}}</span>
+    </div>
+    <div>
+        <span class="detail-strip__label">Model Prob</span>
+        <span>{{.PrefilledModelProb}}</span>
+    </div>
+    <div>
+        <span class="detail-strip__label">Suggested Stake</span>
+        <span>{{.PrefilledStakeDollars}}</span>
+    </div>
+</div>
+{{end}}
+
+<div class="panel" x-data="payoutCalc()">
+    <h3>Bet Details</h3>
+    <form method="post" action="/bets" class="bet-form" style="margin-top:14px;">
+        {{if .SnapshotID}}
+        <input type="hidden" name="snapshot_id" value="{{.SnapshotID}}">
+        {{end}}
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label" for="game_id">Game</label>
+                <select name="game_id" id="game_id" class="form-input" required x-on:change="updateSport($event)">
+                    <option value="">Select a game...</option>
+                    {{range .Games}}
+                    <option value="{{.ID}}" data-sport="{{.Sport}}" {{if $.PrefilledGameID}}{{if eq $.PrefilledGameID .ID}}selected{{end}}{{end}}>{{.Label}}</option>
+                    {{end}}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="sport">Sport</label>
+                <input type="text" name="sport" id="sport" class="form-input" required readonly
+                    value="{{if .PrefilledSport}}{{.PrefilledSport}}{{end}}">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="side">Side</label>
+                <select name="side" id="side" class="form-input" required>
+                    <option value="home" {{if eq .PrefilledSide "home"}}selected{{end}}>Home</option>
+                    <option value="away" {{if eq .PrefilledSide "away"}}selected{{end}}>Away</option>
+                    <option value="over">Over</option>
+                    <option value="under">Under</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="book_key">Book</label>
+                <input type="text" name="book_key" id="book_key" class="form-input" required
+                    placeholder="e.g. draftkings" value="{{.PrefilledBook}}">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="american_odds">American Odds</label>
+                <input type="number" name="american_odds" id="american_odds" class="form-input" required
+                    placeholder="-110" x-model="odds" x-on:input="calc()"
+                    {{if .PrefilledOdds}}value="{{.PrefilledOdds}}"{{end}}>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="stake_dollars">Stake ($)</label>
+                <input type="number" name="stake_dollars" id="stake_dollars" class="form-input" required
+                    step="0.01" min="0.01" placeholder="25.00" x-model="stake" x-on:input="calc()"
+                    {{if .PrefilledStakeDollars}}value="{{.PrefilledStakeDollars}}"{{end}}>
+            </div>
+        </div>
+
+        <div class="payout-preview" x-show="potentialWin > 0" x-cloak>
+            <span class="detail-strip__label">Potential Payout</span>
+            <span class="stat-card__value" style="color:var(--ok);" x-text="'$' + potentialWin.toFixed(2)"></span>
+            <span class="muted" x-text="'Profit: $' + potentialProfit.toFixed(2)"></span>
+        </div>
+
+        <div class="form-group" style="margin-top:14px;">
+            <label class="form-label" for="notes">Notes (optional)</label>
+            <textarea name="notes" id="notes" class="form-input form-textarea" rows="2" placeholder="Any context about this bet..."></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="filter-form__submit">Record Bet</button>
+            <a href="/bets" class="filter-form__clear">Cancel</a>
+        </div>
+    </form>
+</div>

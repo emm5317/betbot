@@ -292,6 +292,70 @@ func (q *Queries) GetTeamRolling5on5Stats(ctx context.Context, arg GetTeamRollin
 	return items, nil
 }
 
+const getTeamRollingAllSituationStats = `-- name: GetTeamRollingAllSituationStats :many
+SELECT
+    game_id, game_date, opponent, home_or_away,
+    goals_for, goals_against
+FROM moneypuck_team_games
+WHERE team = $1
+  AND situation = 'all'
+  AND game_date < $2
+  AND season = $3
+  AND is_playoff = FALSE
+ORDER BY game_date DESC
+LIMIT $4
+`
+
+type GetTeamRollingAllSituationStatsParams struct {
+	Team     string      `json:"team"`
+	GameDate pgtype.Date `json:"game_date"`
+	Season   int32       `json:"season"`
+	Limit    int32       `json:"limit"`
+}
+
+type GetTeamRollingAllSituationStatsRow struct {
+	GameID       string      `json:"game_id"`
+	GameDate     pgtype.Date `json:"game_date"`
+	Opponent     string      `json:"opponent"`
+	HomeOrAway   string      `json:"home_or_away"`
+	GoalsFor     *float64    `json:"goals_for"`
+	GoalsAgainst *float64    `json:"goals_against"`
+}
+
+// Returns the last N all-situation games for a team strictly before a given date.
+// All-situation goals reflect actual game totals (5v5 + PP + SH), needed for totals prediction.
+func (q *Queries) GetTeamRollingAllSituationStats(ctx context.Context, arg GetTeamRollingAllSituationStatsParams) ([]GetTeamRollingAllSituationStatsRow, error) {
+	rows, err := q.db.Query(ctx, getTeamRollingAllSituationStats,
+		arg.Team,
+		arg.GameDate,
+		arg.Season,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTeamRollingAllSituationStatsRow
+	for rows.Next() {
+		var i GetTeamRollingAllSituationStatsRow
+		if err := rows.Scan(
+			&i.GameID,
+			&i.GameDate,
+			&i.Opponent,
+			&i.HomeOrAway,
+			&i.GoalsFor,
+			&i.GoalsAgainst,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOutcomeBacktestGames = `-- name: ListOutcomeBacktestGames :many
 SELECT game_id, season, team AS home_team, opponent AS away_team, game_date,
        goals_for AS home_goals, goals_against AS away_goals

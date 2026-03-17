@@ -119,3 +119,39 @@ func (q *Queries) InsertBankrollEntry(ctx context.Context, arg InsertBankrollEnt
 	)
 	return i, err
 }
+
+const listBankrollEntries = `-- name: ListBankrollEntries :many
+SELECT id, entry_type, amount_cents, currency, reference_type, reference_id, metadata, created_at
+FROM bankroll_ledger
+ORDER BY created_at DESC
+LIMIT $1
+`
+
+func (q *Queries) ListBankrollEntries(ctx context.Context, rowLimit int32) ([]BankrollLedger, error) {
+	rows, err := q.db.Query(ctx, listBankrollEntries, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BankrollLedger
+	for rows.Next() {
+		var i BankrollLedger
+		if err := rows.Scan(
+			&i.ID,
+			&i.EntryType,
+			&i.AmountCents,
+			&i.Currency,
+			&i.ReferenceType,
+			&i.ReferenceID,
+			&i.Metadata,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

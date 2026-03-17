@@ -476,11 +476,120 @@ body::before {
     margin: 8px 0 0;
 }
 
+/* Form styles for bet entry */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-label {
+    font-size: 0.73rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.form-input {
+    padding: 9px 11px;
+    border-radius: 10px;
+    border: 1px solid var(--line-soft);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.92rem;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: rgba(255, 157, 72, 0.5);
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 56px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.payout-preview {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: var(--radius-md);
+    background: rgba(99, 223, 173, 0.08);
+    border: 1px solid rgba(99, 223, 173, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+/* Action buttons for bet settlement */
+.btn-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    border-radius: 8px;
+    border: 1px solid var(--line-soft);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.btn--sm {
+    padding: 4px 8px;
+    font-size: 0.78rem;
+}
+
+.btn--ok {
+    background: rgba(99, 223, 173, 0.15);
+    border-color: rgba(99, 223, 173, 0.3);
+    color: var(--ok);
+}
+
+.btn--danger {
+    background: rgba(255, 116, 131, 0.12);
+    border-color: rgba(255, 116, 131, 0.3);
+    color: var(--degraded);
+}
+
+.btn--muted {
+    color: var(--text-muted);
+    border-style: dashed;
+}
+
+.btn:hover,
+.btn:focus-visible {
+    border-color: var(--line-hard);
+    outline: none;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
 @media (max-width: 1040px) {
     .hero-panel,
     .content-grid,
     .route-grid,
-    .status-grid {
+    .status-grid,
+    .form-grid {
         grid-template-columns: 1fr;
     }
 }

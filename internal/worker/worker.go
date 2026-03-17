@@ -10,6 +10,7 @@ import (
 	"betbot/internal/domain"
 	"betbot/internal/ingestion/injuries"
 	"betbot/internal/ingestion/oddspoller"
+	"betbot/internal/ingestion/scores"
 	"betbot/internal/ingestion/statsetl"
 	"betbot/internal/ingestion/weather"
 	"betbot/internal/store"
@@ -128,6 +129,13 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	river.AddWorker(workers, NewInjurySyncWorker(pool, logger, injuries.NewRotowireProvider("", 0)))
 	river.AddWorker(workers, NewWeatherSyncWorker(pool, logger, weather.NewOpenMeteoProvider("", 0)))
 	river.AddWorker(workers, NewPredictionWorker(pool, logger))
+	river.AddWorker(workers, NewAutoPlacementWorker(pool, logger))
+	river.AddWorker(workers, NewAutoSettlementWorker(
+		pool,
+		logger,
+		scores.NewClient(cfg.OddsAPIKey, cfg.OddsAPIBaseURL, cfg.OddsAPITimeout, cfg.OddsAPIRateLimit),
+		cfg.OddsAPISource,
+	))
 
 	periodicJobs := []*river.PeriodicJob{}
 	if oddsPollingEnabled {
@@ -160,6 +168,30 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 				}, nil
 			},
 			&river.PeriodicJobOpts{ID: "nhl-prediction", RunOnStart: true},
+		),
+	)
+
+	periodicJobs = append(periodicJobs,
+		river.NewPeriodicJob(
+			river.PeriodicInterval(autoSettlementInterval),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return AutoSettlementArgs{
+					RequestedAt: time.Now().UTC(),
+				}, nil
+			},
+			&river.PeriodicJobOpts{ID: "auto-settlement", RunOnStart: true},
+		),
+	)
+
+	periodicJobs = append(periodicJobs,
+		river.NewPeriodicJob(
+			river.PeriodicInterval(autoPlacementInterval),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return AutoPlacementArgs{
+					RequestedAt: time.Now().UTC(),
+				}, nil
+			},
+			&river.PeriodicJobOpts{ID: "auto-placement", RunOnStart: true},
 		),
 	)
 

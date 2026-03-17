@@ -162,6 +162,25 @@ WHERE game_id = $1
 ORDER BY captured_at DESC
 LIMIT 1;
 
+-- name: GetLatestTotalsLineForGame :one
+SELECT point
+FROM odds_history
+WHERE game_id = $1
+  AND market_key = 'totals'
+  AND outcome_side = 'over'
+  AND point IS NOT NULL
+ORDER BY captured_at DESC
+LIMIT 1;
+
+-- name: GetLatestTotalsOverProbForGame :one
+SELECT implied_probability
+FROM odds_history
+WHERE game_id = $1
+  AND market_key = 'totals'
+  AND outcome_side = 'over'
+ORDER BY captured_at DESC
+LIMIT 1;
+
 -- name: CountOddsHistoryRows :one
 SELECT COUNT(*)::BIGINT
 FROM odds_history;

@@ -8,21 +8,53 @@ package store
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getBetByIdempotencyKey = `-- name: GetBetByIdempotencyKey :one
+const getBetByID = `-- name: GetBetByID :one
 SELECT id, idempotency_key, snapshot_id, game_id, sport, market_key,
     recommended_side, book_key, american_odds, stake_cents,
     model_probability, market_probability, edge, status, external_bet_id,
     adapter_name, placed_at, settled_at, settlement_result, payout_cents,
-    clv_delta, closing_probability, error_message, metadata, created_at, updated_at
+    clv_delta, closing_probability, error_message, user_notes, metadata, created_at, updated_at
 FROM bets
-WHERE idempotency_key = $1
+WHERE id = $1
 `
 
-func (q *Queries) GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (Bet, error) {
-	row := q.db.QueryRow(ctx, getBetByIdempotencyKey, idempotencyKey)
-	var i Bet
+type GetBetByIDRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetBetByID(ctx context.Context, id int64) (GetBetByIDRow, error) {
+	row := q.db.QueryRow(ctx, getBetByID, id)
+	var i GetBetByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.IdempotencyKey,
@@ -47,9 +79,124 @@ func (q *Queries) GetBetByIdempotencyKey(ctx context.Context, idempotencyKey str
 		&i.ClvDelta,
 		&i.ClosingProbability,
 		&i.ErrorMessage,
+		&i.UserNotes,
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getBetByIdempotencyKey = `-- name: GetBetByIdempotencyKey :one
+SELECT id, idempotency_key, snapshot_id, game_id, sport, market_key,
+    recommended_side, book_key, american_odds, stake_cents,
+    model_probability, market_probability, edge, status, external_bet_id,
+    adapter_name, placed_at, settled_at, settlement_result, payout_cents,
+    clv_delta, closing_probability, error_message, user_notes, metadata, created_at, updated_at
+FROM bets
+WHERE idempotency_key = $1
+`
+
+type GetBetByIdempotencyKeyRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (GetBetByIdempotencyKeyRow, error) {
+	row := q.db.QueryRow(ctx, getBetByIdempotencyKey, idempotencyKey)
+	var i GetBetByIdempotencyKeyRow
+	err := row.Scan(
+		&i.ID,
+		&i.IdempotencyKey,
+		&i.SnapshotID,
+		&i.GameID,
+		&i.Sport,
+		&i.MarketKey,
+		&i.RecommendedSide,
+		&i.BookKey,
+		&i.AmericanOdds,
+		&i.StakeCents,
+		&i.ModelProbability,
+		&i.MarketProbability,
+		&i.Edge,
+		&i.Status,
+		&i.ExternalBetID,
+		&i.AdapterName,
+		&i.PlacedAt,
+		&i.SettledAt,
+		&i.SettlementResult,
+		&i.PayoutCents,
+		&i.ClvDelta,
+		&i.ClosingProbability,
+		&i.ErrorMessage,
+		&i.UserNotes,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getBetPnLSummary = `-- name: GetBetPnLSummary :one
+SELECT
+    COALESCE(COUNT(*), 0)::BIGINT AS total_bets,
+    COALESCE(COUNT(*) FILTER (WHERE status = 'placed'), 0)::BIGINT AS open_bets,
+    COALESCE(COUNT(*) FILTER (WHERE status = 'settled'), 0)::BIGINT AS settled_bets,
+    COALESCE(COUNT(*) FILTER (WHERE status = 'voided'), 0)::BIGINT AS voided_bets,
+    COALESCE(SUM(stake_cents) FILTER (WHERE status IN ('placed', 'settled')), 0)::BIGINT AS total_staked_cents,
+    COALESCE(SUM(payout_cents) FILTER (WHERE status = 'settled'), 0)::BIGINT AS total_returned_cents,
+    COALESCE(SUM(payout_cents) FILTER (WHERE status = 'settled'), 0)::BIGINT
+      - COALESCE(SUM(stake_cents) FILTER (WHERE status = 'settled'), 0)::BIGINT AS net_pnl_cents
+FROM bets
+WHERE ($1::TEXT = '' OR sport = $1)
+`
+
+type GetBetPnLSummaryRow struct {
+	TotalBets          int64 `json:"total_bets"`
+	OpenBets           int64 `json:"open_bets"`
+	SettledBets        int64 `json:"settled_bets"`
+	VoidedBets         int64 `json:"voided_bets"`
+	TotalStakedCents   int64 `json:"total_staked_cents"`
+	TotalReturnedCents int64 `json:"total_returned_cents"`
+	NetPnlCents        int32 `json:"net_pnl_cents"`
+}
+
+func (q *Queries) GetBetPnLSummary(ctx context.Context, sport string) (GetBetPnLSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getBetPnLSummary, sport)
+	var i GetBetPnLSummaryRow
+	err := row.Scan(
+		&i.TotalBets,
+		&i.OpenBets,
+		&i.SettledBets,
+		&i.VoidedBets,
+		&i.TotalStakedCents,
+		&i.TotalReturnedCents,
+		&i.NetPnlCents,
 	)
 	return i, err
 }
@@ -68,12 +215,12 @@ RETURNING id, idempotency_key, snapshot_id, game_id, sport, market_key,
     recommended_side, book_key, american_odds, stake_cents,
     model_probability, market_probability, edge, status, external_bet_id,
     adapter_name, placed_at, settled_at, settlement_result, payout_cents,
-    clv_delta, closing_probability, error_message, metadata, created_at, updated_at
+    clv_delta, closing_probability, error_message, user_notes, metadata, created_at, updated_at
 `
 
 type InsertBetParams struct {
 	IdempotencyKey    string          `json:"idempotency_key"`
-	SnapshotID        int64           `json:"snapshot_id"`
+	SnapshotID        *int64          `json:"snapshot_id"`
 	GameID            int64           `json:"game_id"`
 	Sport             string          `json:"sport"`
 	MarketKey         string          `json:"market_key"`
@@ -81,14 +228,44 @@ type InsertBetParams struct {
 	BookKey           string          `json:"book_key"`
 	AmericanOdds      int32           `json:"american_odds"`
 	StakeCents        int64           `json:"stake_cents"`
-	ModelProbability  float64         `json:"model_probability"`
-	MarketProbability float64         `json:"market_probability"`
-	Edge              float64         `json:"edge"`
+	ModelProbability  *float64        `json:"model_probability"`
+	MarketProbability *float64        `json:"market_probability"`
+	Edge              *float64        `json:"edge"`
 	AdapterName       string          `json:"adapter_name"`
 	Metadata          json.RawMessage `json:"metadata"`
 }
 
-func (q *Queries) InsertBet(ctx context.Context, arg InsertBetParams) (Bet, error) {
+type InsertBetRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) InsertBet(ctx context.Context, arg InsertBetParams) (InsertBetRow, error) {
 	row := q.db.QueryRow(ctx, insertBet,
 		arg.IdempotencyKey,
 		arg.SnapshotID,
@@ -105,7 +282,7 @@ func (q *Queries) InsertBet(ctx context.Context, arg InsertBetParams) (Bet, erro
 		arg.AdapterName,
 		arg.Metadata,
 	)
-	var i Bet
+	var i InsertBetRow
 	err := row.Scan(
 		&i.ID,
 		&i.IdempotencyKey,
@@ -130,6 +307,119 @@ func (q *Queries) InsertBet(ctx context.Context, arg InsertBetParams) (Bet, erro
 		&i.ClvDelta,
 		&i.ClosingProbability,
 		&i.ErrorMessage,
+		&i.UserNotes,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertManualBet = `-- name: InsertManualBet :one
+INSERT INTO bets (
+    idempotency_key, snapshot_id, game_id, sport, market_key,
+    recommended_side, book_key, american_odds, stake_cents,
+    model_probability, market_probability, edge, status, adapter_name, user_notes, metadata
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9,
+    $10, $11, $12, 'placed', 'manual', $13, '{}'::JSONB
+)
+RETURNING id, idempotency_key, snapshot_id, game_id, sport, market_key,
+    recommended_side, book_key, american_odds, stake_cents,
+    model_probability, market_probability, edge, status, external_bet_id,
+    adapter_name, placed_at, settled_at, settlement_result, payout_cents,
+    clv_delta, closing_probability, error_message, user_notes, metadata, created_at, updated_at
+`
+
+type InsertManualBetParams struct {
+	IdempotencyKey    string   `json:"idempotency_key"`
+	SnapshotID        *int64   `json:"snapshot_id"`
+	GameID            int64    `json:"game_id"`
+	Sport             string   `json:"sport"`
+	MarketKey         string   `json:"market_key"`
+	RecommendedSide   string   `json:"recommended_side"`
+	BookKey           string   `json:"book_key"`
+	AmericanOdds      int32    `json:"american_odds"`
+	StakeCents        int64    `json:"stake_cents"`
+	ModelProbability  *float64 `json:"model_probability"`
+	MarketProbability *float64 `json:"market_probability"`
+	Edge              *float64 `json:"edge"`
+	UserNotes         *string  `json:"user_notes"`
+}
+
+type InsertManualBetRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) InsertManualBet(ctx context.Context, arg InsertManualBetParams) (InsertManualBetRow, error) {
+	row := q.db.QueryRow(ctx, insertManualBet,
+		arg.IdempotencyKey,
+		arg.SnapshotID,
+		arg.GameID,
+		arg.Sport,
+		arg.MarketKey,
+		arg.RecommendedSide,
+		arg.BookKey,
+		arg.AmericanOdds,
+		arg.StakeCents,
+		arg.ModelProbability,
+		arg.MarketProbability,
+		arg.Edge,
+		arg.UserNotes,
+	)
+	var i InsertManualBetRow
+	err := row.Scan(
+		&i.ID,
+		&i.IdempotencyKey,
+		&i.SnapshotID,
+		&i.GameID,
+		&i.Sport,
+		&i.MarketKey,
+		&i.RecommendedSide,
+		&i.BookKey,
+		&i.AmericanOdds,
+		&i.StakeCents,
+		&i.ModelProbability,
+		&i.MarketProbability,
+		&i.Edge,
+		&i.Status,
+		&i.ExternalBetID,
+		&i.AdapterName,
+		&i.PlacedAt,
+		&i.SettledAt,
+		&i.SettlementResult,
+		&i.PayoutCents,
+		&i.ClvDelta,
+		&i.ClosingProbability,
+		&i.ErrorMessage,
+		&i.UserNotes,
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -142,7 +432,7 @@ SELECT id, idempotency_key, snapshot_id, game_id, sport, market_key,
     recommended_side, book_key, american_odds, stake_cents,
     model_probability, market_probability, edge, status, external_bet_id,
     adapter_name, placed_at, settled_at, settlement_result, payout_cents,
-    clv_delta, closing_probability, error_message, metadata, created_at, updated_at
+    clv_delta, closing_probability, error_message, user_notes, metadata, created_at, updated_at
 FROM bets
 WHERE status = $1::bet_status
 ORDER BY created_at DESC
@@ -154,15 +444,45 @@ type ListBetsByStatusParams struct {
 	RowLimit int32     `json:"row_limit"`
 }
 
-func (q *Queries) ListBetsByStatus(ctx context.Context, arg ListBetsByStatusParams) ([]Bet, error) {
+type ListBetsByStatusRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListBetsByStatus(ctx context.Context, arg ListBetsByStatusParams) ([]ListBetsByStatusRow, error) {
 	rows, err := q.db.Query(ctx, listBetsByStatus, arg.Status, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Bet
+	var items []ListBetsByStatusRow
 	for rows.Next() {
-		var i Bet
+		var i ListBetsByStatusRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.IdempotencyKey,
@@ -187,9 +507,116 @@ func (q *Queries) ListBetsByStatus(ctx context.Context, arg ListBetsByStatusPara
 			&i.ClvDelta,
 			&i.ClosingProbability,
 			&i.ErrorMessage,
+			&i.UserNotes,
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBetsWithFilters = `-- name: ListBetsWithFilters :many
+SELECT b.id, b.idempotency_key, b.snapshot_id, b.game_id, b.sport, b.market_key,
+    b.recommended_side, b.book_key, b.american_odds, b.stake_cents,
+    b.model_probability, b.market_probability, b.edge, b.status, b.external_bet_id,
+    b.adapter_name, b.placed_at, b.settled_at, b.settlement_result, b.payout_cents,
+    b.clv_delta, b.closing_probability, b.error_message, b.user_notes, b.metadata,
+    b.created_at, b.updated_at,
+    g.home_team, g.away_team, g.commence_time
+FROM bets b
+JOIN games g ON g.id = b.game_id
+WHERE ($1::TEXT = '' OR b.sport = $1)
+  AND ($2::TEXT = '' OR b.status = $2::bet_status)
+ORDER BY b.created_at DESC
+LIMIT $3
+`
+
+type ListBetsWithFiltersParams struct {
+	Sport        string `json:"sport"`
+	StatusFilter string `json:"status_filter"`
+	RowLimit     int32  `json:"row_limit"`
+}
+
+type ListBetsWithFiltersRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	HomeTeam           string             `json:"home_team"`
+	AwayTeam           string             `json:"away_team"`
+	CommenceTime       pgtype.Timestamptz `json:"commence_time"`
+}
+
+func (q *Queries) ListBetsWithFilters(ctx context.Context, arg ListBetsWithFiltersParams) ([]ListBetsWithFiltersRow, error) {
+	rows, err := q.db.Query(ctx, listBetsWithFilters, arg.Sport, arg.StatusFilter, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBetsWithFiltersRow
+	for rows.Next() {
+		var i ListBetsWithFiltersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.IdempotencyKey,
+			&i.SnapshotID,
+			&i.GameID,
+			&i.Sport,
+			&i.MarketKey,
+			&i.RecommendedSide,
+			&i.BookKey,
+			&i.AmericanOdds,
+			&i.StakeCents,
+			&i.ModelProbability,
+			&i.MarketProbability,
+			&i.Edge,
+			&i.Status,
+			&i.ExternalBetID,
+			&i.AdapterName,
+			&i.PlacedAt,
+			&i.SettledAt,
+			&i.SettlementResult,
+			&i.PayoutCents,
+			&i.ClvDelta,
+			&i.ClosingProbability,
+			&i.ErrorMessage,
+			&i.UserNotes,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.HomeTeam,
+			&i.AwayTeam,
+			&i.CommenceTime,
 		); err != nil {
 			return nil, err
 		}
@@ -206,21 +633,51 @@ SELECT id, idempotency_key, snapshot_id, game_id, sport, market_key,
     recommended_side, book_key, american_odds, stake_cents,
     model_probability, market_probability, edge, status, external_bet_id,
     adapter_name, placed_at, settled_at, settlement_result, payout_cents,
-    clv_delta, closing_probability, error_message, metadata, created_at, updated_at
+    clv_delta, closing_probability, error_message, user_notes, metadata, created_at, updated_at
 FROM bets
 WHERE status = 'placed'
 ORDER BY created_at ASC
 `
 
-func (q *Queries) ListOpenBets(ctx context.Context) ([]Bet, error) {
+type ListOpenBetsRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListOpenBets(ctx context.Context) ([]ListOpenBetsRow, error) {
 	rows, err := q.db.Query(ctx, listOpenBets)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Bet
+	var items []ListOpenBetsRow
 	for rows.Next() {
-		var i Bet
+		var i ListOpenBetsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.IdempotencyKey,
@@ -245,9 +702,112 @@ func (q *Queries) ListOpenBets(ctx context.Context) ([]Bet, error) {
 			&i.ClvDelta,
 			&i.ClosingProbability,
 			&i.ErrorMessage,
+			&i.UserNotes,
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOpenBetsWithGame = `-- name: ListOpenBetsWithGame :many
+SELECT b.id, b.idempotency_key, b.snapshot_id, b.game_id, b.sport, b.market_key,
+    b.recommended_side, b.book_key, b.american_odds, b.stake_cents,
+    b.model_probability, b.market_probability, b.edge, b.status, b.external_bet_id,
+    b.adapter_name, b.placed_at, b.settled_at, b.settlement_result, b.payout_cents,
+    b.clv_delta, b.closing_probability, b.error_message, b.user_notes, b.metadata,
+    b.created_at, b.updated_at,
+    g.source AS game_source, g.external_id AS game_external_id, g.home_team, g.away_team, g.sport AS game_sport
+FROM bets b
+JOIN games g ON g.id = b.game_id
+WHERE b.status = 'placed'
+ORDER BY b.created_at ASC
+`
+
+type ListOpenBetsWithGameRow struct {
+	ID                 int64              `json:"id"`
+	IdempotencyKey     string             `json:"idempotency_key"`
+	SnapshotID         *int64             `json:"snapshot_id"`
+	GameID             int64              `json:"game_id"`
+	Sport              string             `json:"sport"`
+	MarketKey          string             `json:"market_key"`
+	RecommendedSide    string             `json:"recommended_side"`
+	BookKey            string             `json:"book_key"`
+	AmericanOdds       int32              `json:"american_odds"`
+	StakeCents         int64              `json:"stake_cents"`
+	ModelProbability   *float64           `json:"model_probability"`
+	MarketProbability  *float64           `json:"market_probability"`
+	Edge               *float64           `json:"edge"`
+	Status             BetStatus          `json:"status"`
+	ExternalBetID      *string            `json:"external_bet_id"`
+	AdapterName        string             `json:"adapter_name"`
+	PlacedAt           pgtype.Timestamptz `json:"placed_at"`
+	SettledAt          pgtype.Timestamptz `json:"settled_at"`
+	SettlementResult   *string            `json:"settlement_result"`
+	PayoutCents        *int64             `json:"payout_cents"`
+	ClvDelta           *float64           `json:"clv_delta"`
+	ClosingProbability *float64           `json:"closing_probability"`
+	ErrorMessage       *string            `json:"error_message"`
+	UserNotes          *string            `json:"user_notes"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	GameSource         string             `json:"game_source"`
+	GameExternalID     string             `json:"game_external_id"`
+	HomeTeam           string             `json:"home_team"`
+	AwayTeam           string             `json:"away_team"`
+	GameSport          string             `json:"game_sport"`
+}
+
+func (q *Queries) ListOpenBetsWithGame(ctx context.Context) ([]ListOpenBetsWithGameRow, error) {
+	rows, err := q.db.Query(ctx, listOpenBetsWithGame)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOpenBetsWithGameRow
+	for rows.Next() {
+		var i ListOpenBetsWithGameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.IdempotencyKey,
+			&i.SnapshotID,
+			&i.GameID,
+			&i.Sport,
+			&i.MarketKey,
+			&i.RecommendedSide,
+			&i.BookKey,
+			&i.AmericanOdds,
+			&i.StakeCents,
+			&i.ModelProbability,
+			&i.MarketProbability,
+			&i.Edge,
+			&i.Status,
+			&i.ExternalBetID,
+			&i.AdapterName,
+			&i.PlacedAt,
+			&i.SettledAt,
+			&i.SettlementResult,
+			&i.PayoutCents,
+			&i.ClvDelta,
+			&i.ClosingProbability,
+			&i.ErrorMessage,
+			&i.UserNotes,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.GameSource,
+			&i.GameExternalID,
+			&i.HomeTeam,
+			&i.AwayTeam,
+			&i.GameSport,
 		); err != nil {
 			return nil, err
 		}
@@ -314,5 +874,16 @@ func (q *Queries) UpdateBetSettled(ctx context.Context, arg UpdateBetSettledPara
 		arg.ClosingProbability,
 		arg.ID,
 	)
+	return err
+}
+
+const voidBet = `-- name: VoidBet :exec
+UPDATE bets
+SET status = 'voided', updated_at = NOW()
+WHERE id = $1 AND status = 'placed'
+`
+
+func (q *Queries) VoidBet(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, voidBet, id)
 	return err
 }

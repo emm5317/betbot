@@ -18,6 +18,7 @@ const defaultRollingWindow = 20
 // MoneyPuckStore captures the sqlc queries needed for real NHL features.
 type MoneyPuckStore interface {
 	GetTeamRolling5on5Stats(ctx context.Context, arg store.GetTeamRolling5on5StatsParams) ([]store.GetTeamRolling5on5StatsRow, error)
+	GetTeamRollingAllSituationStats(ctx context.Context, arg store.GetTeamRollingAllSituationStatsParams) ([]store.GetTeamRollingAllSituationStatsRow, error)
 	GetStartingGoalie(ctx context.Context, arg store.GetStartingGoalieParams) (store.GetStartingGoalieRow, error)
 	GetGoalieSeasonGSAx(ctx context.Context, arg store.GetGoalieSeasonGSAxParams) (store.GetGoalieSeasonGSAxRow, error)
 	GetGameResult(ctx context.Context, gameID string) ([]store.GetGameResultRow, error)
@@ -103,6 +104,23 @@ func BuildNHLFeatures(
 	homeRolling := computeRollingAverages(homeStats)
 	awayRolling := computeRollingAverages(awayStats)
 
+	// Query all-situation stats for actual GF/GA.
+	homeAllStats, _ := mpStore.GetTeamRollingAllSituationStats(ctx, store.GetTeamRollingAllSituationStatsParams{
+		Team:     homeAbbrev,
+		GameDate: pgDate,
+		Season:   season,
+		Limit:    int32(rollingWindow),
+	})
+	mergeAllSituationGoals(&homeRolling, homeAllStats)
+
+	awayAllStats, _ := mpStore.GetTeamRollingAllSituationStats(ctx, store.GetTeamRollingAllSituationStatsParams{
+		Team:     awayAbbrev,
+		GameDate: pgDate,
+		Season:   season,
+		Limit:    int32(rollingWindow),
+	})
+	mergeAllSituationGoals(&awayRolling, awayAllStats)
+
 	result := NHLFeatureResult{HasReal: true}
 
 	// Look up starting goalies and their cumulative GSAx
@@ -149,15 +167,15 @@ func BuildNHLFeatures(
 			HomeMoneylineProbability: openingHomeProb,
 			AwayMoneylineProbability: 1 - openingHomeProb,
 			HomeSpread:               homeSpread,
-			TotalPoints:              homeRolling.goalsFor + homeRolling.goalsAgainst + awayRolling.goalsFor + awayRolling.goalsAgainst,
+			TotalPoints:              homeRolling.allGoalsFor + homeRolling.allGoalsAgainst + awayRolling.allGoalsFor + awayRolling.allGoalsAgainst,
 		},
 		TeamQuality: features.TeamQualityInputs{
 			HomePowerRating:   clamp(homeRolling.xgPct*200, 60, 130),
 			AwayPowerRating:   clamp(awayRolling.xgPct*200, 60, 130),
-			HomeOffenseRating: clamp(homeRolling.goalsFor*32, 70, 140),
-			AwayOffenseRating: clamp(awayRolling.goalsFor*32, 70, 140),
-			HomeDefenseRating: clamp(homeRolling.goalsAgainst*34, 70, 140),
-			AwayDefenseRating: clamp(awayRolling.goalsAgainst*34, 70, 140),
+			HomeOffenseRating: clamp(homeRolling.allGoalsFor*32, 70, 140),
+			AwayOffenseRating: clamp(awayRolling.allGoalsFor*32, 70, 140),
+			HomeDefenseRating: clamp(homeRolling.allGoalsAgainst*34, 70, 140),
+			AwayDefenseRating: clamp(awayRolling.allGoalsAgainst*34, 70, 140),
 		},
 		Situational: features.SituationalInputs{
 			HomeRestDays:   1,
@@ -240,6 +258,24 @@ func BuildNHLFeaturesFromAbbrev(
 	homeRolling := computeRollingAverages(homeStats)
 	awayRolling := computeRollingAverages(awayStats)
 
+	// Query all-situation stats for actual GF/GA (5v5 + PP + SH).
+	// These reflect real game totals, needed for totals prediction.
+	homeAllStats, _ := mpStore.GetTeamRollingAllSituationStats(ctx, store.GetTeamRollingAllSituationStatsParams{
+		Team:     homeAbbrev,
+		GameDate: pgDate,
+		Season:   season,
+		Limit:    int32(rollingWindow),
+	})
+	mergeAllSituationGoals(&homeRolling, homeAllStats)
+
+	awayAllStats, _ := mpStore.GetTeamRollingAllSituationStats(ctx, store.GetTeamRollingAllSituationStatsParams{
+		Team:     awayAbbrev,
+		GameDate: pgDate,
+		Season:   season,
+		Limit:    int32(rollingWindow),
+	})
+	mergeAllSituationGoals(&awayRolling, awayAllStats)
+
 	result := NHLFeatureResult{HasReal: true}
 
 	homeGSAx := 0.0
@@ -283,15 +319,15 @@ func BuildNHLFeaturesFromAbbrev(
 			HomeMoneylineProbability: defaultProb,
 			AwayMoneylineProbability: 1 - defaultProb,
 			HomeSpread:               0,
-			TotalPoints:              homeRolling.goalsFor + homeRolling.goalsAgainst + awayRolling.goalsFor + awayRolling.goalsAgainst,
+			TotalPoints:              homeRolling.allGoalsFor + homeRolling.allGoalsAgainst + awayRolling.allGoalsFor + awayRolling.allGoalsAgainst,
 		},
 		TeamQuality: features.TeamQualityInputs{
 			HomePowerRating:   clamp(homeRolling.xgPct*200, 60, 130),
 			AwayPowerRating:   clamp(awayRolling.xgPct*200, 60, 130),
-			HomeOffenseRating: clamp(homeRolling.goalsFor*32, 70, 140),
-			AwayOffenseRating: clamp(awayRolling.goalsFor*32, 70, 140),
-			HomeDefenseRating: clamp(homeRolling.goalsAgainst*34, 70, 140),
-			AwayDefenseRating: clamp(awayRolling.goalsAgainst*34, 70, 140),
+			HomeOffenseRating: clamp(homeRolling.allGoalsFor*32, 70, 140),
+			AwayOffenseRating: clamp(awayRolling.allGoalsFor*32, 70, 140),
+			HomeDefenseRating: clamp(homeRolling.allGoalsAgainst*34, 70, 140),
+			AwayDefenseRating: clamp(awayRolling.allGoalsAgainst*34, 70, 140),
 		},
 		Situational: features.SituationalInputs{
 			HomeRestDays:   1,
@@ -355,24 +391,27 @@ func LookupGameOutcome(ctx context.Context, mpStore MoneyPuckStore, gameID strin
 }
 
 type rollingAverages struct {
-	xgPct       float64
-	goalsFor    float64
-	goalsAgainst float64
-	pdo         float64
-	corsi       float64
+	xgPct        float64
+	goalsFor     float64 // 5v5 goals
+	goalsAgainst float64 // 5v5 goals
+	pdo          float64
+	corsi        float64
+	// All-situation goals (5v5 + PP + SH) — used for totals prediction.
+	allGoalsFor     float64
+	allGoalsAgainst float64
 }
 
 func computeRollingAverages(rows []store.GetTeamRolling5on5StatsRow) rollingAverages {
 	n := float64(len(rows))
 	if n == 0 {
-		return rollingAverages{xgPct: 0.50, goalsFor: 3.0, goalsAgainst: 3.0, pdo: 1.0, corsi: 0.50}
+		return rollingAverages{xgPct: 0.50, goalsFor: 2.0, goalsAgainst: 2.0, pdo: 1.0, corsi: 0.50, allGoalsFor: 3.0, allGoalsAgainst: 3.0}
 	}
 
 	var sumXGPct, sumGF, sumGA, sumSOGF, sumSOGA, sumCorsi float64
 	for _, r := range rows {
 		sumXGPct += deref(r.XgoalsPercentage, 0.50)
-		sumGF += deref(r.GoalsFor, 3.0)
-		sumGA += deref(r.GoalsAgainst, 3.0)
+		sumGF += deref(r.GoalsFor, 2.0)
+		sumGA += deref(r.GoalsAgainst, 2.0)
 		sumSOGF += deref(r.ShotsOnGoalFor, 30.0)
 		sumSOGA += deref(r.ShotsOnGoalAgainst, 30.0)
 		sumCorsi += deref(r.CorsiPercentage, 0.50)
@@ -393,12 +432,29 @@ func computeRollingAverages(rows []store.GetTeamRolling5on5StatsRow) rollingAver
 	}
 
 	return rollingAverages{
-		xgPct:        sumXGPct / n,
-		goalsFor:     avgGF,
-		goalsAgainst: avgGA,
-		pdo:          shootingPct + savePct,
-		corsi:        sumCorsi / n,
+		xgPct:           sumXGPct / n,
+		goalsFor:        avgGF,
+		goalsAgainst:    avgGA,
+		pdo:             shootingPct + savePct,
+		corsi:           sumCorsi / n,
+		allGoalsFor:     avgGF, // placeholder; overridden by mergeAllSituationGoals
+		allGoalsAgainst: avgGA,
 	}
+}
+
+// mergeAllSituationGoals overlays all-situation goals onto rolling averages.
+func mergeAllSituationGoals(ra *rollingAverages, rows []store.GetTeamRollingAllSituationStatsRow) {
+	n := float64(len(rows))
+	if n == 0 {
+		return
+	}
+	var sumGF, sumGA float64
+	for _, r := range rows {
+		sumGF += deref(r.GoalsFor, 3.0)
+		sumGA += deref(r.GoalsAgainst, 3.0)
+	}
+	ra.allGoalsFor = sumGF / n
+	ra.allGoalsAgainst = sumGA / n
 }
 
 // nhlSeasonFromDate converts a game date to the MoneyPuck season year.

@@ -15,6 +15,12 @@ RETURNING id, entry_type, amount_cents, currency, reference_type, reference_id, 
 SELECT COALESCE(SUM(amount_cents), 0)::BIGINT AS balance_cents
 FROM bankroll_ledger;
 
+-- name: ListBankrollEntries :many
+SELECT id, entry_type, amount_cents, currency, reference_type, reference_id, metadata, created_at
+FROM bankroll_ledger
+ORDER BY created_at DESC
+LIMIT @row_limit;
+
 -- name: GetBankrollCircuitMetrics :one
 WITH anchor AS (
     SELECT

@@ -81,6 +81,11 @@ func main() {
 	fmt.Printf("positive_clv_rate: %.4f\n", artifact.CLV.PositiveCLVRate)
 	fmt.Printf("calibration_mae: %.6f\n", artifact.Calibration.MeanAbsoluteError)
 	fmt.Printf("brier_score: %.6f\n", artifact.Calibration.BrierScore)
+	if artifact.OutcomeCalibration.Samples > 0 {
+		fmt.Printf("outcome_calibration_samples: %d\n", artifact.OutcomeCalibration.Samples)
+		fmt.Printf("outcome_calibration_mae: %.6f\n", artifact.OutcomeCalibration.MeanAbsoluteError)
+		fmt.Printf("outcome_brier_score: %.6f\n", artifact.OutcomeCalibration.BrierScore)
+	}
 	fmt.Printf("walk_forward_splits: %d\n", len(artifact.WalkForward))
 	fmt.Printf("guardrails_pass: %t\n", guardrails.Pass)
 	if len(guardrails.Findings) > 0 {
@@ -163,6 +168,7 @@ func parseFlags() (parsedFlags, error) {
 	outcomeCfg := backtest.OutcomeRunConfig{
 		RollingWindow:         rollingWindow,
 		ModelVersion:          strings.TrimSpace(modelVersion),
+		MarketKey:             strings.TrimSpace(marketKey),
 		WalkForwardTrain:      trainWindow,
 		WalkForwardValidation: validationWindow,
 		WalkForwardStep:       step,

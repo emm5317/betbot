@@ -71,16 +71,20 @@ func (a *App) handleExecutionPlace(c fiber.Ctx) error {
 func (a *App) handleExecutionBets(c fiber.Ctx) error {
 	statusFilter := c.Query("status")
 
-	var bets []store.Bet
 	var err error
+	var result any
 
 	if statusFilter != "" {
+		var bets []store.ListBetsByStatusRow
 		bets, err = a.queries.ListBetsByStatus(c.Context(), store.ListBetsByStatusParams{
 			Status:   store.BetStatus(statusFilter),
 			RowLimit: 100,
 		})
+		result = bets
 	} else {
+		var bets []store.ListOpenBetsRow
 		bets, err = a.queries.ListOpenBets(c.Context())
+		result = bets
 	}
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -89,7 +93,7 @@ func (a *App) handleExecutionBets(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"bets":  bets,
-		"count": len(bets),
+		"bets":  result,
+		"count": result,
 	})
 }

@@ -65,3 +65,26 @@ SELECT id, generated_at, sport, game_id, event_time, event_date, market_key,
     bankroll_check_pass, bankroll_check_reason, rank_score, metadata, created_at
 FROM recommendation_snapshots
 WHERE id = @id;
+
+-- name: ListPlaceableRecommendationSnapshots :many
+SELECT
+    rs.id AS snapshot_id,
+    rs.game_id,
+    rs.sport,
+    rs.market_key,
+    rs.recommended_side,
+    rs.best_book,
+    rs.best_american_odds,
+    rs.suggested_stake_cents,
+    rs.model_probability,
+    rs.market_probability,
+    rs.edge
+FROM recommendation_snapshots AS rs
+WHERE rs.suggested_stake_cents > 0
+  AND NOT EXISTS (
+      SELECT 1
+      FROM bets AS b
+      WHERE b.snapshot_id = rs.id
+  )
+ORDER BY rs.rank_score DESC, rs.id ASC
+LIMIT @row_limit;
