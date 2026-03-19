@@ -50,7 +50,7 @@ func (a *App) handleRecommendations(c fiber.Ctx) error {
 		})
 	}
 
-	candidates, err := a.recommendationCandidates(c.Context(), sportFilter, dateFilter, limit)
+	candidates, predictionsByKey, err := a.recommendationCandidates(c.Context(), sportFilter, dateFilter, limit)
 	if err != nil {
 		return fmt.Errorf("load recommendation candidates: %w", err)
 	}
@@ -87,14 +87,14 @@ func (a *App) handleRecommendations(c fiber.Ctx) error {
 		DayStartBalanceCents:  circuitMetrics.DayStartBalanceCents,
 		WeekStartBalanceCents: circuitMetrics.WeekStartBalanceCents,
 		PeakBalanceCents:      circuitMetrics.PeakBalanceCents,
-	}); err != nil {
+	}, predictionsByKey); err != nil {
 		return fmt.Errorf("persist recommendation snapshots: %w", err)
 	}
 
 	return c.JSON(recommendations)
 }
 
-func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFilterSelection, dateFilter *time.Time, limit int) ([]decision.RecommendationCandidate, error) {
+func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFilterSelection, dateFilter *time.Time, limit int) ([]decision.RecommendationCandidate, map[string]store.ModelPrediction, error) {
 	sports := recommendationSportsForFilter(sportFilter)
 
 	seasonYear := int32(time.Now().UTC().Year())
@@ -110,7 +110,7 @@ func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFil
 			Season: season,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("list model predictions for %s: %w", sport, err)
+			return nil, nil, fmt.Errorf("list model predictions for %s: %w", sport, err)
 		}
 		for _, row := range rows {
 			if !row.EventTime.Valid {
@@ -132,7 +132,7 @@ func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFil
 		Sport:    sportFilter.storeParam(),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list latest odds: %w", err)
+		return nil, nil, fmt.Errorf("list latest odds: %w", err)
 	}
 
 	quotesByMarket := latestQuotesByGameAndMarketUpcoming(oddsRows)
@@ -171,10 +171,15 @@ func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFil
 		return left.Sport < right.Sport
 	})
 
-	return candidates, nil
+	return candidates, predictionsByKey, nil
 }
 
-func (a *App) persistRecommendationSnapshots(ctx context.Context, recommendations []decision.Recommendation, circuitMetrics decision.CircuitBreakerMetrics) error {
+func (a *App) persistRecommendationSnapshots(
+	ctx context.Context,
+	recommendations []decision.Recommendation,
+	circuitMetrics decision.CircuitBreakerMetrics,
+	predictionsByKey map[string]store.ModelPrediction,
+) error {
 	baseMetadata := map[string]any{
 		"mode":         "recommendation-only",
 		"ev_threshold": a.cfg.EVThreshold,
@@ -218,6 +223,23 @@ func (a *App) persistRecommendationSnapshots(ctx context.Context, recommendation
 			"week_start_balance_cents": circuitMetrics.WeekStartBalanceCents,
 			"peak_balance_cents":       circuitMetrics.PeakBalanceCents,
 		}
+		modelFamily := "unknown"
+		modelVersion := "unknown"
+		modelSource := "unknown"
+		if prediction, ok := predictionsByKey[recommendationKey(rec.GameID, rec.Market)]; ok {
+			if value := strings.TrimSpace(prediction.ModelFamily); value != "" {
+				modelFamily = value
+			}
+			if value := strings.TrimSpace(prediction.ModelVersion); value != "" {
+				modelVersion = value
+			}
+			if value := strings.TrimSpace(prediction.Source); value != "" {
+				modelSource = value
+			}
+		}
+		metadata["model_family"] = modelFamily
+		metadata["model_version"] = modelVersion
+		metadata["source"] = modelSource
 		metadataJSON, err := json.Marshal(metadata)
 		if err != nil {
 			return fmt.Errorf("marshal recommendation metadata game_id=%d market=%s: %w", rec.GameID, rec.Market, err)

@@ -14,13 +14,13 @@ import (
 	"betbot/internal/store"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/jackc/pgx/v5/pgxpool"
 	fiberlogger "github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	html "github.com/gofiber/template/html/v2"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type readQueries interface {
@@ -145,6 +145,7 @@ func (a *App) routes() {
 	a.app.Get("/odds", a.handleOdds)
 	a.app.Get("/recommendations", a.handleRecommendations)
 	a.app.Get("/recommendations/performance", a.handleRecommendationsPerformance)
+	a.app.Get("/recommendations/performance/models", a.handleRecommendationsPerformanceModels)
 	a.app.Get("/recommendations/calibration", a.handleRecommendationsCalibration)
 	a.app.Get("/recommendations/calibration/alerts", a.handleRecommendationsCalibrationAlerts)
 	a.app.Get("/recommendations/calibration/alerts/history", a.handleRecommendationsCalibrationAlertsHistory)

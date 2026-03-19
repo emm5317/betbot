@@ -6,7 +6,7 @@
     <a class="filter-form__submit" href="/bets/new">+ Record Bet</a>
 </div>
 
-<div class="status-grid" style="grid-template-columns: repeat(4, 1fr);">
+<div class="status-grid" style="grid-template-columns: repeat(5, 1fr);">
     <div class="stat-card">
         <span class="stat-card__label">Total Staked</span>
         <span class="stat-card__value">{{.TotalStaked}}</span>
@@ -24,6 +24,11 @@
         <span class="stat-card__label">Bets</span>
         <span class="stat-card__value">{{.OpenBets}} open / {{.SettledBets}} settled</span>
         <span class="muted" style="font-size:0.82rem;">{{.VoidedBets}} voided</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-card__label">Settlement Lag</span>
+        <span class="stat-card__value">{{.SettlementLagCount}} open past event time</span>
+        <span class="muted" style="font-size:0.82rem;">Check score ingestion and settlement worker</span>
     </div>
 </div>
 
@@ -61,6 +66,8 @@
                     <th>Game</th>
                     <th>Side</th>
                     <th>Book</th>
+                    <th>Source</th>
+                    <th>Snapshot</th>
                     <th>Odds</th>
                     <th>Stake</th>
                     <th>Result</th>
@@ -77,6 +84,8 @@
                     <td>{{.HomeTeam}} vs {{.AwayTeam}}</td>
                     <td>{{.Side}}</td>
                     <td>{{.BookKey}}</td>
+                    <td><span class="status-pill">{{.PlacementSource}}</span></td>
+                    <td style="font-family:monospace;">{{.SnapshotRef}}</td>
                     <td style="font-family:monospace;">{{.AmericanOdds}}</td>
                     <td>{{.StakeDollars}}</td>
                     <td>
@@ -117,7 +126,7 @@
                 {{end}}
                 {{else}}
                 <tr>
-                    <td colspan="10" class="empty-state">No bets recorded yet. <a href="/bets/new" class="text-link">Record your first bet</a>.</td>
+                    <td colspan="12" class="empty-state">No bets recorded yet. <a href="/bets/new" class="text-link">Record your first bet</a>.</td>
                 </tr>
                 {{end}}
             </tbody>

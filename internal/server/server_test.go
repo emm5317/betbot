@@ -469,6 +469,9 @@ func TestHandleRecommendationsReturnsRankedJSONAndPersistsSnapshots(t *testing.T
 					GameID:               42,
 					Sport:                "MLB",
 					MarketKey:            "h2h",
+					ModelFamily:          "elo",
+					ModelVersion:         "v1",
+					Source:               "live",
 					PredictedProbability: 0.58,
 					MarketProbability:    0.52,
 					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 18, 0, 0, 0, time.UTC)),
@@ -478,6 +481,9 @@ func TestHandleRecommendationsReturnsRankedJSONAndPersistsSnapshots(t *testing.T
 					GameID:               43,
 					Sport:                "MLB",
 					MarketKey:            "h2h",
+					ModelFamily:          "elo",
+					ModelVersion:         "v1",
+					Source:               "live",
 					PredictedProbability: 0.62,
 					MarketProbability:    0.53,
 					EventTime:            store.Timestamptz(time.Date(2026, time.March, 16, 20, 0, 0, 0, time.UTC)),
@@ -587,6 +593,15 @@ func TestHandleRecommendationsReturnsRankedJSONAndPersistsSnapshots(t *testing.T
 	}
 	if _, ok := circuit["daily_loss_stop"].(float64); !ok {
 		t.Fatalf("snapshot metadata circuit.daily_loss_stop missing: %+v", circuit)
+	}
+	if got, ok := snapshotMetadata["model_family"].(string); !ok || got != "elo" {
+		t.Fatalf("snapshot metadata model_family = %v, want elo", snapshotMetadata["model_family"])
+	}
+	if got, ok := snapshotMetadata["model_version"].(string); !ok || got != "v1" {
+		t.Fatalf("snapshot metadata model_version = %v, want v1", snapshotMetadata["model_version"])
+	}
+	if got, ok := snapshotMetadata["source"].(string); !ok || got != "live" {
+		t.Fatalf("snapshot metadata source = %v, want live", snapshotMetadata["source"])
 	}
 	if len(queries.modelPredictionsCalls) != 1 || queries.modelPredictionsCalls[0].Sport != "MLB" {
 		t.Fatalf("model predictions calls = %+v, want one MLB call", queries.modelPredictionsCalls)
@@ -1283,6 +1298,152 @@ func TestHandleRecommendationsPerformanceRejectsInvalidLimit(t *testing.T) {
 		t.Fatalf("GET /recommendations/performance invalid limit status = %d, want 400", resp.StatusCode)
 	}
 	assertContains(t, readBody(t, resp), "expected integer in [1,500]")
+}
+
+func TestHandleRecommendationsPerformanceModelsReturnsGroupedRowsAndSummary(t *testing.T) {
+	queries := &fakeReadQueries{
+		listPerformanceRows: []store.ListRecommendationPerformanceSnapshotsRow{
+			{
+				SnapshotID:             801,
+				GeneratedAt:            store.Timestamptz(time.Date(2026, time.March, 15, 16, 0, 0, 0, time.UTC)),
+				Sport:                  "MLB",
+				GameID:                 91,
+				HomeTeam:               "Boston Red Sox",
+				AwayTeam:               "New York Yankees",
+				EventTime:              store.Timestamptz(time.Date(2026, time.March, 16, 1, 0, 0, 0, time.UTC)),
+				EventDate:              pgtype.Date{Time: time.Date(2026, time.March, 16, 0, 0, 0, 0, time.UTC), Valid: true},
+				MarketKey:              "h2h",
+				RecommendedSide:        "home",
+				BestBook:               "book-a",
+				BestAmericanOdds:       108,
+				ModelProbability:       0.58,
+				MarketProbability:      0.52,
+				Edge:                   0.06,
+				SuggestedStakeFraction: 0.02,
+				SuggestedStakeCents:    2000,
+				BankrollCheckPass:      true,
+				BankrollCheckReason:    "ok",
+				RankScore:              601,
+				SnapshotMetadata:       json.RawMessage(`{"mode":"recommendation-only","model_family":"elo","model_version":"v1","source":"live"}`),
+				CloseLineID:            9001,
+				CloseAmericanOdds:      -105,
+				CloseProbability:       0.55,
+				CloseCapturedAt:        store.Timestamptz(time.Date(2026, time.March, 16, 4, 0, 0, 0, time.UTC)),
+				CloseRawJson:           json.RawMessage(`{"completed":true,"scores":[{"name":"Boston Red Sox","score":"5"},{"name":"New York Yankees","score":"2"}]}`),
+			},
+			{
+				SnapshotID:             802,
+				GeneratedAt:            store.Timestamptz(time.Date(2026, time.March, 15, 17, 0, 0, 0, time.UTC)),
+				Sport:                  "MLB",
+				GameID:                 92,
+				HomeTeam:               "Chicago Cubs",
+				AwayTeam:               "St. Louis Cardinals",
+				EventTime:              store.Timestamptz(time.Date(2026, time.March, 16, 3, 0, 0, 0, time.UTC)),
+				EventDate:              pgtype.Date{Time: time.Date(2026, time.March, 16, 0, 0, 0, 0, time.UTC), Valid: true},
+				MarketKey:              "h2h",
+				RecommendedSide:        "away",
+				BestBook:               "book-b",
+				BestAmericanOdds:       115,
+				ModelProbability:       0.48,
+				MarketProbability:      0.51,
+				Edge:                   0.04,
+				SuggestedStakeFraction: 0.01,
+				SuggestedStakeCents:    1000,
+				BankrollCheckPass:      false,
+				BankrollCheckReason:    "insufficient_funds",
+				RankScore:              401,
+				SnapshotMetadata:       json.RawMessage(`{"mode":"recommendation-only","model_family":"elo","model_version":"v1","source":"live"}`),
+				CloseLineID:            0,
+				CloseAmericanOdds:      0,
+				CloseProbability:       0,
+				CloseRawJson:           json.RawMessage(`{}`),
+			},
+			{
+				SnapshotID:             803,
+				GeneratedAt:            store.Timestamptz(time.Date(2026, time.March, 15, 18, 0, 0, 0, time.UTC)),
+				Sport:                  "MLB",
+				GameID:                 93,
+				HomeTeam:               "Seattle Mariners",
+				AwayTeam:               "Houston Astros",
+				EventTime:              store.Timestamptz(time.Date(2026, time.March, 16, 5, 0, 0, 0, time.UTC)),
+				EventDate:              pgtype.Date{Time: time.Date(2026, time.March, 16, 0, 0, 0, 0, time.UTC), Valid: true},
+				MarketKey:              "h2h",
+				RecommendedSide:        "away",
+				BestBook:               "book-c",
+				BestAmericanOdds:       120,
+				ModelProbability:       0.46,
+				MarketProbability:      0.60,
+				Edge:                   0.07,
+				SuggestedStakeFraction: 0.03,
+				SuggestedStakeCents:    2500,
+				BankrollCheckPass:      true,
+				BankrollCheckReason:    "ok",
+				RankScore:              701,
+				SnapshotMetadata:       json.RawMessage(`{"mode":"recommendation-only","model_family":"xg-goalie-quality","model_version":"v1","source":"live"}`),
+				CloseLineID:            9002,
+				CloseAmericanOdds:      -102,
+				CloseProbability:       0.48,
+				CloseCapturedAt:        store.Timestamptz(time.Date(2026, time.March, 16, 8, 0, 0, 0, time.UTC)),
+				CloseRawJson:           json.RawMessage(`{"completed":true,"scores":[{"name":"Seattle Mariners","score":"2"},{"name":"Houston Astros","score":"1"}]}`),
+			},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/recommendations/performance/models?sport=baseball_mlb&date_from=2026-03-10&date_to=2026-03-17&limit=5")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /recommendations/performance/models status = %d, want 200", resp.StatusCode)
+	}
+
+	var payload struct {
+		Filters map[string]any   `json:"filters"`
+		Rows    []map[string]any `json:"rows"`
+		Summary map[string]any   `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(readBody(t, resp)), &payload); err != nil {
+		t.Fatalf("decode recommendations/performance/models: %v", err)
+	}
+	if len(payload.Rows) != 2 {
+		t.Fatalf("len(rows) = %d, want 2", len(payload.Rows))
+	}
+	if got := payload.Rows[0]["model_family"].(string); got != "elo" {
+		t.Fatalf("rows[0].model_family = %q, want elo", got)
+	}
+	if got := int(payload.Rows[0]["count"].(float64)); got != 2 {
+		t.Fatalf("rows[0].count = %d, want 2", got)
+	}
+	if got := int(payload.Rows[0]["settled_count"].(float64)); got != 1 {
+		t.Fatalf("rows[0].settled_count = %d, want 1", got)
+	}
+	if got := payload.Rows[0]["avg_clv"].(float64); math.Abs(got-0.03) > 1e-9 {
+		t.Fatalf("rows[0].avg_clv = %.6f, want 0.03", got)
+	}
+	if got := payload.Rows[1]["model_family"].(string); got != "xg-goalie-quality" {
+		t.Fatalf("rows[1].model_family = %q, want xg-goalie-quality", got)
+	}
+	if got := payload.Filters["sport"].(string); got != "baseball_mlb" {
+		t.Fatalf("filters.sport = %q, want baseball_mlb", got)
+	}
+	if got := int(payload.Summary["snapshot_count"].(float64)); got != 3 {
+		t.Fatalf("summary.snapshot_count = %d, want 3", got)
+	}
+	if got := int(payload.Summary["group_count"].(float64)); got != 2 {
+		t.Fatalf("summary.group_count = %d, want 2", got)
+	}
+
+	if len(queries.insertOutcomeCalls) != 3 {
+		t.Fatalf("InsertRecommendationOutcomeIfChanged call count = %d, want 3", len(queries.insertOutcomeCalls))
+	}
+}
+
+func TestHandleRecommendationsPerformanceModelsRejectsInvalidLimit(t *testing.T) {
+	app := newTestServerApp(t, &fakeReadQueries{})
+
+	resp := doRequest(t, app.app, "/recommendations/performance/models?limit=201")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("GET /recommendations/performance/models invalid limit status = %d, want 400", resp.StatusCode)
+	}
+	assertContains(t, readBody(t, resp), "expected integer in [1,200]")
 }
 
 func TestHandleRecommendationsCalibrationRejectsInvalidBucketCount(t *testing.T) {

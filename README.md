@@ -81,6 +81,11 @@ The repository is still early-stage. What exists today:
   - `GET /recommendations/calibration/alerts`
   - `GET /recommendations/calibration/alerts/history`
 - append-only recommendation calibration alert run persistence with deterministic rolling trend windows
+- execution layer foundations for paper mode:
+  - `POST /execution/place`
+  - `GET /execution/bets`
+  - idempotent placement orchestration, audit trail persistence, and settlement/CLV capture
+- automated paper workers for recommendation auto-placement and auto-settlement
 
 What is built now:
 
@@ -91,11 +96,12 @@ What is built now:
 - deduplicated market snapshots
 - minimal Fiber operational views for health and current odds
 - sport-aware registry and active-season polling policy
-- recommendation-only calibration/drift observability with append-only historical alert runs
+- recommendation calibration/drift observability with append-only historical alert runs
+- paper-mode execution loop (recommendation -> placement -> settlement) with exactly-once controls
 
-The current open build step is Phase 4 decision-engine implementation (`P4-007` onward), with execution still deferred.
+The current open build step is Phase 5 sustained paper-mode validation (`P5-006`): runbook validation, monitoring review cadence, and threshold tuning under paper traffic.
 
-Recommendation mode is now available through `GET /recommendations` for ranked bet suggestions. This flow is recommendation-only and does not invoke live placement adapters.
+Recommendation mode is available through `GET /recommendations` for ranked bet suggestions. Live real-money execution is still deferred; paper-mode placement and settlement automation are active.
 
 Recommendation performance monitoring is now available through `GET /recommendations/performance` for CLV/outcome audit rows plus aggregate operator summary metrics.
 

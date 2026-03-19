@@ -34,7 +34,22 @@ func (a *App) handleBetsPage(c fiber.Ctx) error {
 	}
 
 	betRows := make([]map[string]any, 0, len(bets))
+	settlementLagCount := 0
+	nowUTC := time.Now().UTC()
 	for _, b := range bets {
+		snapshotRef := "—"
+		if b.SnapshotID != nil {
+			snapshotRef = strconv.FormatInt(*b.SnapshotID, 10)
+		}
+		placementSource := "manual"
+		if strings.EqualFold(b.AdapterName, "manual") {
+			placementSource = "manual"
+		} else if b.SnapshotID != nil {
+			placementSource = "recommendation"
+			if strings.EqualFold(b.AdapterName, "paper") {
+				placementSource = "paper-auto"
+			}
+		}
 		row := map[string]any{
 			"ID":               b.ID,
 			"Sport":            b.Sport,
@@ -50,6 +65,9 @@ func (a *App) handleBetsPage(c fiber.Ctx) error {
 			"PayoutDollars":    "—",
 			"PnLDollars":       "—",
 			"PlacedAt":         formatTimestamp(b.PlacedAt, "—"),
+			"SnapshotRef":      snapshotRef,
+			"PlacementSource":  placementSource,
+			"AdapterName":      b.AdapterName,
 		}
 		if b.SettlementResult != nil {
 			row["SettlementResult"] = *b.SettlementResult
@@ -57,6 +75,9 @@ func (a *App) handleBetsPage(c fiber.Ctx) error {
 		if b.PayoutCents != nil {
 			row["PayoutDollars"] = formatCents(*b.PayoutCents)
 			row["PnLDollars"] = formatCentsSigned(*b.PayoutCents - b.StakeCents)
+		}
+		if b.Status == "placed" && b.CommenceTime.Valid && b.CommenceTime.Time.UTC().Before(nowUTC) {
+			settlementLagCount++
 		}
 		betRows = append(betRows, row)
 	}
@@ -81,6 +102,7 @@ func (a *App) handleBetsPage(c fiber.Ctx) error {
 		"OpenBets":           pnl.OpenBets,
 		"SettledBets":        pnl.SettledBets,
 		"VoidedBets":         pnl.VoidedBets,
+		"SettlementLagCount": settlementLagCount,
 		"TotalStaked":        formatCents(pnl.TotalStakedCents),
 		"TotalReturned":      formatCents(pnl.TotalReturnedCents),
 		"NetPnL":             formatCentsSigned(int64(pnl.NetPnlCents)),
