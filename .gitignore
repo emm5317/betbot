@@ -9,3 +9,6 @@ __pycache__/
 /.gomodcache/
 *.exe
 .gitnexus
+/artifacts/
+/data/
+/Betbot_Obsidian/
