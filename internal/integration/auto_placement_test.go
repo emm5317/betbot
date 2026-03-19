@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"betbot/internal/execution/adapters/paper"
 	"betbot/internal/store"
 	"betbot/internal/worker"
 
@@ -64,6 +65,7 @@ func TestAutoPlacementWorkerIdempotentAcrossReruns(t *testing.T) {
 	placementWorker := worker.NewAutoPlacementWorker(
 		pool,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		paper.New(),
 	)
 	job := &river.Job[worker.AutoPlacementArgs]{
 		Args: worker.AutoPlacementArgs{RequestedAt: time.Now().UTC()},

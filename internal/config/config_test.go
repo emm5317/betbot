@@ -17,6 +17,9 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("BETBOT_DAILY_LOSS_STOP", "")
 	t.Setenv("BETBOT_WEEKLY_LOSS_STOP", "")
 	t.Setenv("BETBOT_DRAWDOWN_BREAKER", "")
+	t.Setenv("BETBOT_PAPER_MODE", "")
+	t.Setenv("BETBOT_EXECUTION_ADAPTER", "")
+	t.Setenv("BETBOT_AUTO_PLACEMENT_ENABLED", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -82,9 +85,59 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.DrawdownBreaker != defaultDrawdownBreaker {
 		t.Fatalf("DrawdownBreaker = %.3f, want %.3f", cfg.DrawdownBreaker, defaultDrawdownBreaker)
 	}
+	if !cfg.PaperMode {
+		t.Fatalf("PaperMode = %t, want true", cfg.PaperMode)
+	}
+	if cfg.ExecutionAdapter != defaultExecutionAdapter {
+		t.Fatalf("ExecutionAdapter = %q, want %q", cfg.ExecutionAdapter, defaultExecutionAdapter)
+	}
+	if !cfg.AutoPlacementEnabled {
+		t.Fatalf("AutoPlacementEnabled = %t, want true", cfg.AutoPlacementEnabled)
+	}
 
 	if len(cfg.OddsAPISports) != 4 {
 		t.Fatalf("OddsAPISports len = %d, want 4", len(cfg.OddsAPISports))
+	}
+}
+
+func TestLoadExecutionAdapterLiveModeDefaultsAutoPlacementOff(t *testing.T) {
+	t.Setenv("BETBOT_PAPER_MODE", "false")
+	t.Setenv("BETBOT_EXECUTION_ADAPTER", "pinnacle")
+	t.Setenv("BETBOT_AUTO_PLACEMENT_ENABLED", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.ExecutionAdapter != "pinnacle" {
+		t.Fatalf("ExecutionAdapter = %q, want %q", cfg.ExecutionAdapter, "pinnacle")
+	}
+	if cfg.AutoPlacementEnabled {
+		t.Fatalf("AutoPlacementEnabled = %t, want false", cfg.AutoPlacementEnabled)
+	}
+}
+
+func TestLoadExecutionAdapterInvalidCombinations(t *testing.T) {
+	t.Setenv("BETBOT_PAPER_MODE", "false")
+	t.Setenv("BETBOT_EXECUTION_ADAPTER", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() expected error when live mode has no execution adapter")
+	}
+
+	t.Setenv("BETBOT_EXECUTION_ADAPTER", "paper")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() expected error when live mode uses paper adapter")
+	}
+
+	t.Setenv("BETBOT_PAPER_MODE", "true")
+	t.Setenv("BETBOT_EXECUTION_ADAPTER", "draftkings")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() expected error when paper mode uses live adapter")
+	}
+
+	t.Setenv("BETBOT_EXECUTION_ADAPTER", "unknown-book")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() expected error for unknown execution adapter")
 	}
 }
 
@@ -280,6 +333,55 @@ func TestOddsPollingRuntime(t *testing.T) {
 			}
 			if reason != tc.reason {
 				t.Fatalf("OddsPollingRuntime() reason = %q, want %q", reason, tc.reason)
+			}
+		})
+	}
+}
+
+func TestAutoPlacementRuntime(t *testing.T) {
+	testCases := []struct {
+		name    string
+		cfg     Config
+		enabled bool
+		reason  string
+	}{
+		{
+			name: "paper mode default enabled",
+			cfg: Config{
+				PaperMode:            true,
+				AutoPlacementEnabled: true,
+			},
+			enabled: true,
+			reason:  "",
+		},
+		{
+			name: "paper mode disabled by config",
+			cfg: Config{
+				PaperMode:            true,
+				AutoPlacementEnabled: false,
+			},
+			enabled: false,
+			reason:  "disabled-by-config",
+		},
+		{
+			name: "live mode defaults disabled",
+			cfg: Config{
+				PaperMode:            false,
+				AutoPlacementEnabled: false,
+			},
+			enabled: false,
+			reason:  "disabled-in-live-mode",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			enabled, reason := tc.cfg.AutoPlacementRuntime()
+			if enabled != tc.enabled {
+				t.Fatalf("AutoPlacementRuntime() enabled = %t, want %t", enabled, tc.enabled)
+			}
+			if reason != tc.reason {
+				t.Fatalf("AutoPlacementRuntime() reason = %q, want %q", reason, tc.reason)
 			}
 		})
 	}

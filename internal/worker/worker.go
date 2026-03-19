@@ -8,6 +8,7 @@ import (
 
 	"betbot/internal/config"
 	"betbot/internal/domain"
+	executionadapters "betbot/internal/execution/adapters"
 	"betbot/internal/ingestion/injuries"
 	"betbot/internal/ingestion/oddspoller"
 	"betbot/internal/ingestion/scores"
@@ -88,12 +89,14 @@ func (w *OddsPollWorker) Work(ctx context.Context, job *river.Job[OddsPollArgs])
 }
 
 type App struct {
-	cfg                      config.Config
-	logger                   *slog.Logger
-	pool                     interface{ Close() }
-	client                   *river.Client[pgx.Tx]
-	oddsPollingEnabled       bool
-	oddsPollingDisableReason string
+	cfg                        config.Config
+	logger                     *slog.Logger
+	pool                       interface{ Close() }
+	client                     *river.Client[pgx.Tx]
+	oddsPollingEnabled         bool
+	oddsPollingDisableReason   string
+	autoPlacementEnabled       bool
+	autoPlacementDisableReason string
 }
 
 func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -115,6 +118,7 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 
 	sportRegistry := domain.DefaultSportRegistry()
 	oddsPollingEnabled, oddsPollingDisableReason := cfg.OddsPollingRuntime()
+	autoPlacementEnabled, autoPlacementDisableReason := cfg.AutoPlacementRuntime()
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &OddsPollWorker{
 		poller:         oddspoller.NewPoller(cfg, logger, pool),
@@ -129,13 +133,22 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	river.AddWorker(workers, NewInjurySyncWorker(pool, logger, injuries.NewRotowireProvider("", 0)))
 	river.AddWorker(workers, NewWeatherSyncWorker(pool, logger, weather.NewOpenMeteoProvider("", 0)))
 	river.AddWorker(workers, NewPredictionWorker(pool, logger))
-	river.AddWorker(workers, NewAutoPlacementWorker(pool, logger))
 	river.AddWorker(workers, NewAutoSettlementWorker(
 		pool,
 		logger,
 		scores.NewClient(cfg.OddsAPIKey, cfg.OddsAPIBaseURL, cfg.OddsAPITimeout, cfg.OddsAPIRateLimit),
 		cfg.OddsAPISource,
 	))
+	if autoPlacementEnabled {
+		adapter, err := executionadapters.NewBookAdapter(cfg.ExecutionAdapter)
+		if err != nil {
+			pool.Close()
+			return nil, fmt.Errorf("configure auto placement adapter: %w", err)
+		}
+		river.AddWorker(workers, NewAutoPlacementWorker(pool, logger, adapter))
+	} else {
+		logger.Info("auto placement disabled", slog.String("reason", autoPlacementDisableReason))
+	}
 
 	periodicJobs := []*river.PeriodicJob{}
 	if oddsPollingEnabled {
@@ -183,17 +196,19 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		),
 	)
 
-	periodicJobs = append(periodicJobs,
-		river.NewPeriodicJob(
-			river.PeriodicInterval(autoPlacementInterval),
-			func() (river.JobArgs, *river.InsertOpts) {
-				return AutoPlacementArgs{
-					RequestedAt: time.Now().UTC(),
-				}, nil
-			},
-			&river.PeriodicJobOpts{ID: "auto-placement", RunOnStart: true},
-		),
-	)
+	if autoPlacementEnabled {
+		periodicJobs = append(periodicJobs,
+			river.NewPeriodicJob(
+				river.PeriodicInterval(autoPlacementInterval),
+				func() (river.JobArgs, *river.InsertOpts) {
+					return AutoPlacementArgs{
+						RequestedAt: time.Now().UTC(),
+					}, nil
+				},
+				&river.PeriodicJobOpts{ID: "auto-placement", RunOnStart: true},
+			),
+		)
+	}
 
 	client, err := river.NewClient(driver, &river.Config{
 		Logger: logger,
@@ -212,12 +227,14 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	}
 
 	return &App{
-		cfg:                      cfg,
-		logger:                   logger,
-		pool:                     pool,
-		client:                   client,
-		oddsPollingEnabled:       oddsPollingEnabled,
-		oddsPollingDisableReason: oddsPollingDisableReason,
+		cfg:                        cfg,
+		logger:                     logger,
+		pool:                       pool,
+		client:                     client,
+		oddsPollingEnabled:         oddsPollingEnabled,
+		oddsPollingDisableReason:   oddsPollingDisableReason,
+		autoPlacementEnabled:       autoPlacementEnabled,
+		autoPlacementDisableReason: autoPlacementDisableReason,
 	}, nil
 }
 
@@ -269,6 +286,9 @@ func (a *App) Run(ctx context.Context) error {
 	attrs := []any{
 		slog.Duration("poll_interval", a.cfg.OddsAPIPollInterval),
 		slog.Bool("odds_polling_enabled", a.oddsPollingEnabled),
+		slog.Bool("auto_placement_enabled", a.autoPlacementEnabled),
+		slog.String("execution_adapter", a.cfg.ExecutionAdapter),
+		slog.Bool("paper_mode", a.cfg.PaperMode),
 	}
 	if !a.oddsPollingEnabled {
 		reason := a.oddsPollingDisableReason
@@ -276,6 +296,13 @@ func (a *App) Run(ctx context.Context) error {
 			reason = "disabled"
 		}
 		attrs = append(attrs, slog.String("odds_polling_disabled_reason", reason))
+	}
+	if !a.autoPlacementEnabled {
+		reason := a.autoPlacementDisableReason
+		if reason == "" {
+			reason = "disabled"
+		}
+		attrs = append(attrs, slog.String("auto_placement_disabled_reason", reason))
 	}
 	a.logger.Info("betbot worker started", attrs...)
 	<-ctx.Done()

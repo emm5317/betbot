@@ -2,7 +2,7 @@
 
 Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸️ DEFERRED`
 
-**Last updated:** 2026-03-16
+**Last updated:** 2026-03-18
 **Current phase:** Phase 4 — Decision Engine
 
 ---
@@ -48,6 +48,7 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Manual bet tracking now includes automatic settlement: a River periodic worker (`auto_settlement`) runs every 30 minutes, fetches completed game scores from The Odds API, settles matching open `h2h` bets deterministically, and writes settlement ledger entries via shared execution settlement/audit helpers (done 2026-03-15).
 - Free-source MLB historical import path is now scaffolded for 2025-first replay: local XLSX odds import (`scripts/import_historical_odds.py`), MLB-StatsAPI outcomes import (`scripts/import_game_results.py`), normalized scraper CSV wrapper (`scripts/import_scraped_odds.py`), and pybaseball team/pitcher stat importer (`scripts/import_mlb_features_pybaseball.py`) (done 2026-03-16).
 - Odds-mode backtest replay now joins latest final `game_results` when available and emits explicit `outcome_calibration` metrics plus per-row actual-score fields in `outcomes.csv` artifacts (done 2026-03-16).
+- Execution runtime guardrails now require explicit adapter selection (`BETBOT_EXECUTION_ADAPTER`) and disable auto-placement by default when `BETBOT_PAPER_MODE=false`, so live rollout starts fail-closed and manual-first (done 2026-03-18).
 
 The current implementation target is Phase 5 sustained paper-mode validation — recommendation→placement→settlement is now automated in paper mode, and remaining work is sustained validation and operational hardening.
 

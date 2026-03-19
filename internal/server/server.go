@@ -9,7 +9,7 @@ import (
 
 	"betbot/internal/config"
 	"betbot/internal/execution"
-	"betbot/internal/execution/adapters/paper"
+	executionadapters "betbot/internal/execution/adapters"
 	"betbot/internal/prediction"
 	"betbot/internal/store"
 
@@ -82,10 +82,11 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 	})
 
 	oddsPollingEnabled, oddsPollingDisabledReason := cfg.OddsPollingRuntime()
-
-	var adapter execution.BookAdapter
-	adapter = paper.New()
-	// TODO: wire live adapters when PaperMode is false
+	adapter, err := executionadapters.NewBookAdapter(cfg.ExecutionAdapter)
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("configure execution adapter: %w", err)
+	}
 
 	instance := &App{
 		app:                       app,

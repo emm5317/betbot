@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"betbot/internal/execution"
-	"betbot/internal/execution/adapters/paper"
 	"betbot/internal/store"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -50,7 +49,7 @@ type AutoPlacementWorker struct {
 	placementOrchestrator autoPlacementOrchestrator
 }
 
-func NewAutoPlacementWorker(pool *pgxpool.Pool, logger *slog.Logger) *AutoPlacementWorker {
+func NewAutoPlacementWorker(pool *pgxpool.Pool, logger *slog.Logger, adapter execution.BookAdapter) *AutoPlacementWorker {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -59,9 +58,9 @@ func NewAutoPlacementWorker(pool *pgxpool.Pool, logger *slog.Logger) *AutoPlacem
 		logger: logger,
 		pool:   pool,
 	}
-	if pool != nil {
+	if pool != nil && adapter != nil {
 		worker.readQueries = store.New(pool)
-		worker.placementOrchestrator = execution.NewPlacementOrchestrator(pool, paper.New())
+		worker.placementOrchestrator = execution.NewPlacementOrchestrator(pool, adapter)
 	}
 
 	return worker

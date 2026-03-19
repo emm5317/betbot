@@ -54,3 +54,10 @@ func TestOddsPollWorkerSkipsWhenDisabled(t *testing.T) {
 		t.Fatalf("Work() error = %v, want nil", err)
 	}
 }
+
+func TestNewAutoPlacementWorkerLeavesOrchestratorNilWithoutAdapter(t *testing.T) {
+	worker := NewAutoPlacementWorker(nil, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	if worker.placementOrchestrator != nil {
+		t.Fatal("placementOrchestrator != nil, want nil when adapter is absent")
+	}
+}

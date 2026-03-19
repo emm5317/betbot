@@ -42,6 +42,12 @@ const (
 	defaultDailyLossStop                      = 0.05
 	defaultWeeklyLossStop                     = 0.10
 	defaultDrawdownBreaker                    = 0.15
+	executionAdapterPaper                     = "paper"
+	executionAdapterDraftKings                = "draftkings"
+	executionAdapterFanDuel                   = "fanduel"
+	executionAdapterBetMGM                    = "betmgm"
+	executionAdapterPinnacle                  = "pinnacle"
+	defaultExecutionAdapter                   = executionAdapterPaper
 	oddsAPIKeyPlaceholder                     = "TODO_SET_BETBOT_ODDS_API_KEY"
 )
 
@@ -79,6 +85,8 @@ type Config struct {
 	WeeklyLossStop                     float64
 	DrawdownBreaker                    float64
 	PaperMode                          bool
+	ExecutionAdapter                   string
+	AutoPlacementEnabled               bool
 }
 
 func Load() (Config, error) {
@@ -158,6 +166,14 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	executionAdapter, err := resolveExecutionAdapter(paperMode)
+	if err != nil {
+		return Config{}, err
+	}
+	autoPlacementEnabled, err := getBool("BETBOT_AUTO_PLACEMENT_ENABLED", paperMode)
+	if err != nil {
+		return Config{}, err
+	}
 	maxConns, err := getInt32("BETBOT_DB_MAX_CONNS", defaultDBMaxConns)
 	if err != nil {
 		return Config{}, err
@@ -201,6 +217,8 @@ func Load() (Config, error) {
 		WeeklyLossStop:                     weeklyLossStop,
 		DrawdownBreaker:                    drawdownBreaker,
 		PaperMode:                          paperMode,
+		ExecutionAdapter:                   executionAdapter,
+		AutoPlacementEnabled:               autoPlacementEnabled,
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -250,8 +268,51 @@ func (c Config) OddsPollingRuntime() (bool, string) {
 	return true, ""
 }
 
+func (c Config) AutoPlacementRuntime() (bool, string) {
+	if c.AutoPlacementEnabled {
+		return true, ""
+	}
+	if c.PaperMode {
+		return false, "disabled-by-config"
+	}
+	return false, "disabled-in-live-mode"
+}
+
 func IsUnresolvedOddsAPIKey(apiKey string) bool {
 	return strings.EqualFold(strings.TrimSpace(apiKey), oddsAPIKeyPlaceholder)
+}
+
+func resolveExecutionAdapter(paperMode bool) (string, error) {
+	value := NormalizeExecutionAdapter(os.Getenv("BETBOT_EXECUTION_ADAPTER"))
+	if value == "" {
+		if paperMode {
+			return defaultExecutionAdapter, nil
+		}
+		return "", errors.New("BETBOT_EXECUTION_ADAPTER must be set when BETBOT_PAPER_MODE=false")
+	}
+	if !isSupportedExecutionAdapter(value) {
+		return "", fmt.Errorf("BETBOT_EXECUTION_ADAPTER must be one of paper, draftkings, fanduel, betmgm, pinnacle")
+	}
+	if paperMode && value != executionAdapterPaper {
+		return "", errors.New("BETBOT_EXECUTION_ADAPTER must be \"paper\" when BETBOT_PAPER_MODE=true")
+	}
+	if !paperMode && value == executionAdapterPaper {
+		return "", errors.New("BETBOT_EXECUTION_ADAPTER must be a live adapter when BETBOT_PAPER_MODE=false")
+	}
+	return value, nil
+}
+
+func NormalizeExecutionAdapter(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func isSupportedExecutionAdapter(value string) bool {
+	switch NormalizeExecutionAdapter(value) {
+	case executionAdapterPaper, executionAdapterDraftKings, executionAdapterFanDuel, executionAdapterBetMGM, executionAdapterPinnacle:
+		return true
+	default:
+		return false
+	}
 }
 
 func getenv(key string, fallback string) string {

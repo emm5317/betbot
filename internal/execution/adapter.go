@@ -2,7 +2,16 @@ package execution
 
 import (
 	"context"
+	"strings"
 	"time"
+)
+
+const (
+	AdapterPaper      = "paper"
+	AdapterDraftKings = "draftkings"
+	AdapterFanDuel    = "fanduel"
+	AdapterBetMGM     = "betmgm"
+	AdapterPinnacle   = "pinnacle"
 )
 
 // BookAdapter is the interface that all sportsbook adapters must implement.
@@ -43,4 +52,17 @@ type BetStatusResponse struct {
 	Status        string // "pending", "accepted", "settled", "cancelled"
 	Result        string // "win", "loss", "push" — only set when settled
 	PayoutCents   int64  // only set when settled
+}
+
+func NormalizeAdapterName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func IsSupportedAdapter(name string) bool {
+	switch NormalizeAdapterName(name) {
+	case AdapterPaper, AdapterDraftKings, AdapterFanDuel, AdapterBetMGM, AdapterPinnacle:
+		return true
+	default:
+		return false
+	}
 }

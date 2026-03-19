@@ -86,6 +86,7 @@ The repository is still early-stage. What exists today:
   - `GET /execution/bets`
   - idempotent placement orchestration, audit trail persistence, and settlement/CLV capture
 - automated paper workers for recommendation auto-placement and auto-settlement
+- execution runtime now uses explicit adapter selection via `BETBOT_EXECUTION_ADAPTER`; `BETBOT_PAPER_MODE=false` requires a non-paper adapter and defaults `BETBOT_AUTO_PLACEMENT_ENABLED=false` for conservative live rollout
 
 What is built now:
 
@@ -390,6 +391,9 @@ Global env overrides for recommendation sizing are optional:
 - `BETBOT_DAILY_LOSS_STOP` in `[0,1]` (default `0.05`)
 - `BETBOT_WEEKLY_LOSS_STOP` in `[0,1]` (default `0.10`)
 - `BETBOT_DRAWDOWN_BREAKER` in `[0,1]` (default `0.15`)
+- `BETBOT_PAPER_MODE` toggles paper vs live execution posture (default `true`)
+- `BETBOT_EXECUTION_ADAPTER` selects the execution adapter; defaults to `paper` in paper mode and must be explicitly set to a live adapter when `BETBOT_PAPER_MODE=false`
+- `BETBOT_AUTO_PLACEMENT_ENABLED` controls the recommendation auto-placement worker; defaults to `true` in paper mode and `false` in live mode
 
 When sizing overrides are unset/zero, the decision layer uses sport-specific baseline sizing policy values (MLB/NBA/NHL/NFL). Correlation guard settings use the deterministic global defaults shown above.
 
