@@ -39,6 +39,7 @@ type readQueries interface {
 	GetRecommendationSnapshotByID(ctx context.Context, id int64) (store.RecommendationSnapshot, error)
 	ListBetsByStatus(ctx context.Context, arg store.ListBetsByStatusParams) ([]store.ListBetsByStatusRow, error)
 	ListOpenBets(ctx context.Context) ([]store.ListOpenBetsRow, error)
+	ListOpenBetsWithGame(ctx context.Context) ([]store.ListOpenBetsWithGameRow, error)
 	GetBetByIdempotencyKey(ctx context.Context, idempotencyKey string) (store.GetBetByIdempotencyKeyRow, error)
 	GetBetByID(ctx context.Context, id int64) (store.GetBetByIDRow, error)
 	InsertManualBet(ctx context.Context, arg store.InsertManualBetParams) (store.InsertManualBetRow, error)
@@ -153,6 +154,8 @@ func (a *App) routes() {
 	a.app.Get("/partials/topbar-status", a.handlePartialTopbarStatus)
 	a.app.Get("/partials/pipeline-status", a.handlePartialPipelineStatus)
 	a.app.Get("/partials/odds-table", a.handlePartialOddsTable)
+	a.app.Get("/partials/home-recommendations", a.handlePartialHomeRecommendations)
+	a.app.Get("/partials/home-open-bets", a.handlePartialHomeOpenBets)
 
 	a.app.Post("/predictions/run", a.handlePredictionsRun)
 
@@ -170,29 +173,7 @@ func (a *App) routes() {
 }
 
 func (a *App) handleHome(c fiber.Ctx) error {
-	sportFilter, filterErr := resolveSportFilter(c.Query("sport"))
-	pipeline, overallStatus := a.pipelineView(c.Context(), sportFilter)
-
-	view := map[string]any{
-		"Title":         "betbot",
-		"ActiveNav":     "home",
-		"OverallStatus": overallStatus,
-		"Environment":   a.cfg.Env,
-		"WorkerStatus":  overallStatus,
-		"Pipeline":      pipeline,
-		"Status":        overallStatus,
-		"PageStatus":    overallStatus,
-	}
-	applySportFilterView(view, "/", sportFilter)
-	if filterErr != nil {
-		view["Alert"] = map[string]any{
-			"Title":   "Invalid sport filter",
-			"Message": filterErr.Error(),
-		}
-		return c.Status(fiber.StatusBadRequest).Render("pages/home", view, "layouts/base")
-	}
-
-	return c.Render("pages/home", view, "layouts/base")
+	return a.renderHome(c)
 }
 
 func (a *App) handleOdds(c fiber.Ctx) error {
@@ -200,7 +181,7 @@ func (a *App) handleOdds(c fiber.Ctx) error {
 	_, overallStatus := a.pipelineView(c.Context(), sportFilter)
 
 	view := map[string]any{
-		"Title":         "Latest Odds",
+		"Title":         "Market Board",
 		"ActiveNav":     "odds",
 		"OverallStatus": overallStatus,
 		"Environment":   a.cfg.Env,
@@ -234,8 +215,8 @@ func (a *App) handlePipelineHealth(c fiber.Ctx) error {
 	pipeline, overallStatus := a.pipelineView(c.Context(), sportFilter)
 
 	view := map[string]any{
-		"Title":         "Pipeline Health",
-		"ActiveNav":     "pipeline",
+		"Title":         "System Pulse",
+		"ActiveNav":     "system",
 		"OverallStatus": overallStatus,
 		"Environment":   a.cfg.Env,
 		"Pipeline":      pipeline,

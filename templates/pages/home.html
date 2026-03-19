@@ -1,93 +1,127 @@
 {{template "partials/alert_banner" .}}
 
-<section class="hero-panel">
-    <div class="hero-panel__copy">
-        <p class="eyebrow">Data Foundation Vertical Slice</p>
-        <h2>Operational visibility before model complexity.</h2>
-        <p class="hero-panel__lede">
-            Keep signal high: ingest odds, persist snapshots, and surface drift fast enough for operator action.
-        </p>
+<section class="hero">
+    <div class="hero__copy">
+        <p class="eyebrow">{{or .SelectedSportLabel "All sports"}} scope</p>
+        <h2>{{or .HeroTitle "Game-day decisions without admin-tool drag"}}</h2>
+        <p class="hero__lede">{{or .HeroLede "Recommendations, bankroll posture, open positions, and near-term games in one calm surface."}}</p>
     </div>
 
-    <div class="hero-panel__stack">
-        <div class="stat-card stat-card--accent">
-            <span class="stat-card__label">Runtime</span>
-            <strong class="stat-card__value">{{or .Environment .Env "development"}}</strong>
-            <span class="stat-card__hint">Go 1.25 baseline</span>
-        </div>
-        <div class="stat-card">
-            <span class="stat-card__label">Data Source</span>
-            <strong class="stat-card__value">The Odds API</strong>
-            <span class="stat-card__hint">append-only odds archive</span>
-        </div>
-        <div class="stat-card">
-            <span class="stat-card__label">Worker Posture</span>
-            <strong class="stat-card__value">{{or .WorkerStatus .Status "warming"}}</strong>
-            <span class="stat-card__hint">River-backed polling</span>
-        </div>
-    </div>
-</section>
-
-<section class="content-grid">
-    <article class="panel">
-        <div class="panel__header">
-            <div>
-                <p class="eyebrow">Mission</p>
-                <h3>What this UI should answer quickly</h3>
-            </div>
-        </div>
-        <div class="checklist">
-            <div class="checklist__item">
-                <strong>Is the service actually ready?</strong>
-                <p>Database reachability and worker health should be visible on one screen.</p>
-            </div>
-            <div class="checklist__item">
-                <strong>Are odds being captured right now?</strong>
-                <p>Book, market, and capture time should be readable without log-scraping.</p>
-            </div>
-            <div class="checklist__item">
-                <strong>Did the latest poll run cleanly?</strong>
-                <p>Insert counts, dedup skips, and errors should be obvious at a glance.</p>
-            </div>
-        </div>
-    </article>
-
-    <article class="panel panel--tall">
-        <div class="panel__header panel__header--dense">
-            <div>
-                <p class="eyebrow">Pipeline Snapshot</p>
-                <h3>Current ingestion posture</h3>
-            </div>
-            <a class="text-link" href="/pipeline/health{{.SelectedSportQuery}}">Open full pipeline view</a>
-        </div>
+    <div class="hero__controls">
         {{template "partials/sport_filter" .}}
-        {{template "partials/pipeline_status_block" .}}
-    </article>
+    </div>
+
+    <div class="hero__stats">
+        <article class="metric-card metric-card--accent">
+            <span class="metric-card__label">Live recommendations</span>
+            <strong class="metric-card__value">{{.HeroRecommendationCount}}</strong>
+            <span class="metric-card__hint">current decision rail</span>
+        </article>
+        <article class="metric-card">
+            <span class="metric-card__label">Open bets</span>
+            <strong class="metric-card__value">{{.HeroOpenBetsCount}}</strong>
+            <span class="metric-card__hint">positions still working</span>
+        </article>
+        <article class="metric-card">
+            <span class="metric-card__label">Open exposure</span>
+            <strong class="metric-card__value">{{.HeroExposure}}</strong>
+            <span class="metric-card__hint">capital currently in play</span>
+        </article>
+        <article class="metric-card">
+            <span class="metric-card__label">Balance</span>
+            <strong class="metric-card__value">{{.HeroBalance}}</strong>
+            <span class="metric-card__hint">ledger-backed bankroll</span>
+        </article>
+    </div>
 </section>
 
-<section class="panel">
-    <div class="panel__header">
-        <div>
-            <p class="eyebrow">Phase 1 Surface</p>
-            <h3>Minimal operator routes</h3>
-        </div>
+<section class="home-grid">
+    <div class="home-grid__main">
+        <section class="panel panel--feature">
+            <div class="panel__header panel__header--stacked">
+                <div>
+                    <p class="eyebrow">Decision Rail</p>
+                    <h3>Recommended looks right now</h3>
+                </div>
+                <p class="panel__lede">Built for calm scanning: edge, stake, bankroll posture, and immediate action without flipping into another tool.</p>
+            </div>
+            {{template "partials/home_recommendations_block" .}}
+        </section>
     </div>
 
-    <div class="route-grid">
-        <a class="route-card" href="/{{.SelectedSportQuery}}">
-            <span class="route-card__path">GET /</span>
-            <strong>Overview</strong>
-            <p>High-signal summary of environment, status, and pipeline posture.</p>
-        </a>
-        <a class="route-card" href="/odds{{.SelectedSportQuery}}">
-            <span class="route-card__path">GET /odds</span>
-            <strong>Latest odds</strong>
-            <p>Persisted latest-market view for operators, not a live scraped widget.</p>
-        </a>
-        <a class="route-card" href="/pipeline/health{{.SelectedSportQuery}}">
-            <span class="route-card__path">GET /pipeline/health</span>
-            <strong>Pipeline health</strong>
-            <p>Last successful poll, insert counts, and error visibility from stored data.</p>
-        </a>
-    </div>
+    <aside class="home-grid__side">
+        <section class="panel panel--side">
+            <div class="panel__header">
+                <div>
+                    <p class="eyebrow">Bankroll Pulse</p>
+                    <h3>Current posture</h3>
+                </div>
+            </div>
+            {{if .BankrollError}}
+            <p class="empty-state">{{.BankrollError}}</p>
+            {{else}}
+            <div class="stack-list stack-list--compact">
+                <div class="stack-row"><span>Balance</span><strong>{{.BankrollBalance}}</strong></div>
+                <div class="stack-row"><span>Open exposure</span><strong>{{.BankrollOpenExposure}}</strong></div>
+                <div class="stack-row"><span>Net P&amp;L</span><strong>{{.BankrollNetPnL}}</strong></div>
+                <div class="stack-row"><span>Open bets</span><strong>{{.BankrollOpenBets}}</strong></div>
+                <div class="stack-row"><span>Settled bets</span><strong>{{.BankrollSettledBets}}</strong></div>
+            </div>
+            <div class="panel__actions">
+                <a class="button button--primary" href="/bankroll">Open bankroll</a>
+                <a class="button button--ghost" href="/bets">See all bets</a>
+            </div>
+            {{end}}
+        </section>
+
+        <section class="panel panel--side panel--quiet">
+            <div class="panel__header">
+                <div>
+                    <p class="eyebrow">Upcoming Slate</p>
+                    <h3>What needs attention soon</h3>
+                </div>
+            </div>
+            {{if .UpcomingGamesError}}
+            <p class="empty-state">{{.UpcomingGamesError}}</p>
+            {{else if .UpcomingGames}}
+            <div class="stack-list">
+                {{range .UpcomingGames}}
+                <article class="slate-card">
+                    <div>
+                        <p class="slate-card__meta">{{.Sport}} · <span class="timestamp" data-timestamp="{{.CommenceTime}}">{{.CommenceTime}}</span></p>
+                        <h4>{{.Matchup}}</h4>
+                    </div>
+                    <span class="tone-chip tone-chip--{{.ReasonTone}}">{{.Reason}}</span>
+                </article>
+                {{end}}
+            </div>
+            {{else}}
+            <p class="empty-state">No near-term games in the current scope.</p>
+            {{end}}
+        </section>
+    </aside>
+</section>
+
+<section class="home-grid home-grid--lower">
+    <section class="panel">
+        <div class="panel__header panel__header--stacked">
+            <div>
+                <p class="eyebrow">Open Positions</p>
+                <h3>Bets already in the market</h3>
+            </div>
+            <p class="panel__lede">Current exposure and placement context, tuned for an always-open screen.</p>
+        </div>
+        {{template "partials/home_open_bets_block" .}}
+    </section>
+
+    <section class="panel panel--quiet">
+        <div class="panel__header panel__header--stacked">
+            <div>
+                <p class="eyebrow">System Read</p>
+                <h3>Market and ingestion freshness</h3>
+            </div>
+            <p class="panel__lede">Visible, but no longer the center of the product.</p>
+        </div>
+        {{template "partials/pipeline_status_block" .}}
+    </section>
 </section>

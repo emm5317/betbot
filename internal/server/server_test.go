@@ -26,6 +26,12 @@ type fakeReadQueries struct {
 	listLatestOddsRows             []store.ListLatestOddsRow
 	listLatestOddsErr              error
 	listLatestOddsCalls            []store.ListLatestOddsParams
+	listOpenBetsWithGameRows       []store.ListOpenBetsWithGameRow
+	listOpenBetsWithGameErr        error
+	upcomingGames                  []store.Game
+	upcomingGamesErr               error
+	betPnLSummary                  store.GetBetPnLSummaryRow
+	betPnLSummaryErr               error
 	listPerformanceRows            []store.ListRecommendationPerformanceSnapshotsRow
 	listPerformanceRowsByRange     map[string][]store.ListRecommendationPerformanceSnapshotsRow
 	listPerformanceErr             error
@@ -201,6 +207,13 @@ func (f *fakeReadQueries) ListOpenBets(_ context.Context) ([]store.ListOpenBetsR
 	return nil, nil
 }
 
+func (f *fakeReadQueries) ListOpenBetsWithGame(_ context.Context) ([]store.ListOpenBetsWithGameRow, error) {
+	if f.listOpenBetsWithGameErr != nil {
+		return nil, f.listOpenBetsWithGameErr
+	}
+	return f.listOpenBetsWithGameRows, nil
+}
+
 func (f *fakeReadQueries) GetBetByIdempotencyKey(_ context.Context, _ string) (store.GetBetByIdempotencyKeyRow, error) {
 	return store.GetBetByIdempotencyKeyRow{}, pgx.ErrNoRows
 }
@@ -218,7 +231,10 @@ func (f *fakeReadQueries) ListBetsWithFilters(_ context.Context, _ store.ListBet
 }
 
 func (f *fakeReadQueries) GetBetPnLSummary(_ context.Context, _ string) (store.GetBetPnLSummaryRow, error) {
-	return store.GetBetPnLSummaryRow{}, nil
+	if f.betPnLSummaryErr != nil {
+		return store.GetBetPnLSummaryRow{}, f.betPnLSummaryErr
+	}
+	return f.betPnLSummary, nil
 }
 
 func (f *fakeReadQueries) VoidBet(_ context.Context, _ int64) error {
@@ -238,7 +254,10 @@ func (f *fakeReadQueries) UpdateBetSettled(_ context.Context, _ store.UpdateBetS
 }
 
 func (f *fakeReadQueries) ListUpcomingGames(_ context.Context, _ int32) ([]store.Game, error) {
-	return nil, nil
+	if f.upcomingGamesErr != nil {
+		return nil, f.upcomingGamesErr
+	}
+	return f.upcomingGames, nil
 }
 
 func (f *fakeReadQueries) GetGameByID(_ context.Context, _ int64) (store.Game, error) {
@@ -443,7 +462,150 @@ func TestOverviewPageContainsHTMXRefreshTargets(t *testing.T) {
 	}
 	body := readBody(t, resp)
 	assertContains(t, body, "/partials/topbar-status?sport=basketball_nba")
-	assertContains(t, body, "/partials/pipeline-status?sport=basketball_nba")
+	assertContains(t, body, "/partials/home-recommendations?sport=basketball_nba")
+	assertContains(t, body, "/partials/home-open-bets?sport=basketball_nba")
+}
+
+func TestHandleHomeBuildsReadOnlyRecommendationsWithoutSnapshotInserts(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 100000,
+		betPnLSummary: store.GetBetPnLSummaryRow{
+			OpenBets:    1,
+			SettledBets: 2,
+			NetPnlCents: 1500,
+		},
+		upcomingGames: []store.Game{
+			{
+				ID:           42,
+				Sport:        "MLB",
+				HomeTeam:     "Boston Red Sox",
+				AwayTeam:     "New York Yankees",
+				CommenceTime: store.Timestamptz(time.Date(2026, time.March, 18, 23, 0, 0, 0, time.UTC)),
+			},
+		},
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{
+					ID:                   1,
+					GameID:               42,
+					Sport:                "MLB",
+					MarketKey:            "h2h",
+					PredictedProbability: 0.58,
+					MarketProbability:    0.52,
+					EventTime:            store.Timestamptz(time.Date(2026, time.March, 18, 23, 0, 0, 0, time.UTC)),
+				},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 42, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 42, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -120},
+		},
+		listOpenBetsWithGameRows: []store.ListOpenBetsWithGameRow{
+			{
+				ID:              91,
+				GameID:          42,
+				Sport:           "MLB",
+				GameSport:       "MLB",
+				HomeTeam:        "Boston Red Sox",
+				AwayTeam:        "New York Yankees",
+				RecommendedSide: "home",
+				BookKey:         "book-a",
+				AmericanOdds:    110,
+				StakeCents:      2500,
+				CreatedAt:       store.Timestamptz(time.Date(2026, time.March, 18, 20, 0, 0, 0, time.UTC)),
+			},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/?sport=baseball_mlb")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /?sport=baseball_mlb status = %d, want 200", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "Recommended looks right now")
+	assertContains(t, body, "Boston Red Sox vs New York Yankees")
+	assertContains(t, body, "/bets/new?")
+	if len(queries.insertSnapshotCalls) != 0 {
+		t.Fatalf("snapshot inserts = %d, want 0 for read-only home recommendations", len(queries.insertSnapshotCalls))
+	}
+}
+
+func TestPartialHomeRecommendationsRespectsSportFilterAndDoesNotPersist(t *testing.T) {
+	queries := &fakeReadQueries{
+		bankrollBalanceCents: 100000,
+		upcomingGames: []store.Game{
+			{ID: 42, Sport: "MLB", HomeTeam: "Boston Red Sox", AwayTeam: "New York Yankees", CommenceTime: store.Timestamptz(time.Date(2026, time.March, 18, 23, 0, 0, 0, time.UTC))},
+		},
+		modelPredictionsBySport: map[string][]store.ModelPrediction{
+			"MLB": {
+				{ID: 1, GameID: 42, Sport: "MLB", MarketKey: "h2h", PredictedProbability: 0.58, MarketProbability: 0.52, EventTime: store.Timestamptz(time.Date(2026, time.March, 18, 23, 0, 0, 0, time.UTC))},
+			},
+		},
+		listLatestOddsRows: []store.ListLatestOddsRow{
+			{GameID: 42, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "home", PriceAmerican: 110},
+			{GameID: 42, BookKey: "book-a", BookName: "book-a", MarketKey: "h2h", OutcomeSide: "away", PriceAmerican: -120},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/partials/home-recommendations?sport=baseball_mlb")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /partials/home-recommendations status = %d, want 200", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "id=\"home-recommendations-block\"")
+	assertContains(t, body, "Boston Red Sox vs New York Yankees")
+	if len(queries.modelPredictionsCalls) != 1 || queries.modelPredictionsCalls[0].Sport != "MLB" {
+		t.Fatalf("model predictions calls = %+v, want one MLB call", queries.modelPredictionsCalls)
+	}
+	if len(queries.insertSnapshotCalls) != 0 {
+		t.Fatalf("snapshot inserts = %d, want 0 for read-only partial", len(queries.insertSnapshotCalls))
+	}
+}
+
+func TestPartialHomeOpenBetsRespectsSportFilter(t *testing.T) {
+	queries := &fakeReadQueries{
+		listOpenBetsWithGameRows: []store.ListOpenBetsWithGameRow{
+			{
+				ID:              91,
+				GameID:          42,
+				Sport:           "MLB",
+				GameSport:       "MLB",
+				HomeTeam:        "Boston Red Sox",
+				AwayTeam:        "New York Yankees",
+				RecommendedSide: "home",
+				BookKey:         "book-a",
+				AmericanOdds:    110,
+				StakeCents:      2500,
+				CreatedAt:       store.Timestamptz(time.Date(2026, time.March, 18, 20, 0, 0, 0, time.UTC)),
+			},
+			{
+				ID:              92,
+				GameID:          43,
+				Sport:           "NBA",
+				GameSport:       "NBA",
+				HomeTeam:        "Chicago Bulls",
+				AwayTeam:        "Boston Celtics",
+				RecommendedSide: "away",
+				BookKey:         "book-b",
+				AmericanOdds:    -120,
+				StakeCents:      1800,
+				CreatedAt:       store.Timestamptz(time.Date(2026, time.March, 18, 18, 0, 0, 0, time.UTC)),
+			},
+		},
+	}
+	app := newTestServerApp(t, queries)
+
+	resp := doRequest(t, app.app, "/partials/home-open-bets?sport=baseball_mlb")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /partials/home-open-bets status = %d, want 200", resp.StatusCode)
+	}
+	body := readBody(t, resp)
+	assertContains(t, body, "Boston Red Sox vs New York Yankees")
+	if strings.Contains(body, "Chicago Bulls vs Boston Celtics") {
+		t.Fatalf("response unexpectedly contains filtered-out NBA bet: %q", body)
+	}
 }
 
 func TestOddsPageContainsHTMXRefreshTargets(t *testing.T) {

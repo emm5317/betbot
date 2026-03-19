@@ -152,6 +152,38 @@ func (a *App) handleBetsNewPage(c fiber.Ctx) error {
 		}
 	}
 
+	if view["SnapshotID"] == nil {
+		if gameIDStr := strings.TrimSpace(c.Query("game_id")); gameIDStr != "" {
+			if gameID, err := strconv.ParseInt(gameIDStr, 10, 64); err == nil {
+				view["PrefilledGameID"] = gameID
+			}
+		}
+		if sport := strings.TrimSpace(c.Query("sport")); sport != "" {
+			view["PrefilledSport"] = sport
+		}
+		if side := strings.TrimSpace(c.Query("side")); side != "" {
+			view["PrefilledSide"] = side
+		}
+		if book := strings.TrimSpace(c.Query("book_key")); book != "" {
+			view["PrefilledBook"] = book
+		}
+		if odds := strings.TrimSpace(c.Query("american_odds")); odds != "" {
+			view["PrefilledOdds"] = odds
+		}
+		if stake := strings.TrimSpace(c.Query("stake_dollars")); stake != "" {
+			view["PrefilledStakeDollars"] = stake
+		}
+		if edge := strings.TrimSpace(c.Query("edge")); edge != "" {
+			view["PrefilledEdge"] = edge
+		}
+		if modelProb := strings.TrimSpace(c.Query("model_prob")); modelProb != "" {
+			view["PrefilledModelProb"] = modelProb
+		}
+		if gameLabel := strings.TrimSpace(c.Query("game_label")); gameLabel != "" {
+			view["PrefilledGameLabel"] = gameLabel
+		}
+	}
+
 	// Load upcoming games for the dropdown
 	games, err := a.queries.ListUpcomingGames(c.Context(), 100)
 	if err != nil {

@@ -1,8 +1,3 @@
-{{$query := or .SelectedSportQuery ""}}
-<div id="pipeline-status-block"
-     class="live-fragment"
-     hx-get="{{printf "/partials/pipeline-status%s" $query}}"
-     hx-trigger="load, every 30s"
-     hx-swap="outerHTML">
+<div id="pipeline-status-block" class="pipeline-grid live-fragment">
     {{template "partials/pipeline_status" .}}
 </div>

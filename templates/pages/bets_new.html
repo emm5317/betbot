@@ -1,35 +1,34 @@
-<div class="page-header">
+{{template "partials/alert_banner" .}}
+
+<section class="page-hero page-hero--compact">
     <div>
-        <p class="eyebrow">Manual Tracking</p>
-        <h2>Record a Bet</h2>
+        <p class="eyebrow">Record Bet</p>
+        <h2>Capture a new position</h2>
+        <p class="page-hero__lede">Use recommendation context when it exists, but keep manual entry direct and fast.</p>
     </div>
-    <a class="filter-form__clear" href="/bets">Back to Ledger</a>
-</div>
+    <a class="button button--ghost" href="/bets">Back to bets</a>
+</section>
 
 {{if .PrefilledEdge}}
-<div class="detail-strip" style="margin-bottom:8px;">
-    <div>
-        <span class="detail-strip__label">Recommendation</span>
-        <span>Snapshot #{{.SnapshotID}}</span>
+<section class="panel panel--quiet">
+    <div class="detail-grid detail-grid--full">
+        <div><span class="detail-grid__label">Recommendation</span><strong>{{or .PrefilledGameLabel (printf "Snapshot #%v" .SnapshotID)}}</strong></div>
+        <div><span class="detail-grid__label">Model edge</span><strong>{{.PrefilledEdge}}</strong></div>
+        <div><span class="detail-grid__label">Model probability</span><strong>{{.PrefilledModelProb}}</strong></div>
+        <div><span class="detail-grid__label">Suggested stake</span><strong>{{.PrefilledStakeDollars}}</strong></div>
     </div>
-    <div>
-        <span class="detail-strip__label">Model Edge</span>
-        <span>{{.PrefilledEdge}}</span>
-    </div>
-    <div>
-        <span class="detail-strip__label">Model Prob</span>
-        <span>{{.PrefilledModelProb}}</span>
-    </div>
-    <div>
-        <span class="detail-strip__label">Suggested Stake</span>
-        <span>{{.PrefilledStakeDollars}}</span>
-    </div>
-</div>
+</section>
 {{end}}
 
-<div class="panel" x-data="payoutCalc()">
-    <h3>Bet Details</h3>
-    <form method="post" action="/bets" class="bet-form" style="margin-top:14px;">
+<section class="panel" x-data="payoutCalc()">
+    <div class="panel__header">
+        <div>
+            <p class="eyebrow">Entry Form</p>
+            <h3>Bet details</h3>
+        </div>
+    </div>
+
+    <form method="post" action="/bets" class="entry-form">
         {{if .SnapshotID}}
         <input type="hidden" name="snapshot_id" value="{{.SnapshotID}}">
         {{end}}
@@ -47,8 +46,7 @@
 
             <div class="form-group">
                 <label class="form-label" for="sport">Sport</label>
-                <input type="text" name="sport" id="sport" class="form-input" required readonly
-                    value="{{if .PrefilledSport}}{{.PrefilledSport}}{{end}}">
+                <input type="text" name="sport" id="sport" class="form-input" required readonly value="{{if .PrefilledSport}}{{.PrefilledSport}}{{end}}">
             </div>
 
             <div class="form-group">
@@ -63,39 +61,34 @@
 
             <div class="form-group">
                 <label class="form-label" for="book_key">Book</label>
-                <input type="text" name="book_key" id="book_key" class="form-input" required
-                    placeholder="e.g. draftkings" value="{{.PrefilledBook}}">
+                <input type="text" name="book_key" id="book_key" class="form-input" required placeholder="draftkings" value="{{.PrefilledBook}}">
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="american_odds">American Odds</label>
-                <input type="number" name="american_odds" id="american_odds" class="form-input" required
-                    placeholder="-110" x-model="odds" x-on:input="calc()"
-                    {{if .PrefilledOdds}}value="{{.PrefilledOdds}}"{{end}}>
+                <label class="form-label" for="american_odds">American odds</label>
+                <input type="number" name="american_odds" id="american_odds" class="form-input" required placeholder="-110" x-model="odds" x-on:input="calc()" {{if .PrefilledOdds}}value="{{.PrefilledOdds}}"{{end}}>
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="stake_dollars">Stake ($)</label>
-                <input type="number" name="stake_dollars" id="stake_dollars" class="form-input" required
-                    step="0.01" min="0.01" placeholder="25.00" x-model="stake" x-on:input="calc()"
-                    {{if .PrefilledStakeDollars}}value="{{.PrefilledStakeDollars}}"{{end}}>
+                <label class="form-label" for="stake_dollars">Stake</label>
+                <input type="number" name="stake_dollars" id="stake_dollars" class="form-input" required step="0.01" min="0.01" placeholder="25.00" x-model="stake" x-on:input="calc()" {{if .PrefilledStakeDollars}}value="{{.PrefilledStakeDollars}}"{{end}}>
             </div>
         </div>
 
-        <div class="payout-preview" x-show="potentialWin > 0" x-cloak>
-            <span class="detail-strip__label">Potential Payout</span>
-            <span class="stat-card__value" style="color:var(--ok);" x-text="'$' + potentialWin.toFixed(2)"></span>
+        <div class="preview-card" x-show="potentialWin > 0" x-cloak>
+            <span class="detail-grid__label">Potential payout</span>
+            <strong class="preview-card__value" x-text="'$' + potentialWin.toFixed(2)"></strong>
             <span class="muted" x-text="'Profit: $' + potentialProfit.toFixed(2)"></span>
         </div>
 
-        <div class="form-group" style="margin-top:14px;">
-            <label class="form-label" for="notes">Notes (optional)</label>
-            <textarea name="notes" id="notes" class="form-input form-textarea" rows="2" placeholder="Any context about this bet..."></textarea>
+        <div class="form-group">
+            <label class="form-label" for="notes">Notes</label>
+            <textarea name="notes" id="notes" class="form-input form-textarea" rows="3" placeholder="Optional context about this ticket"></textarea>
         </div>
 
-        <div class="form-actions">
-            <button type="submit" class="filter-form__submit">Record Bet</button>
-            <a href="/bets" class="filter-form__clear">Cancel</a>
+        <div class="panel__actions">
+            <button type="submit" class="button button--primary">Record bet</button>
+            <a href="/bets" class="button button--ghost">Cancel</a>
         </div>
     </form>
-</div>
+</section>

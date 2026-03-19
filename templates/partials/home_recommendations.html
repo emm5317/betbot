@@ -1,0 +1,44 @@
+{{if .RecommendationsError}}
+<p class="empty-state">{{.RecommendationsError}}</p>
+{{else if .Recommendations}}
+<div class="recommendation-rail">
+    {{range .Recommendations}}
+    <article class="recommendation-card">
+        <div class="recommendation-card__header">
+            <div>
+                <p class="recommendation-card__meta">{{.Sport}} · {{.Market}} · <span class="timestamp" data-timestamp="{{.EventTime}}">{{.EventTime}}</span></p>
+                <h4>{{.Matchup}}</h4>
+            </div>
+            <span class="tone-chip tone-chip--accent">{{.RecommendedSide}}</span>
+        </div>
+
+        <div class="stat-strip">
+            <div><span class="stat-strip__label">Edge</span><strong>{{.Edge}}</strong></div>
+            <div><span class="stat-strip__label">Stake</span><strong>{{.SuggestedStake}}</strong></div>
+            <div><span class="stat-strip__label">Book</span><strong>{{.BestBook}}</strong></div>
+            <div><span class="stat-strip__label">Odds</span><strong>{{.BestAmericanOdds}}</strong></div>
+        </div>
+
+        <div class="detail-grid">
+            <div><span class="detail-grid__label">Model probability</span><strong>{{.ModelProbability}}</strong></div>
+            <div><span class="detail-grid__label">Market probability</span><strong>{{.MarketProbability}}</strong></div>
+            <div><span class="detail-grid__label">Stake fraction</span><strong>{{.StakeFraction}}</strong></div>
+            <div><span class="detail-grid__label">Sizing note</span><strong>{{.BookNote}}</strong></div>
+        </div>
+
+        <p class="micro-copy">{{.SizingReasons}}</p>
+
+        <div class="panel__actions">
+            {{if .CanRecord}}
+            <a class="button button--primary" href="{{.PrefillURL}}">Record this bet</a>
+            {{else}}
+            <span class="button button--disabled">Stake unavailable</span>
+            {{end}}
+            <a class="button button--ghost" href="/odds{{$.SelectedSportQuery}}">Check market board</a>
+        </div>
+    </article>
+    {{end}}
+</div>
+{{else}}
+<p class="empty-state">No qualified recommendations in the current scope.</p>
+{{end}}

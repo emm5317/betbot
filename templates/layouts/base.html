@@ -4,40 +4,48 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{if .Title}}{{.Title}} · {{end}}betbot</title>
-    <meta name="description" content="betbot operational surface for Phase 1 odds ingestion and pipeline visibility.">
+    <meta name="description" content="betbot game-day dashboard for recommendations, bankroll posture, and active positions.">
     <link rel="stylesheet" href="/static/css/app.css">
     <script defer src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
     <script defer src="/static/js/app.js"></script>
 </head>
 <body>
-    <a class="skip-link" href="#workspace">Skip to workspace</a>
-    <div class="app-shell">
-        <div class="chrome">
-            <header class="topbar">
-                <div class="topbar__brand">
-                    <a class="brand-mark" href="/">bb</a>
-                    <div>
-                        <p class="eyebrow">Ops UI v1</p>
-                        <h1 class="brand-title">betbot</h1>
-                    </div>
+    <a class="skip-link" href="#workspace">Skip to content</a>
+
+    <div class="app-shell" id="app-shell">
+        <header class="topbar">
+            <div class="topbar__brand">
+                <a class="brand-mark" href="/">BB</a>
+                <div>
+                    <p class="eyebrow">Game Day Surface</p>
+                    <h1 class="brand-title">betbot</h1>
                 </div>
+            </div>
 
-                <nav class="topbar__nav" aria-label="Primary">
-                    <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/{{.SelectedSportQuery}}">Overview</a>
-                    <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds{{.SelectedSportQuery}}">Odds</a>
-                    <a class="nav-link {{if eq .ActiveNav "pipeline"}}is-active{{end}}" href="/pipeline/health{{.SelectedSportQuery}}">Pipeline</a>
-                    <a class="nav-link {{if eq .ActiveNav "bets"}}is-active{{end}}" href="/bets">Bets</a>
-                    <a class="nav-link {{if eq .ActiveNav "bankroll"}}is-active{{end}}" href="/bankroll">Bankroll</a>
-                </nav>
+            <nav class="topbar__nav"
+                 aria-label="Primary"
+                 hx-boost="true"
+                 hx-target="#app-shell"
+                 hx-select="#app-shell"
+                 hx-swap="outerHTML transition:true"
+                 hx-push-url="true">
+                <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/{{.SelectedSportQuery}}">Game Day</a>
+                <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds{{.SelectedSportQuery}}">Market</a>
+                <a class="nav-link {{if eq .ActiveNav "bets"}}is-active{{end}}" href="/bets">Bets</a>
+                <a class="nav-link {{if eq .ActiveNav "bankroll"}}is-active{{end}}" href="/bankroll">Bankroll</a>
+                <a class="nav-link {{if eq .ActiveNav "system"}}is-active{{end}}" href="/pipeline/health{{.SelectedSportQuery}}">System</a>
+            </nav>
 
+            <div class="topbar__actions">
+                <a class="button button--ghost" href="/bets/new">Record Bet</a>
                 {{template "partials/topbar_status" .}}
-            </header>
+            </div>
+        </header>
 
-            <main id="workspace" class="workspace">
-                {{embed}}
-            </main>
-        </div>
+        <main id="workspace" class="workspace">
+            {{embed}}
+        </main>
     </div>
 </body>
 </html>

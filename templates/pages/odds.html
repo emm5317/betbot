@@ -1,27 +1,21 @@
 {{template "partials/alert_banner" .}}
 
-<section class="page-header">
+<section class="page-hero page-hero--compact">
     <div>
-        <p class="eyebrow">Odds Archive</p>
-        <h2>Latest persisted market view</h2>
-        <p class="page-header__lede">
-            Read from storage only. This table is the current persisted snapshot of market rows.
-        </p>
+        <p class="eyebrow">Market Board</p>
+        <h2>Latest persisted prices</h2>
+        <p class="page-hero__lede">Stored quotes only. This page stays simple: scope, price, and capture time.</p>
     </div>
-    <div class="page-header__meta">
-        <span class="runtime-chip">stored data only</span>
-        <span class="runtime-chip">scope: {{or .SelectedSportLabel "All sports"}}</span>
-    </div>
+    {{template "partials/sport_filter" .}}
 </section>
 
 <section class="panel">
-    <div class="panel__header panel__header--dense">
+    <div class="panel__header">
         <div>
-            <p class="eyebrow">Operational Read</p>
-            <h3>Book and market rows</h3>
-            <span class="panel__caption">Auto-refreshes every 25s with current scope.</span>
+            <p class="eyebrow">Live Table</p>
+            <h3>Current market rows</h3>
         </div>
-        {{template "partials/sport_filter" .}}
+        <p class="panel__lede">Auto-refreshes every 25 seconds with the current scope.</p>
     </div>
     {{template "partials/odds_table_block" .}}
 </section>

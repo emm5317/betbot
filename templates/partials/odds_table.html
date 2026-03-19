@@ -1,5 +1,5 @@
 <div class="table-shell" role="region" aria-label="Latest odds table" tabindex="0">
-    <table class="data-table data-table--dense">
+    <table class="data-table">
         <thead>
             <tr>
                 <th scope="col">Sport</th>
@@ -15,26 +15,20 @@
         <tbody>
             {{with .OddsRows}}
                 {{range .}}
-                    <tr>
-                        <td>{{or .Sport .SportKey "n/a"}}</td>
-                        <td>
-                            <strong>{{or .AwayTeam .Visitor "Away"}}</strong>
-                            <span class="muted">at</span>
-                            <strong>{{or .HomeTeam .Home "Home"}}</strong>
-                        </td>
-                        <td>{{or .Book .BookKey .Bookmaker "n/a"}}</td>
-                        <td>{{or .Market .MarketKey "n/a"}}</td>
-                        <td>{{or .Outcome .Selection .Side "n/a"}}</td>
-                        <td>{{if .Point}}{{.Point}}{{else}}-{{end}}</td>
-                        <td>{{if .PriceAmerican}}{{.PriceAmerican}}{{else if .Price}}{{.Price}}{{else}}-{{end}}</td>
-                        <td class="timestamp" data-timestamp="{{or .CapturedAt .LastSeenAt}}">{{or .CapturedAt .LastSeenAt "-"}}</td>
-                    </tr>
+                <tr>
+                    <td>{{or .Sport .SportKey "n/a"}}</td>
+                    <td><strong>{{or .AwayTeam .Visitor "Away"}}</strong> <span class="muted">at</span> <strong>{{or .HomeTeam .Home "Home"}}</strong></td>
+                    <td>{{or .Book .BookKey .Bookmaker "n/a"}}</td>
+                    <td>{{or .Market .MarketKey "n/a"}}</td>
+                    <td>{{or .Outcome .Selection .Side "n/a"}}</td>
+                    <td>{{if .Point}}{{.Point}}{{else}}-{{end}}</td>
+                    <td class="data-table__mono">{{if .PriceAmerican}}{{.PriceAmerican}}{{else if .Price}}{{.Price}}{{else}}-{{end}}</td>
+                    <td class="timestamp" data-timestamp="{{or .CapturedAt .LastSeenAt}}">{{or .CapturedAt .LastSeenAt "-"}}</td>
+                </tr>
                 {{end}}
             {{else}}
                 <tr>
-                    <td colspan="8" class="empty-state">
-                        No persisted odds rows are available yet. Once the poller lands snapshots, the latest markets appear here.
-                    </td>
+                    <td colspan="8" class="empty-state">No persisted odds rows are available yet.</td>
                 </tr>
             {{end}}
         </tbody>

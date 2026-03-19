@@ -1,0 +1,33 @@
+{{if .OpenBetsError}}
+<p class="empty-state">{{.OpenBetsError}}</p>
+{{else if .OpenBets}}
+<div class="position-list">
+    {{range .OpenBets}}
+    <article class="position-card">
+        <div class="position-card__header">
+            <div>
+                <p class="position-card__meta">{{.Sport}} · {{.Source}} · ticket {{.ID}}</p>
+                <h4>{{.Matchup}}</h4>
+            </div>
+            <span class="tone-chip tone-chip--{{.StateTone}}">{{.State}}</span>
+        </div>
+
+        <div class="stat-strip">
+            <div><span class="stat-strip__label">Side</span><strong>{{.Side}}</strong></div>
+            <div><span class="stat-strip__label">Stake</span><strong>{{.Stake}}</strong></div>
+            <div><span class="stat-strip__label">Book</span><strong>{{.BookKey}}</strong></div>
+            <div><span class="stat-strip__label">Odds</span><strong>{{.AmericanOdds}}</strong></div>
+        </div>
+
+        <div class="detail-grid">
+            <div><span class="detail-grid__label">Placed</span><strong class="timestamp" data-timestamp="{{.PlacedAt}}">{{.PlacedAt}}</strong></div>
+            <div><span class="detail-grid__label">Exposure</span><strong>{{.Exposure}}</strong></div>
+            <div><span class="detail-grid__label">Snapshot</span><strong>{{.SnapshotID}}</strong></div>
+            <div><span class="detail-grid__label">Status</span><strong>{{.State}}</strong></div>
+        </div>
+    </article>
+    {{end}}
+</div>
+{{else}}
+<p class="empty-state">No open bets in the current scope.</p>
+{{end}}

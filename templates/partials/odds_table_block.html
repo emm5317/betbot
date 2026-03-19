@@ -1,7 +1,5 @@
-{{$query := or .SelectedSportQuery ""}}
-<div id="odds-table-block"
-     class="live-fragment"
-     hx-get="{{printf "/partials/odds-table%s" $query}}"
+<div id="odds-table-block" class="live-fragment"
+     hx-get="{{printf "/partials/odds-table%s" (or .SelectedSportQuery "")}}"
      hx-trigger="load, every 25s"
      hx-swap="outerHTML">
     {{template "partials/odds_table" .}}

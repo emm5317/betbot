@@ -38,13 +38,25 @@
         });
     };
 
+    const markLoading = (target, active) => {
+        if (!target || !target.classList) {
+            return;
+        }
+        target.classList.toggle('is-loading', active);
+    };
+
     const installHTMXHooks = () => {
         if (!window.htmx || !document.body) {
             return;
         }
 
+        document.body.addEventListener('htmx:beforeRequest', (event) => {
+            markLoading(event?.detail?.target, true);
+        });
+
         document.body.addEventListener('htmx:afterSwap', (event) => {
             if (event?.detail?.target) {
+                markLoading(event.detail.target, false);
                 syncTimestamps(event.detail.target);
             }
         });
@@ -54,6 +66,7 @@
             if (!target) {
                 return;
             }
+            markLoading(target, false);
             target.classList.add('live-fragment--error');
         });
     };
@@ -65,7 +78,6 @@
     });
 })();
 
-// Alpine.js payout calculator for bet entry form
 function payoutCalc() {
     return {
         odds: '',

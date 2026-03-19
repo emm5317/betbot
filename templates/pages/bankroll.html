@@ -1,29 +1,53 @@
-<div class="page-header">
+{{template "partials/alert_banner" .}}
+
+<section class="page-hero page-hero--compact">
     <div>
-        <p class="eyebrow">Bankroll Management</p>
-        <h2>Bankroll</h2>
+        <p class="eyebrow">Bankroll</p>
+        <h2>Ledger-backed capital</h2>
+        <p class="page-hero__lede">Simple visibility into balance and the entries that created it.</p>
     </div>
-</div>
+</section>
 
-<div class="status-grid" style="grid-template-columns: 1fr 1fr;">
-    <div class="stat-card stat-card--accent">
-        <span class="stat-card__label">Current Balance</span>
-        <span class="stat-card__value">{{.Balance}}</span>
-    </div>
+<section class="home-grid home-grid--lower">
+    <section class="panel panel--feature">
+        <div class="panel__header">
+            <div>
+                <p class="eyebrow">Current Balance</p>
+                <h3>{{.Balance}}</h3>
+            </div>
+        </div>
+        <div class="detail-grid detail-grid--full">
+            <div><span class="detail-grid__label">Ledger entries shown</span><strong>{{len .Entries}}</strong></div>
+            <div><span class="detail-grid__label">Currency</span><strong>USD</strong></div>
+        </div>
+    </section>
 
-    <div class="stat-card">
-        <span class="stat-card__label">Deposit Funds</span>
-        <form method="post" action="/bankroll/deposit" style="display:flex;gap:8px;align-items:flex-end;margin-top:8px;">
-            <input type="number" name="amount_dollars" class="form-input" step="0.01" min="0.01" placeholder="100.00" required style="max-width:160px;">
-            <button type="submit" class="filter-form__submit">Deposit</button>
+    <section class="panel panel--side">
+        <div class="panel__header">
+            <div>
+                <p class="eyebrow">Deposit Funds</p>
+                <h3>Add bankroll</h3>
+            </div>
+        </div>
+        <form method="post" action="/bankroll/deposit" class="entry-form entry-form--compact">
+            <label class="form-label" for="amount_dollars">Amount</label>
+            <div class="entry-form__inline">
+                <input type="number" name="amount_dollars" id="amount_dollars" class="form-input" step="0.01" min="0.01" placeholder="100.00" required>
+                <button type="submit" class="button button--primary">Deposit</button>
+            </div>
         </form>
-    </div>
-</div>
+    </section>
+</section>
 
-<div class="panel">
-    <h3>Ledger Entries</h3>
-    <div class="table-shell" style="margin-top:14px;">
-        <table class="data-table data-table--dense">
+<section class="panel">
+    <div class="panel__header">
+        <div>
+            <p class="eyebrow">Ledger</p>
+            <h3>Recent entries</h3>
+        </div>
+    </div>
+    <div class="table-shell">
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>Date</th>
@@ -37,26 +61,15 @@
                 {{range .Entries}}
                 <tr>
                     <td><span class="timestamp" data-timestamp="{{.CreatedAt}}">{{.CreatedAt}}</span></td>
-                    <td>
-                        {{if eq .EntryType "deposit"}}<span class="status-pill status-pill--ok">deposit</span>
-                        {{else if eq .EntryType "bet_stake_reserved"}}<span class="status-pill status-pill--warn">stake reserved</span>
-                        {{else if eq .EntryType "bet_stake_released"}}<span class="status-pill">stake released</span>
-                        {{else if eq .EntryType "bet_settlement_win"}}<span class="status-pill status-pill--ok">win</span>
-                        {{else if eq .EntryType "bet_settlement_loss"}}<span class="status-pill status-pill--degraded">loss</span>
-                        {{else if eq .EntryType "bet_settlement_push"}}<span class="status-pill">push</span>
-                        {{else}}<span class="status-pill">{{.EntryType}}</span>
-                        {{end}}
-                    </td>
-                    <td style="font-family:monospace;{{if .AmountPositive}}color:var(--ok);{{else}}color:var(--degraded);{{end}}">{{.AmountDollars}}</td>
-                    <td class="muted">{{.ReferenceType}}: {{.ReferenceID}}</td>
+                    <td><span class="subtle-chip">{{.EntryType}}</span></td>
+                    <td class="data-table__mono">{{.AmountDollars}}</td>
+                    <td>{{.ReferenceType}}: {{.ReferenceID}}</td>
                 </tr>
                 {{end}}
                 {{else}}
-                <tr>
-                    <td colspan="4" class="empty-state">No ledger entries yet. Deposit funds to get started.</td>
-                </tr>
+                <tr><td colspan="4" class="empty-state">No ledger entries yet.</td></tr>
                 {{end}}
             </tbody>
         </table>
     </div>
-</div>
+</section>
