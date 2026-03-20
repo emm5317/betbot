@@ -4,8 +4,6 @@ A quantitative sports betting system built in Go. betbot treats sports betting a
 
 Covers **MLB**, **NBA**, **NHL**, and **NFL** moneyline markets.
 
-![Game Day Hub](docs/screenshots/gameday.png)
-
 ---
 
 ## What It Does
