@@ -1,496 +1,249 @@
 # betbot
 
-Open-source sports betting infrastructure for `MLB`, `NBA`, `NHL`, and `NFL`.
+A quantitative sports betting system built in Go. betbot treats sports betting as trading: find mispriced probability, measure edge against the closing line, size positions with Kelly criterion, and enforce risk limits through circuit breakers.
 
-betbot is a sports betting bot and sports betting analytics platform built for developers who care about `odds tracking`, `closing line value (CLV)`, `expected value (EV)`, `backtesting`, `line shopping`, and `risk-managed bet automation`. The system is being built in Go with PostgreSQL, River, Fiber, and sqlc, with a clear bias toward measurable edge instead of hype.
+Covers **MLB**, **NBA**, **NHL**, and **NFL** moneyline markets.
 
-If you are looking for a `sports betting tracker`, `odds history database`, `CLV tracker`, `sports betting backtesting engine`, `Kelly Criterion bankroll manager`, or a serious open-source foundation for `MLB betting models`, `NBA betting models`, `NHL betting models`, and `NFL betting models`, this repository is aimed at that problem space.
+![Game Day Hub](docs/screenshots/gameday.png)
 
-## Why betbot
+---
 
-Most betting projects stop at picks, parlays, or dashboards. betbot is being built around a harder question:
+## What It Does
 
-How do you create a reproducible, measurable, open-source sports betting system that can:
+betbot is a five-layer pipeline:
 
-- ingest and archive odds continuously
-- compare model probability against market probability
-- measure edge with CLV instead of short-term win rate
-- backtest strategies against historical odds data
-- apply bankroll controls before any execution path exists
-- specialize deeply in the four highest-value North American leagues
+```
+Data Ingestion  ->  Postgres Data Store  ->  Modeling  ->  Decision Engine  ->  Execution
+```
 
-The design principle is simple:
+- **Ingestion** — Polls live odds from [The Odds API](https://the-odds-api.com/), normalizes across books, deduplicates unchanged snapshots, stores append-only to `odds_history`. Sport-specific stats ETL for team and player data.
+- **Modeling** — Sport-specific baseline models: pitcher matchups (MLB), lineup-adjusted net ratings (NBA), xG + goalie (NHL), EPA/DVOA situational (NFL). Feature builders produce stable vectors for prediction.
+- **Decision Engine** — EV thresholding, cross-book line shopping, fractional Kelly sizing, bankroll-aware stake capping, same-game correlation guards, and daily/weekly/drawdown circuit breakers.
+- **Execution** — Two-transaction exactly-once placement protocol with idempotency keys, ledger-backed stake reservation, and paper/live adapter abstraction.
+- **Monitoring** — CLV tracking, calibration by rank bucket, rolling drift alerts, and settlement accuracy verification.
 
-`measurement before modeling, modeling before execution`
+### Current Status
 
-## Supported Sports
+The system is in **paper-trading validation**. Odds polling, predictions, recommendations, and bet placement run end-to-end through a paper adapter. No real capital is at risk. The pipeline must pass sustained validation criteria before a live book adapter is enabled.
 
-betbot is intentionally specialized for:
+See [`docs/TRACKER.md`](docs/TRACKER.md) for detailed phase-by-phase progress.
 
-- `MLB`
-- `NBA`
-- `NHL`
-- `NFL`
+---
 
-This is not a generic all-sports repo. The architecture is reusable, but the product direction is focused on the leagues with the best mix of market depth, public data, and year-round operational value.
+## Dashboard
 
-## Core Concepts
+A game-day surface built with HTMX + Alpine.js on Go HTML templates.
 
-- `Odds ingestion`: poll sportsbooks and aggregators, normalize market data, and store a replayable odds history
-- `CLV tracking`: use closing line value as the primary truth signal for whether the process has real edge
-- `Expected value screening`: compare model probability to implied market probability
-- `Line shopping`: identify the best available number across books
-- `Backtesting`: replay historical odds and evaluate strategy quality before risking capital
-- `Bankroll management`: apply Kelly-style sizing, exposure controls, and drawdown discipline
-- `Sport-specific specialization`: separate data, features, and models for MLB, NBA, NHL, and NFL
+**Game Day Hub** — Recommendations, bankroll posture, open positions, and upcoming games. Click **Refresh Picks** to poll fresh odds and run predictions on demand. Click **Place Bet** on any qualified recommendation to place it through the paper adapter with full ledger tracking.
+
+**Market Board** — Latest persisted prices across books, auto-refreshing.
+
+![Market Board](docs/screenshots/market-board.png)
+
+**Bankroll** — Ledger-backed balance, deposit form, and entry history. Every state transition (reserve, release, settle) is an append-only ledger entry.
+
+![Bankroll](docs/screenshots/bankroll.png)
+
+---
 
 ## Tech Stack
 
-- `Go 1.25`
-- `PostgreSQL 17` target baseline
-- `pgxpool` for database pooling
-- `sqlc` for typed SQL access
-- `River` for background jobs and scheduling
-- `Fiber v3` for HTTP and operational views
-- `HTMX` and server-rendered templates for the UI surface
-- Python sidecar planned later for heavier ML workloads
+| Layer | Technology |
+|-------|-----------|
+| Language | Go 1.24 |
+| HTTP | [Fiber v3](https://github.com/gofiber/fiber) |
+| Database | PostgreSQL 17 |
+| SQL | [sqlc](https://github.com/sqlc-dev/sqlc) (generated, never hand-written) |
+| Job Queue | [River](https://github.com/riverqueue/river) |
+| Numerics | [gonum](https://github.com/gonum/gonum) |
+| Frontend | HTMX 2 + Alpine.js + DaisyUI 5 / Tailwind CSS 4 |
+| Driver | [pgx v5](https://github.com/jackc/pgx) |
 
-## Current Status
+---
 
-The repository is still early-stage. What exists today:
+## Project Structure
 
-- Go module and project scaffold
-- local Docker Compose runtime
-- Fiber operational server, River worker wiring, and PostgreSQL-backed Phase 1 slice
-- sqlc-generated store layer backing the current app code
-- Postgres-backed integration tests for dedup behavior and Phase 1 boot smoke
-- live `SportConfig` registry for MLB/NBA/NHL/NFL
-- worker scheduling that filters odds polling to sports active in the current season
-- documentation set aligned to the four-sport roadmap
-- manifest-backed `model_predictions` persistence with stable feature indexing
-- end-to-end backtest CLI replay that consumes stored odds snapshots, persists predictions, and emits deterministic artifacts
-- walk-forward validation plus unified CLV/calibration reporting in one pipeline output
-- NHL xG + goalie and NFL EPA/DVOA situational baseline model packages with unit test coverage
-- sport-specific Kelly baseline defaults (MLB/NBA/NHL/NFL) wired into replay stake recommendations and shared decision sizing
-- decision-engine EV threshold filter with sport-aware defaults and pass/fail gating for candidate evaluation
-- deterministic recommendation stake sizing with odds-aware Kelly math, hard cap enforcement, and ledger-backed bankroll availability gating
-- recommendation-only pull and monitoring API surface:
-  - `GET /recommendations`
-  - `GET /recommendations/performance`
-  - `GET /recommendations/calibration`
-  - `GET /recommendations/calibration/alerts`
-  - `GET /recommendations/calibration/alerts/history`
-- append-only recommendation calibration alert run persistence with deterministic rolling trend windows
-- execution layer foundations for paper mode:
-  - `POST /execution/place`
-  - `GET /execution/bets`
-  - idempotent placement orchestration, audit trail persistence, and settlement/CLV capture
-- automated paper workers for recommendation auto-placement and auto-settlement
-- execution runtime now uses explicit adapter selection via `BETBOT_EXECUTION_ADAPTER`; `BETBOT_PAPER_MODE=false` requires a non-paper adapter and defaults `BETBOT_AUTO_PLACEMENT_ENABLED=false` for conservative live rollout
-
-What is built now:
-
-- PostgreSQL 17 baseline
-- `pgxpool` and `sqlc`
-- River-backed odds polling
-- append-only `odds_history`
-- deduplicated market snapshots
-- minimal Fiber operational views for health and current odds
-- sport-aware registry and active-season polling policy
-- recommendation calibration/drift observability with append-only historical alert runs
-- paper-mode execution loop (recommendation -> placement -> settlement) with exactly-once controls
-
-The current open build step is Phase 5 sustained paper-mode validation (`P5-006`): runbook validation, monitoring review cadence, and threshold tuning under paper traffic.
-
-Recommendation mode is available through `GET /recommendations` for ranked bet suggestions. Live real-money execution is still deferred; paper-mode placement and settlement automation are active.
-
-Recommendation performance monitoring is now available through `GET /recommendations/performance` for CLV/outcome audit rows plus aggregate operator summary metrics.
-
-## Roadmap
-
-### Phase 1: Data Foundation Vertical Slice
-
-- Postgres 17 runtime baseline
-- `games`, `odds_history`, and `bankroll_ledger`
-- The Odds API client
-- River-backed `OddsPollJob`
-- odds normalization and deduplication
-- minimal Fiber health and odds views
-
-### Phase 2: Sport Foundation
-
-- `SportConfig` registry
-- sport-aware scheduling
-- sport-specific stat tables
-- lineup, injury, and weather ingestion
-- MLB/NBA/NHL/NFL ETL workers
-
-### Phase 3: Baseline Models and Backtesting
-
-- MLB pitcher matchup model
-- NBA lineup-adjusted rating model
-- NHL xG plus goalie model
-- NFL EPA/DVOA situational model
-- walk-forward replay engine
-- calibration and CLV reporting
-- sport-specific Kelly baseline defaults
-
-### Phase 4: Decision Engine
-
-- EV thresholding
-- line shopping
-- Kelly sizing
-- exposure controls
-- circuit breakers
-
-### Phase 5: Execution and Paper Validation
-
-- adapter interface
-- idempotency and audit flow
-- paper trading mode
-- settlement and CLV capture
-
-### Phase 6: Live Validation and Expansion
-
-- constrained live rollout
-- sharper line sources
-- richer props support
-- ML sidecar and Bayesian refinement
-
-## Architecture at a Glance
-
-```text
-Odds Sources -> Ingestion Workers -> PostgreSQL -> Models -> Decision Engine -> Execution
-                     |                  |
-                     |                  +-> Fiber operational views
-                     +-> River jobs
+```
+betbot/
+  cmd/
+    server/         HTTP service + dashboard
+    worker/         River background jobs
+    backtest/       CLI replay engine
+  internal/
+    domain/         Core types (Game, Odds, Bet, Bankroll, SportConfig)
+    ingestion/      Odds poller, stats ETL, scores client
+    modeling/       Sport-specific models + feature builders
+    prediction/     Live prediction bridge (offline models -> live recommendations)
+    decision/       Recommendations, sizing, correlation, circuit breakers
+    execution/      Placement orchestrator, book adapters, settlement, audit
+    store/          sqlc-generated queries (do not edit)
+  migrations/       Sequential SQL migrations (append-only)
+  sql/              sqlc query definitions (.sql files you edit)
+  templates/        Go HTML templates (HTMX partials)
+  static/           CSS, JS assets
+  docs/             Architecture, runbooks, validation queries
 ```
 
-Shared infrastructure:
+---
 
-- ingestion
-- storage
-- scheduling
-- observability
-- bankroll controls
+## Quickstart
 
-Sport-specific layers:
+### Prerequisites
 
-- ETL sources
-- feature engineering
-- model families
-- schedule and market heuristics
+- Go 1.24+
+- Docker (for PostgreSQL)
+- An API key from [The Odds API](https://the-odds-api.com/)
 
-## Planned Feature Areas
-
-- sports betting odds tracker
-- sportsbook line history archive
-- CLV dashboard
-- EV screening engine
-- bankroll ledger
-- backtesting CLI
-- sport-specific feature pipelines
-- paper trading workflow
-- operational alerts and runbooks
-
-## Quick Start
-
-The project is still under active build-out, but the local baseline is straightforward.
-
-### Requirements
-
-- Go `1.24+`
-- Docker and Docker Compose
-- PostgreSQL via the provided local stack
-
-### Local setup
+### Setup
 
 ```bash
-git clone <your-fork-or-repo-url>
-cd betbot
-docker compose -f deploy/docker/docker-compose.yml up -d --build
-go test ./...
+# Clone
+git clone https://github.com/emm5317/betbot.git && cd betbot
+
+# Create .env from template
+cp .env.example .env
+# Edit .env: set BETBOT_ODDS_API_KEY
+
+# Start PostgreSQL (standalone, port 25432)
+docker run -d --name betbot-postgres \
+  -e POSTGRES_DB=betbot \
+  -e POSTGRES_USER=betbot \
+  -e POSTGRES_PASSWORD=betbot-dev-password \
+  -p 25432:5432 \
+  postgres:17-alpine
+
+# Run migrations
+docker run --rm \
+  -v "$(pwd)/migrations:/migrations" \
+  --network host \
+  migrate/migrate \
+  -path=/migrations \
+  -database "postgres://betbot:betbot-dev-password@localhost:25432/betbot?sslmode=disable" \
+  up
+
+# Seed bankroll (paper money — $100,000)
+docker exec betbot-postgres psql -U betbot -d betbot \
+  -c "INSERT INTO bankroll_ledger (entry_type, amount_cents, currency, reference_type, reference_id, metadata) \
+      VALUES ('deposit', 10000000, 'USD', 'manual', 'initial-seed', '{}'::jsonb);"
+
+# Start the server
+BETBOT_DATABASE_URL="postgres://betbot:betbot-dev-password@127.0.0.1:25432/betbot?sslmode=disable" \
+BETBOT_ODDS_API_KEY="<your-key>" \
+BETBOT_ODDS_API_MARKETS=h2h,spreads,totals \
+BETBOT_ODDS_POLLING_ENABLED=false \
+BETBOT_HTTP_ADDR=:18080 \
+BETBOT_PAPER_MODE=true \
+go run cmd/server/main.go
 ```
 
+Open [http://localhost:18080](http://localhost:18080).
 
-Local compose runs odds polling in explicit disabled mode so health is deterministic without a real Odds API key:
+### Daily Workflow
+
+1. Open the dashboard
+2. Click **Refresh Picks** — pulls live odds from The Odds API and runs predictions
+3. Review the decision rail: edge, stake, book, odds for each recommendation
+4. Click **Place Bet** on the picks you want
+5. Open Positions updates with bankroll deduction
+
+---
+
+## API Endpoints
+
+### Pages
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/` | Game Day Hub |
+| `GET` | `/odds` | Market board |
+| `GET` | `/bets` | Bet ledger |
+| `GET` | `/bankroll` | Bankroll + ledger |
+| `GET` | `/pipeline/health` | System diagnostics |
+
+### Data & Actions
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/health` | Health check (JSON) |
+| `POST` | `/recommendations/refresh` | Poll odds + predict + build recommendations |
+| `GET` | `/recommendations` | Ranked recommendations (JSON) |
+| `GET` | `/recommendations/performance` | CLV and outcome metrics |
+| `GET` | `/recommendations/calibration` | Calibration by rank bucket |
+| `GET` | `/recommendations/calibration/alerts` | Drift alerts (point-in-time or rolling) |
+| `GET` | `/recommendations/calibration/alerts/history` | Append-only drift run history |
+| `POST` | `/execution/place` | Place a bet (JSON API) |
+| `POST` | `/partials/place-bet` | Place a bet (HTMX, from dashboard) |
+| `GET` | `/execution/bets` | List placed bets |
+| `POST` | `/predictions/run` | Trigger predictions manually |
+
+All pages accept an optional `?sport=` filter (`baseball_mlb`, `basketball_nba`, `icehockey_nhl`, `americanfootball_nfl`).
+
+---
+
+## Configuration
+
+Key environment variables (see [`.env.example`](.env.example) for the full list):
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `BETBOT_DATABASE_URL` | Postgres connection string | required |
+| `BETBOT_ODDS_API_KEY` | [The Odds API](https://the-odds-api.com/) key | required |
+| `BETBOT_PAPER_MODE` | Paper trading (no real money) | `true` |
+| `BETBOT_EV_THRESHOLD` | Minimum EV edge to recommend | `0.02` |
+| `BETBOT_KELLY_FRACTION` | Fractional Kelly override (`0` = sport defaults) | `0` |
+| `BETBOT_DAILY_LOSS_STOP` | Daily loss halt threshold | `0.05` |
+| `BETBOT_WEEKLY_LOSS_STOP` | Weekly loss halt threshold | `0.10` |
+| `BETBOT_DRAWDOWN_BREAKER` | Peak drawdown halt threshold | `0.15` |
+| `BETBOT_ODDS_POLLING_ENABLED` | Automatic odds polling | `false` |
+| `BETBOT_AUTO_PLACEMENT_ENABLED` | Automatic bet placement | `false` |
+| `BETBOT_EXECUTION_ADAPTER` | Book adapter (`paper`, `draftkings`, etc.) | `paper` |
+
+---
+
+## Key Design Decisions
+
+**CLV as primary metric.** Win/loss over small samples is noise. The system tracks whether recommendations consistently beat the closing line.
+
+**Append-only financial ledger.** Bankroll balance is computed from `bankroll_ledger` entries, never stored as a mutable field. Every stake reservation, release, and settlement is immutable.
+
+**Two-transaction placement.** Tx1 inserts a pending bet and reserves stake in the ledger. The book adapter call happens outside any transaction. Tx2 finalizes (mark placed, or mark failed + release stake). Survives crashes mid-placement.
+
+**Immutable recommendation snapshots.** Every recommendation is persisted with full metadata (sizing fractions, correlation check, circuit breaker state) for audit replay and drift detection.
+
+**Models must pass backtesting.** No model touches capital without offline validation against historical odds data. The backtest CLI produces calibration reports, CLV metrics, and walk-forward validation artifacts.
+
+---
+
+## Testing
 
 ```bash
-BETBOT_ODDS_POLLING_ENABLED=false
-BETBOT_ODDS_API_KEY=TODO_SET_BETBOT_ODDS_API_KEY
+go test ./...                       # All tests
+go test -race ./...                 # With race detector
+go test -v ./internal/decision/...  # Specific package
 ```
 
-Set `BETBOT_ODDS_POLLING_ENABLED=true` and provide a real `BETBOT_ODDS_API_KEY` when you want live odds ingestion.
-If you are upgrading an older local Docker volume from PostgreSQL 16, recreate that local database volume before starting the PostgreSQL 17 container. The old data directory is not compatible with PostgreSQL 17.
-
-To run the Postgres-backed integration package explicitly:
-
-```bash
-BETBOT_TEST_DATABASE_URL=postgres://betbot:betbot-dev-password@localhost:5432/betbot?sslmode=disable go test ./internal/integration -v
-```
-
-Current entrypoints:
-
-- `cmd/server`
-- `cmd/worker`
-- `cmd/backtest`
-
-### Free MLB Historical Backfill (2025-first)
-
-The repository now includes free-source Python importers for MLB historical replay inputs:
-
-- `scripts/import_historical_odds.py`
-  - imports local workbook odds (default `C:\Users\Admin\Downloads\mlb-odds.xlsx`)
-  - optional normalized scraper CSVs (`--scraped-csv`) for free-source gap fill
-  - source precedence is deterministic: `mlb-odds.xlsx` first, then `sportsbookreview-scraper`, then `mlb-odds-scraper`
-- `scripts/import_game_results.py`
-  - imports final MLB game outcomes via `MLB-StatsAPI` into `game_results`
-- `scripts/import_mlb_features_pybaseball.py`
-  - imports season team/pitcher stat snapshots from `pybaseball`
-- `scripts/import_scraped_odds.py`
-  - wrapper for normalized outputs from `mlb-odds-scraper` / `sportsbookreview-scraper`
-
-Install dependencies:
-
-```bash
-python -m pip install -r ml/requirements.txt
-```
-
-Typical flow:
-
-```bash
-# 1) odds snapshots (xlsx + optional scraped CSV)
-python scripts/import_historical_odds.py --xlsx "C:\Users\Admin\Downloads\mlb-odds.xlsx"
-
-# 2) final scores / outcomes
-python scripts/import_game_results.py --season 2025
-
-# 3) pybaseball stats snapshots (optional, model feature foundations)
-python scripts/import_mlb_features_pybaseball.py --season 2025
-
-# 4) run MLB replay
-go run cmd/backtest/main.go --sport MLB --season 2025 --market h2h --mode odds
-```
-
-### Operator sport filters (read views)
-
-Read views accept an optional `sport` query parameter for operator scoping. If omitted, views stay in all-sports mode.
-
-Examples:
-
-- `GET /odds`
-- `GET /odds?sport=baseball_mlb`
-- `GET /pipeline/health`
-- `GET /pipeline/health?sport=icehockey_nhl`
-- `GET /?sport=americanfootball_nfl`
-
-Allowed `sport` values are exactly:
-
-- `baseball_mlb`
-- `basketball_nba`
-- `icehockey_nhl`
-- `americanfootball_nfl`
-
-Invalid sport filters return `HTTP 400` and render an explicit operator-facing error message.
-
-### Recommendation endpoints (recommendation-only)
-
-Use the recommendation pull surface for ranked picks:
-
-- `GET /recommendations`
-- `GET /recommendations?sport=baseball_mlb&date=2026-03-16&limit=20`
-
-`/recommendations` is recommendation-only and now returns auditable stake-sizing fields per row:
-
-- `raw_kelly_fraction`, `applied_fractional_kelly`, `capped_fraction`
-- `pre_bankroll_stake_dollars`, `pre_bankroll_stake_cents`
-- `bankroll_available_cents`, `bankroll_check_pass`, `bankroll_check_reason`
-- `suggested_stake_dollars`, `suggested_stake_cents`, `suggested_stake_fraction`
-- `correlation_check_pass`, `correlation_check_reason`, `correlation_group_key`
-- `circuit_check_pass`, `circuit_check_reason`
-- deterministic `sizing_reasons`
-
-Sizing semantics are deterministic and ordered:
-
-- compute raw Kelly from model side probability + selected best-book odds
-- apply fractional Kelly policy (sport defaults unless env override)
-- enforce max bet fraction cap
-- run ledger-backed bankroll gate against current `bankroll_ledger` balance
-- if insufficient funds, cap final stake to available cents and emit explicit reasons
-
-Correlation guard semantics are deterministic and recommendation-only:
-
-- runs after sizing/bankroll gate and before final `limit` truncation
-- groups by `sport|game_id` across mixed markets (for example `h2h`, `spreads`, `totals`)
-- applies same-game limits (`max picks`, `max summed stake fraction`) with fixed reason codes
-- optional `sport|event_date` pick limit can also be enforced
-- zero-stake rows are retained with explicit `retained_zero_stake` and do not consume exposure capacity
-
-Example:
-
-- `GET /recommendations?sport=baseball_mlb&date=2026-03-16&limit=10`
-- If two MLB markets from the same game rank highly, only the highest-ranked retained row survives when `BETBOT_CORRELATION_MAX_PICKS_PER_GAME=1`, and the response order remains deterministic.
-
-Circuit breaker semantics are deterministic and recommendation-only:
-
-- runs after correlation guard and before final `limit` truncation
-- uses persisted ledger-derived bankroll metrics (`current`, `day-start`, `week-start`, `peak`) from Postgres
-- enforces `daily_loss_stop`, `weekly_loss_stop`, and `drawdown_breaker` with deterministic reason precedence
-- exact threshold equality triggers (`>=`) a breaker
-- zero-stake rows are retained with explicit `retained_zero_stake`
-
-Example:
-
-- `GET /recommendations?sport=baseball_mlb&date=2026-03-16&limit=20`
-- If bankroll loss breaches `BETBOT_DAILY_LOSS_STOP`, positive-stake rows are dropped with `circuit_check_reason=dropped_daily_loss_stop`.
-
-Use the performance surface for recommendation quality and CLV monitoring:
-
-- `GET /recommendations/performance`
-- `GET /recommendations/performance?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&limit=100`
-
-Performance rows are deterministic and include explicit status when close or result data is not yet available (`close_unavailable`, `pending_outcome`, `settled`).
-
-Use the calibration surface for confidence alignment checks by rank bucket:
-
-- `GET /recommendations/calibration`
-- `GET /recommendations/calibration?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&bucket_count=10&limit=500`
-
-Calibration supports `bucket_count` in `[1,20]` (default `10`) and reports filter echo, settled/excluded counts, per-bucket observed vs expected win rates, calibration gaps, Brier scores, and overall ECE.
-
-Use the drift-alert surface to compare current vs baseline calibration windows with sample guardrails:
-
-- `GET /recommendations/calibration/alerts`
-- `GET /recommendations/calibration/alerts?sport=baseball_mlb&current_from=2026-03-01&current_to=2026-03-14&baseline_from=2026-02-01&baseline_to=2026-02-14&bucket_count=10&min_settled_overall=100&min_settled_per_bucket=20`
-
-Alert levels are `ok`, `warn`, `critical`, or `insufficient_sample`, with deterministic reasons and per-bucket calibration-gap/Brier deltas.
-
-Use rolling mode on the same endpoint to evaluate deterministic multi-window drift trends:
-
-- `GET /recommendations/calibration/alerts?mode=rolling&sport=baseball_mlb&current_to=2026-03-14&window_days=7&steps=5&bucket_count=10&limit=500`
-- `GET /recommendations/calibration/alerts?mode=rolling&sport=baseball_mlb&current_to=2026-03-14&window_days=30&steps=10&min_settled_overall=200&min_settled_per_bucket=25`
-
-Rolling mode returns the existing latest-window alert block plus a deterministic `trend` array ordered oldest-to-newest (`window_start`, `window_end`, `alert_level`, `ece_delta`, `brier_delta`, settled sample counts).
-
-Use drift history for append-only alert run audit visibility:
-
-- `GET /recommendations/calibration/alerts/history`
-- `GET /recommendations/calibration/alerts/history?sport=baseball_mlb&date_from=2026-03-01&date_to=2026-03-14&limit=100`
-
-History rows are ordered `created_at DESC, id DESC` and include run hashes, window bounds, thresholds/guardrails, alert level/reasons, summary deltas, and optional persisted payload snapshot.
-
-### Recommendation sizing config overrides
-
-Global env overrides for recommendation sizing are optional:
-
-- `BETBOT_KELLY_FRACTION` in `[0,1]` (`0` = use sport defaults)
-- `BETBOT_MAX_BET_FRACTION` in `[0,1]` (`0` = use sport defaults)
-- `BETBOT_CORRELATION_MAX_PICKS_PER_GAME` in `[1,25]` (default `1`)
-- `BETBOT_CORRELATION_MAX_STAKE_FRACTION_PER_GAME` in `(0,1]` (default `0.03`)
-- `BETBOT_CORRELATION_MAX_PICKS_PER_SPORT_DAY` in `[0,500]` (default `0`, disabled)
-- `BETBOT_DAILY_LOSS_STOP` in `[0,1]` (default `0.05`)
-- `BETBOT_WEEKLY_LOSS_STOP` in `[0,1]` (default `0.10`)
-- `BETBOT_DRAWDOWN_BREAKER` in `[0,1]` (default `0.15`)
-- `BETBOT_PAPER_MODE` toggles paper vs live execution posture (default `true`)
-- `BETBOT_EXECUTION_ADAPTER` selects the execution adapter; defaults to `paper` in paper mode and must be explicitly set to a live adapter when `BETBOT_PAPER_MODE=false`
-- `BETBOT_AUTO_PLACEMENT_ENABLED` controls the recommendation auto-placement worker; defaults to `true` in paper mode and `false` in live mode
-
-When sizing overrides are unset/zero, the decision layer uses sport-specific baseline sizing policy values (MLB/NBA/NHL/NFL). Correlation guard settings use the deterministic global defaults shown above.
+---
 
 ## Documentation
 
-Start here if you want the full project picture:
+| Document | Purpose |
+|----------|---------|
+| [`docs/TRACKER.md`](docs/TRACKER.md) | Phase-by-phase progress tracker |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Technical architecture |
+| [`docs/SOUL.md`](docs/SOUL.md) | Project philosophy and boundaries |
+| [`docs/runbooks/paper-validation.md`](docs/runbooks/paper-validation.md) | Daily/weekly validation checklist with exit criteria |
+| [`docs/runbooks/threshold-tuning.md`](docs/runbooks/threshold-tuning.md) | Threshold inventory and tuning procedure |
+| [`docs/sql/validation-queries.sql`](docs/sql/validation-queries.sql) | 12 diagnostic SQL queries for pipeline health |
+| [`docs/SPORT_OPTIMIZATION.md`](docs/SPORT_OPTIMIZATION.md) | Four-sport specialization rationale |
 
-- [Implementation plan](docs/betbot-plan.md)
-- [Technical architecture](docs/ARCHITECTURE.md)
-- [Progress tracker](docs/TRACKER.md)
-- [Repository structure](docs/REPO_STRUCTURE.md)
-- [Four-sport specialization deep dive](docs/SPORT_OPTIMIZATION.md)
-- [Product voice and operator posture](docs/SOUL.md)
+---
 
-Key ADRs:
+## Compliance Note
 
-- [Four-sport specialization](docs/decisions/007-four-sport-specialization.md)
-- [Phase 1 vertical slice first](docs/decisions/008-phase-1-vertical-slice-first.md)
+This repository is for infrastructure, analytics, and research. Sports betting laws, operator terms of service, and automation rules vary by jurisdiction. Anyone using this code for real-money activity is responsible for their own legal and compliance review.
 
-## Open Source Position
+---
 
-betbot is intended to remain open source.
+## License
 
-### License
-
-This project is licensed under `Apache-2.0`.
-
-Why that is the best fit here:
-
-- permissive for commercial and hobby use
-- clearer patent grant than MIT
-- widely understood in infrastructure and developer-tooling projects
-- friendly to contributors who may later build hosted or managed derivatives
-
-The full license text is in [LICENSE](LICENSE).
-
-## Contributing
-
-Contributions are welcome, especially around:
-
-- odds ingestion
-- PostgreSQL schema design
-- sqlc query design
-- River worker patterns
-- sports data integrations
-- CLV and backtesting workflows
-- MLB, NBA, NHL, and NFL feature engineering
-- documentation and runbooks
-
-Before opening a large PR, read:
-
-- [betbot-plan.md](docs/betbot-plan.md)
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [TRACKER.md](docs/TRACKER.md)
-
-## Suggested GitHub Topics
-
-If this repo is published publicly, these topics will help discovery:
-
-- `sports-betting`
-- `sports-analytics`
-- `sports-betting-bot`
-- `clv`
-- `expected-value`
-- `backtesting`
-- `odds-api`
-- `postgresql`
-- `golang`
-- `fiber`
-- `river`
-- `sqlc`
-- `mlb`
-- `nba`
-- `nhl`
-- `nfl`
-
-## Recommended Community Setup
-
-For better GitHub discovery and contributor flow, enable:
-
-- GitHub Discussions for modeling, data sources, and roadmap questions
-- issue labels by area: `ingestion`, `db`, `worker`, `ui`, `docs`, `mlb`, `nba`, `nhl`, `nfl`
-- a public roadmap pinned from [TRACKER.md](docs/TRACKER.md)
-- a CONTRIBUTING guide in a follow-up change
-
-## Compliance and Risk Note
-
-This repository is for infrastructure, analytics, and research. Sports betting laws, operator terms of service, and automation rules vary by jurisdiction and book. Anyone using this code for real-money workflows is responsible for their own legal, compliance, and operational review.
-
-## Keywords
-
-Open-source sports betting bot, sports betting analytics, sports betting tracker, odds tracking, closing line value, CLV tracker, expected value betting, Kelly Criterion bankroll management, sportsbook odds history, line shopping, sports betting backtesting, MLB betting model, NBA betting model, NHL betting model, NFL betting model, Go sports betting project, PostgreSQL odds database.
-
-
-
-
-
-
-
-
+Licensed under [Apache-2.0](LICENSE).
