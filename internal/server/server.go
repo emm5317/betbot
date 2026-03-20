@@ -169,6 +169,7 @@ func (a *App) routes() {
 	a.app.Post("/recommendations/refresh", a.handleRecommendationsRefresh)
 
 	a.app.Post("/execution/place", a.handleExecutionPlace)
+	a.app.Post("/partials/place-bet", a.handlePartialPlaceBet)
 	a.app.Get("/execution/bets", a.handleExecutionBets)
 
 	a.app.Get("/bets", a.handleBetsPage)

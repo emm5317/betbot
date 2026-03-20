@@ -174,11 +174,34 @@ func (a *App) recommendationCandidates(ctx context.Context, sportFilter sportFil
 	return candidates, predictionsByKey, nil
 }
 
+func (a *App) persistRecommendationSnapshotsWithIDs(
+	ctx context.Context,
+	recommendations []decision.Recommendation,
+	circuitMetrics decision.CircuitBreakerMetrics,
+	predictionsByKey map[string]store.ModelPrediction,
+) ([]int64, error) {
+	ids := make([]int64, len(recommendations))
+	if err := a.persistRecommendationSnapshotsInto(ctx, recommendations, circuitMetrics, predictionsByKey, ids); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
 func (a *App) persistRecommendationSnapshots(
 	ctx context.Context,
 	recommendations []decision.Recommendation,
 	circuitMetrics decision.CircuitBreakerMetrics,
 	predictionsByKey map[string]store.ModelPrediction,
+) error {
+	return a.persistRecommendationSnapshotsInto(ctx, recommendations, circuitMetrics, predictionsByKey, nil)
+}
+
+func (a *App) persistRecommendationSnapshotsInto(
+	ctx context.Context,
+	recommendations []decision.Recommendation,
+	circuitMetrics decision.CircuitBreakerMetrics,
+	predictionsByKey map[string]store.ModelPrediction,
+	snapshotIDs []int64,
 ) error {
 	baseMetadata := map[string]any{
 		"mode":         "recommendation-only",
@@ -246,7 +269,7 @@ func (a *App) persistRecommendationSnapshots(
 		}
 
 		eventDate := rec.EventTime.UTC()
-		if _, err := a.queries.InsertRecommendationSnapshot(ctx, store.InsertRecommendationSnapshotParams{
+		snapshot, err := a.queries.InsertRecommendationSnapshot(ctx, store.InsertRecommendationSnapshotParams{
 			GeneratedAt:            store.Timestamptz(rec.GeneratedAt),
 			Sport:                  string(rec.Sport),
 			GameID:                 rec.GameID,
@@ -265,8 +288,12 @@ func (a *App) persistRecommendationSnapshots(
 			BankrollCheckReason:    rec.BankrollCheckReason,
 			RankScore:              rec.RankScore,
 			Metadata:               metadataJSON,
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("insert recommendation snapshot for game_id=%d market=%s: %w", rec.GameID, rec.Market, err)
+		}
+		if snapshotIDs != nil && i < len(snapshotIDs) {
+			snapshotIDs[i] = snapshot.ID
 		}
 	}
 

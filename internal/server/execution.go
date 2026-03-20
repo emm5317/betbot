@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"betbot/internal/execution"
 	"betbot/internal/store"
 
@@ -66,6 +68,57 @@ func (a *App) handleExecutionPlace(c fiber.Ctx) error {
 		"external_bet_id": result.ExternalBetID,
 		"already_exists":  result.AlreadyExists,
 	})
+}
+
+func (a *App) handlePartialPlaceBet(c fiber.Ctx) error {
+	snapshotIDStr := c.FormValue("snapshot_id")
+	if snapshotIDStr == "" {
+		c.Set("HX-Trigger", `{"show-toast": {"type": "error", "message": "Missing snapshot ID"}}`)
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	var snapshotID int64
+	if _, err := fmt.Sscanf(snapshotIDStr, "%d", &snapshotID); err != nil || snapshotID <= 0 {
+		c.Set("HX-Trigger", `{"show-toast": {"type": "error", "message": "Invalid snapshot ID"}}`)
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	snapshot, err := a.queries.GetRecommendationSnapshotByID(c.Context(), snapshotID)
+	if err != nil {
+		c.Set("HX-Trigger", `{"show-toast": {"type": "error", "message": "Snapshot not found"}}`)
+		return c.SendStatus(fiber.StatusNotFound)
+	}
+
+	idempotencyKey := execution.GenerateIdempotencyKey(
+		snapshot.GameID, snapshot.MarketKey, snapshot.BestBook, snapshot.GeneratedAt.Time,
+	)
+
+	result, err := a.placementOrchestrator.Place(c.Context(), execution.PlaceInput{
+		IdempotencyKey:    idempotencyKey,
+		SnapshotID:        snapshot.ID,
+		GameID:            snapshot.GameID,
+		Sport:             snapshot.Sport,
+		MarketKey:         snapshot.MarketKey,
+		RecommendedSide:   snapshot.RecommendedSide,
+		BookKey:           snapshot.BestBook,
+		AmericanOdds:      int(snapshot.BestAmericanOdds),
+		StakeCents:        snapshot.SuggestedStakeCents,
+		ModelProbability:  snapshot.ModelProbability,
+		MarketProbability: snapshot.MarketProbability,
+		Edge:              snapshot.Edge,
+	})
+	if err != nil {
+		msg := fmt.Sprintf("Placement failed: %s", err.Error())
+		c.Set("HX-Trigger", fmt.Sprintf(`{"show-toast": {"type": "error", "message": %q}}`, msg))
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
+	msg := fmt.Sprintf("Bet #%d placed", result.BetID)
+	if result.AlreadyExists {
+		msg = fmt.Sprintf("Bet #%d already exists", result.BetID)
+	}
+	c.Set("HX-Trigger", fmt.Sprintf(`{"show-toast": {"type": "success", "message": %q}, "refreshBets": true}`, msg))
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func (a *App) handleExecutionBets(c fiber.Ctx) error {

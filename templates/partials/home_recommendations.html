@@ -41,8 +41,17 @@
 
             <p class="text-xs text-base-content/30 mt-2">{{.SizingReasons}}</p>
 
-            <div class="card-actions mt-3">
-                {{if .CanRecord}}
+            <div class="card-actions mt-3 relative z-10">
+                {{if .CanPlace}}
+                <button class="btn btn-primary btn-sm"
+                        hx-post="/partials/place-bet"
+                        hx-vals='{"snapshot_id": "{{.SnapshotID}}"}'
+                        hx-swap="none"
+                        hx-disabled-elt="this"
+                        hx-on::after-request="htmx.trigger('#home-open-bets-block', 'refreshBets')">
+                    Place Bet
+                </button>
+                {{else if .CanRecord}}
                 <a class="btn btn-primary btn-sm" href="{{.PrefillURL}}">Record this bet</a>
                 {{else}}
                 <span class="btn btn-disabled btn-sm">Stake unavailable</span>

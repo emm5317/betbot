@@ -40,7 +40,7 @@ These values are the current repo baseline and should stay aligned with the actu
 | In-container app port | `8080` |
 | Local health endpoint | `GET /health` |
 | Local compose file | `deploy/docker/docker-compose.yml` |
-| Current server | Fiber v3 operational + recommendation + execution API surface (`/recommendations`, `/recommendations/refresh`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`, `/execution/place`, `/execution/bets`) |
+| Current server | Fiber v3 operational + recommendation + execution API surface (`/recommendations`, `/recommendations/refresh`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`, `/execution/place`, `/execution/bets`, `/partials/place-bet`) |
 
 ---
 
@@ -305,6 +305,7 @@ When starting a Claude Code session on betbot:
 - Do not use `time.Now()` for financial timestamps. Use Postgres `NOW()`.
 - Do not deploy a model without backtesting. Period.
 - Do not log sensitive credentials. zerolog fields are reviewed for PII.
+- Do not modify tests just to make them pass. Tests must validate that end-to-end operations actually work. When behavior changes break tests, update fakes to properly simulate the new behavior (e.g., return real IDs, not zero values), add assertions that verify the new UI/API output, and confirm the tests pass because the code works — not because assertions were weakened.
 
 <!-- gitnexus:start -->
 # GitNexus MCP

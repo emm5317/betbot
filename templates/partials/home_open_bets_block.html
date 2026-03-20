@@ -1,7 +1,7 @@
 <div id="home-open-bets-block"
      class="live-fragment"
      hx-get="{{printf "/partials/home-open-bets%s" (or .SelectedSportQuery "")}}"
-     hx-trigger="load, every 30s"
+     hx-trigger="load, every 30s, refreshBets from:body"
      hx-swap="outerHTML">
     {{template "partials/home_open_bets" .}}
 </div>

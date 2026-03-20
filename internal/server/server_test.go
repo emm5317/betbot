@@ -192,7 +192,9 @@ func (f *fakeReadQueries) InsertRecommendationSnapshot(_ context.Context, arg st
 	if f.insertSnapshotErr != nil {
 		return store.RecommendationSnapshot{}, f.insertSnapshotErr
 	}
-	return store.RecommendationSnapshot{}, nil
+	return store.RecommendationSnapshot{
+		ID: int64(len(f.insertSnapshotCalls)),
+	}, nil
 }
 
 func (f *fakeReadQueries) GetRecommendationSnapshotByID(_ context.Context, _ int64) (store.RecommendationSnapshot, error) {
@@ -525,13 +527,14 @@ func TestHandleHomeBuildsReadOnlyRecommendationsWithoutSnapshotInserts(t *testin
 	body := readBody(t, resp)
 	assertContains(t, body, "Recommended looks right now")
 	assertContains(t, body, "Boston Red Sox vs New York Yankees")
-	assertContains(t, body, "/bets/new?")
-	if len(queries.insertSnapshotCalls) != 0 {
-		t.Fatalf("snapshot inserts = %d, want 0 for read-only home recommendations", len(queries.insertSnapshotCalls))
+	assertContains(t, body, "Place Bet")
+	assertContains(t, body, "/partials/place-bet")
+	if len(queries.insertSnapshotCalls) == 0 {
+		t.Fatalf("snapshot inserts = 0, want > 0 (home recommendations now persist snapshots for placement)")
 	}
 }
 
-func TestPartialHomeRecommendationsRespectsSportFilterAndDoesNotPersist(t *testing.T) {
+func TestPartialHomeRecommendationsRespectsSportFilterAndPersistsSnapshots(t *testing.T) {
 	queries := &fakeReadQueries{
 		bankrollBalanceCents: 100000,
 		upcomingGames: []store.Game{
@@ -556,11 +559,13 @@ func TestPartialHomeRecommendationsRespectsSportFilterAndDoesNotPersist(t *testi
 	body := readBody(t, resp)
 	assertContains(t, body, "id=\"home-recommendations-block\"")
 	assertContains(t, body, "Boston Red Sox vs New York Yankees")
+	assertContains(t, body, "Place Bet")
+	assertContains(t, body, "/partials/place-bet")
 	if len(queries.modelPredictionsCalls) != 1 || queries.modelPredictionsCalls[0].Sport != "MLB" {
 		t.Fatalf("model predictions calls = %+v, want one MLB call", queries.modelPredictionsCalls)
 	}
-	if len(queries.insertSnapshotCalls) != 0 {
-		t.Fatalf("snapshot inserts = %d, want 0 for read-only partial", len(queries.insertSnapshotCalls))
+	if len(queries.insertSnapshotCalls) == 0 {
+		t.Fatalf("snapshot inserts = 0, want > 0 (partial recommendations now persist snapshots for placement)")
 	}
 }
 

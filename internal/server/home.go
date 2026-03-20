@@ -94,8 +94,8 @@ func (a *App) populateHomeView(ctx context.Context, view map[string]any, sportFi
 	recommendations, recommendationsErr := a.buildLiveRecommendations(ctx, sportFilter, homeRecommendationsLimit)
 	recommendationCards := mapRecommendationCards(recommendations, gameByID)
 	recommendationGameIDs := make(map[int64]struct{}, len(recommendations))
-	for _, rec := range recommendations {
-		recommendationGameIDs[rec.GameID] = struct{}{}
+	for _, lr := range recommendations {
+		recommendationGameIDs[lr.GameID] = struct{}{}
 	}
 
 	openBets, totalExposure, openBetsErr := a.loadOpenBets(ctx, sportFilter, homeOpenBetsLimit)
@@ -145,7 +145,12 @@ func (a *App) populateHomeView(ctx context.Context, view map[string]any, sportFi
 	view["UpcomingGamesError"] = homeSectionError(upcomingErr)
 }
 
-func (a *App) buildLiveRecommendations(ctx context.Context, sportFilter sportFilterSelection, limit int) ([]decision.Recommendation, error) {
+type liveRecommendation struct {
+	decision.Recommendation
+	SnapshotID int64
+}
+
+func (a *App) buildLiveRecommendations(ctx context.Context, sportFilter sportFilterSelection, limit int) ([]liveRecommendation, error) {
 	circuitMetrics, err := a.queries.GetBankrollCircuitMetrics(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("bankroll unavailable: %w", err)
@@ -154,9 +159,16 @@ func (a *App) buildLiveRecommendations(ctx context.Context, sportFilter sportFil
 		return nil, fmt.Errorf("bankroll unavailable")
 	}
 
-	candidates, _, err := a.recommendationCandidates(ctx, sportFilter, nil, limit)
+	candidates, predictionsByKey, err := a.recommendationCandidates(ctx, sportFilter, nil, limit)
 	if err != nil {
 		return nil, fmt.Errorf("load recommendation candidates: %w", err)
+	}
+
+	cbMetrics := decision.CircuitBreakerMetrics{
+		CurrentBalanceCents:   circuitMetrics.CurrentBalanceCents,
+		DayStartBalanceCents:  circuitMetrics.DayStartBalanceCents,
+		WeekStartBalanceCents: circuitMetrics.WeekStartBalanceCents,
+		PeakBalanceCents:      circuitMetrics.PeakBalanceCents,
 	}
 
 	recommendations, err := decision.BuildRecommendations(candidates, decision.RecommendationBuildConfig{
@@ -169,14 +181,9 @@ func (a *App) buildLiveRecommendations(ctx context.Context, sportFilter sportFil
 		CircuitDailyLossStop:                 a.cfg.DailyLossStop,
 		CircuitWeeklyLossStop:                a.cfg.WeeklyLossStop,
 		CircuitDrawdownBreaker:               a.cfg.DrawdownBreaker,
-		CircuitMetrics: decision.CircuitBreakerMetrics{
-			CurrentBalanceCents:   circuitMetrics.CurrentBalanceCents,
-			DayStartBalanceCents:  circuitMetrics.DayStartBalanceCents,
-			WeekStartBalanceCents: circuitMetrics.WeekStartBalanceCents,
-			PeakBalanceCents:      circuitMetrics.PeakBalanceCents,
-		},
-		AvailableBankrollCents: circuitMetrics.CurrentBalanceCents,
-		GeneratedAt:            time.Now().UTC(),
+		CircuitMetrics:                       cbMetrics,
+		AvailableBankrollCents:               circuitMetrics.CurrentBalanceCents,
+		GeneratedAt:                          time.Now().UTC(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build recommendations: %w", err)
@@ -184,7 +191,20 @@ func (a *App) buildLiveRecommendations(ctx context.Context, sportFilter sportFil
 	if len(recommendations) > limit {
 		recommendations = recommendations[:limit]
 	}
-	return recommendations, nil
+
+	snapshotIDs, err := a.persistRecommendationSnapshotsWithIDs(ctx, recommendations, cbMetrics, predictionsByKey)
+	if err != nil {
+		return nil, fmt.Errorf("persist recommendation snapshots: %w", err)
+	}
+
+	result := make([]liveRecommendation, len(recommendations))
+	for i, rec := range recommendations {
+		result[i] = liveRecommendation{
+			Recommendation: rec,
+			SnapshotID:     snapshotIDs[i],
+		}
+	}
+	return result, nil
 }
 
 func (a *App) loadOpenBets(ctx context.Context, sportFilter sportFilterSelection, limit int) ([]store.ListOpenBetsWithGameRow, int64, error) {
@@ -241,9 +261,10 @@ func gameLookupByID(games []store.Game) map[int64]store.Game {
 	return lookup
 }
 
-func mapRecommendationCards(recommendations []decision.Recommendation, gameByID map[int64]store.Game) []map[string]any {
+func mapRecommendationCards(recommendations []liveRecommendation, gameByID map[int64]store.Game) []map[string]any {
 	cards := make([]map[string]any, 0, len(recommendations))
-	for _, rec := range recommendations {
+	for _, lr := range recommendations {
+		rec := lr.Recommendation
 		game, ok := gameByID[rec.GameID]
 		matchup := fmt.Sprintf("Game #%d", rec.GameID)
 		if ok {
@@ -251,6 +272,7 @@ func mapRecommendationCards(recommendations []decision.Recommendation, gameByID 
 		}
 		cards = append(cards, map[string]any{
 			"GameID":              rec.GameID,
+			"SnapshotID":         lr.SnapshotID,
 			"Sport":               strings.ToUpper(string(rec.Sport)),
 			"Matchup":             matchup,
 			"HomeTeam":            game.HomeTeam,
@@ -270,6 +292,7 @@ func mapRecommendationCards(recommendations []decision.Recommendation, gameByID 
 			"SizingReasons":       strings.Join(rec.SizingReasons, " • "),
 			"BookNote":            bankrollReasonLabel(rec.BankrollCheckReason),
 			"CanRecord":           rec.SuggestedStakeCents > 0,
+			"CanPlace":            lr.SnapshotID > 0 && rec.SuggestedStakeCents > 0,
 			"PrefillURL":          recommendationPrefillURL(rec, game),
 		})
 	}

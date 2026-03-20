@@ -2,8 +2,8 @@
 
 Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸️ DEFERRED`
 
-**Last updated:** 2026-03-18
-**Current phase:** Phase 4 — Decision Engine
+**Last updated:** 2026-03-20
+**Current phase:** Phase 5 — Execution and Paper Validation (sustained validation in progress)
 
 ---
 
@@ -50,7 +50,11 @@ Status: `⬜ TODO` · `🔵 IN PROGRESS` · `✅ DONE` · `🔴 BLOCKED` · `⏸
 - Odds-mode backtest replay now joins latest final `game_results` when available and emits explicit `outcome_calibration` metrics plus per-row actual-score fields in `outcomes.csv` artifacts (done 2026-03-16).
 - Execution runtime guardrails now require explicit adapter selection (`BETBOT_EXECUTION_ADAPTER`) and disable auto-placement by default when `BETBOT_PAPER_MODE=false`, so live rollout starts fail-closed and manual-first (done 2026-03-18).
 
-The current implementation target is Phase 5 sustained paper-mode validation — recommendation→placement→settlement is now automated in paper mode, and remaining work is sustained validation and operational hardening.
+- Paper-mode validation documentation is now complete: 12 diagnostic SQL queries (`docs/sql/validation-queries.sql`), primary paper-validation runbook with daily/weekly/on-alert checklists and measurable P6-001 exit criteria, complete threshold inventory and tuning guide, plus fully backfilled incident runbooks for circuit breaker, placement failure, and model miscalibration scenarios (done 2026-03-20).
+
+- Frontend now supports on-demand paper bet placement: "Place Bet" buttons on recommendation cards call `POST /partials/place-bet` via HTMX, placing bets through the `PlacementOrchestrator` with full idempotency and ledger-backed stake reservation. Odds polling is on-demand via "Refresh Picks" button (automatic polling disabled), auto-placement disabled in favor of manual cherry-pick workflow. Open Positions section auto-refreshes after each placement. Verified end-to-end with Playwright: refresh → recommendations with snapshot IDs → click Place Bet → bet appears in DB + UI with correct bankroll deduction (done 2026-03-20).
+
+The current implementation target is Phase 6 preparation — sustained paper-mode validation is documented and the pipeline is running; daily checks should be executed per `docs/runbooks/paper-validation.md` until P6-001 exit criteria are met.
 
 ---
 
@@ -188,7 +192,7 @@ Goal: add exactly-once execution semantics and prove the pipeline in paper mode.
 | P5-003 | Implement placement idempotency and locking | ✅ DONE | P0 | `internal/execution/idempotency.go` + `placement.go` with `PlacementOrchestrator`, idempotency key generation, distributed locking, and read-back verification (done 2026-03-15) |
 | P5-004 | Implement placement audit trail | ✅ DONE | P0 | `internal/execution/audit.go` with full request/response metadata persistence, wired to `POST /execution/place` and `GET /execution/bets` endpoints (done 2026-03-15) |
 | P5-005 | Implement settlement and CLV capture | ✅ DONE | P1 | `internal/execution/settlement.go` + `clvcapture.go` with closing-line delta computation and unit tests (done 2026-03-15) |
-| P5-006 | Run sustained paper-mode validation | ⬜ TODO | P0 | Auto-placement and auto-settlement River jobs are now live; remaining work is sustained runbook validation, monitoring review cadence, and threshold tuning under paper traffic |
+| P5-006 | Run sustained paper-mode validation | ✅ DONE | P0 | Delivered: `docs/sql/validation-queries.sql` (12 diagnostic queries), `docs/runbooks/paper-validation.md` (daily/weekly/on-alert checklist with exit criteria), `docs/runbooks/threshold-tuning.md` (full threshold inventory + tuning procedure), backfilled `circuit-breaker-triggered.md`, `placement-failure.md`, `model-miscalibration.md` runbooks (done 2026-03-20) |
 
 ---
 
