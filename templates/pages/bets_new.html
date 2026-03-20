@@ -1,94 +1,96 @@
 {{template "partials/alert_banner" .}}
 
-<section class="page-hero page-hero--compact">
+<section class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
     <div>
-        <p class="eyebrow">Record Bet</p>
-        <h2>Capture a new position</h2>
-        <p class="page-hero__lede">Use recommendation context when it exists, but keep manual entry direct and fast.</p>
+        <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">Record Bet</p>
+        <h2 class="font-display text-2xl font-bold tracking-tight">Capture a new position</h2>
+        <p class="text-sm text-base-content/50 mt-1">Use recommendation context when it exists, but keep manual entry direct and fast.</p>
     </div>
-    <a class="button button--ghost" href="/bets">Back to bets</a>
+    <a class="btn btn-ghost btn-sm" href="/bets">Back to bets</a>
 </section>
 
 {{if .PrefilledEdge}}
-<section class="panel panel--quiet">
-    <div class="detail-grid detail-grid--full">
-        <div><span class="detail-grid__label">Recommendation</span><strong>{{or .PrefilledGameLabel (printf "Snapshot #%v" .SnapshotID)}}</strong></div>
-        <div><span class="detail-grid__label">Model edge</span><strong>{{.PrefilledEdge}}</strong></div>
-        <div><span class="detail-grid__label">Model probability</span><strong>{{.PrefilledModelProb}}</strong></div>
-        <div><span class="detail-grid__label">Suggested stake</span><strong>{{.PrefilledStakeDollars}}</strong></div>
+<section class="card bg-base-100 border border-base-300 mb-6">
+    <div class="card-body p-4">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            <div><span class="text-xs text-base-content/40 block">Recommendation</span><strong>{{or .PrefilledGameLabel (printf "Snapshot #%v" .SnapshotID)}}</strong></div>
+            <div><span class="text-xs text-base-content/40 block">Model edge</span><strong>{{.PrefilledEdge}}</strong></div>
+            <div><span class="text-xs text-base-content/40 block">Model probability</span><strong>{{.PrefilledModelProb}}</strong></div>
+            <div><span class="text-xs text-base-content/40 block">Suggested stake</span><strong>{{.PrefilledStakeDollars}}</strong></div>
+        </div>
     </div>
 </section>
 {{end}}
 
-<section class="panel" x-data="payoutCalc()">
-    <div class="panel__header">
-        <div>
-            <p class="eyebrow">Entry Form</p>
-            <h3>Bet details</h3>
+<section class="card bg-base-200 border border-base-300" x-data="payoutCalc()">
+    <div class="card-body">
+        <div class="mb-4">
+            <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Entry Form</p>
+            <h3 class="font-display text-lg font-bold">Bet details</h3>
         </div>
+
+        <form method="post" action="/bets" class="space-y-4">
+            {{if .SnapshotID}}
+            <input type="hidden" name="snapshot_id" value="{{.SnapshotID}}">
+            {{end}}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="form-control">
+                    <label class="label" for="game_id"><span class="label-text">Game</span></label>
+                    <select name="game_id" id="game_id" class="select select-bordered w-full" required x-on:change="updateSport($event)">
+                        <option value="">Select a game...</option>
+                        {{range .Games}}
+                        <option value="{{.ID}}" data-sport="{{.Sport}}" {{if $.PrefilledGameID}}{{if eq $.PrefilledGameID .ID}}selected{{end}}{{end}}>{{.Label}}</option>
+                        {{end}}
+                    </select>
+                </div>
+
+                <div class="form-control">
+                    <label class="label" for="sport"><span class="label-text">Sport</span></label>
+                    <input type="text" name="sport" id="sport" class="input input-bordered w-full" required readonly value="{{if .PrefilledSport}}{{.PrefilledSport}}{{end}}">
+                </div>
+
+                <div class="form-control">
+                    <label class="label" for="side"><span class="label-text">Side</span></label>
+                    <select name="side" id="side" class="select select-bordered w-full" required>
+                        <option value="home" {{if eq .PrefilledSide "home"}}selected{{end}}>Home</option>
+                        <option value="away" {{if eq .PrefilledSide "away"}}selected{{end}}>Away</option>
+                        <option value="over">Over</option>
+                        <option value="under">Under</option>
+                    </select>
+                </div>
+
+                <div class="form-control">
+                    <label class="label" for="book_key"><span class="label-text">Book</span></label>
+                    <input type="text" name="book_key" id="book_key" class="input input-bordered w-full" required placeholder="draftkings" value="{{.PrefilledBook}}">
+                </div>
+
+                <div class="form-control">
+                    <label class="label" for="american_odds"><span class="label-text">American odds</span></label>
+                    <input type="number" name="american_odds" id="american_odds" class="input input-bordered w-full" required placeholder="-110" x-model="odds" x-on:input="calc()" {{if .PrefilledOdds}}value="{{.PrefilledOdds}}"{{end}}>
+                </div>
+
+                <div class="form-control">
+                    <label class="label" for="stake_dollars"><span class="label-text">Stake</span></label>
+                    <input type="number" name="stake_dollars" id="stake_dollars" class="input input-bordered w-full" required step="0.01" min="0.01" placeholder="25.00" x-model="stake" x-on:input="calc()" {{if .PrefilledStakeDollars}}value="{{.PrefilledStakeDollars}}"{{end}}>
+                </div>
+            </div>
+
+            <div class="card bg-base-300/50 p-4" x-show="potentialWin > 0" x-cloak>
+                <span class="text-xs text-base-content/40 block">Potential payout</span>
+                <strong class="text-2xl font-display font-bold text-primary" x-text="'$' + potentialWin.toFixed(2)"></strong>
+                <span class="text-sm text-base-content/50" x-text="'Profit: $' + potentialProfit.toFixed(2)"></span>
+            </div>
+
+            <div class="form-control">
+                <label class="label" for="notes"><span class="label-text">Notes</span></label>
+                <textarea name="notes" id="notes" class="textarea textarea-bordered w-full" rows="3" placeholder="Optional context about this ticket"></textarea>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="btn btn-primary">Record bet</button>
+                <a href="/bets" class="btn btn-ghost">Cancel</a>
+            </div>
+        </form>
     </div>
-
-    <form method="post" action="/bets" class="entry-form">
-        {{if .SnapshotID}}
-        <input type="hidden" name="snapshot_id" value="{{.SnapshotID}}">
-        {{end}}
-
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label" for="game_id">Game</label>
-                <select name="game_id" id="game_id" class="form-input" required x-on:change="updateSport($event)">
-                    <option value="">Select a game...</option>
-                    {{range .Games}}
-                    <option value="{{.ID}}" data-sport="{{.Sport}}" {{if $.PrefilledGameID}}{{if eq $.PrefilledGameID .ID}}selected{{end}}{{end}}>{{.Label}}</option>
-                    {{end}}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="sport">Sport</label>
-                <input type="text" name="sport" id="sport" class="form-input" required readonly value="{{if .PrefilledSport}}{{.PrefilledSport}}{{end}}">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="side">Side</label>
-                <select name="side" id="side" class="form-input" required>
-                    <option value="home" {{if eq .PrefilledSide "home"}}selected{{end}}>Home</option>
-                    <option value="away" {{if eq .PrefilledSide "away"}}selected{{end}}>Away</option>
-                    <option value="over">Over</option>
-                    <option value="under">Under</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="book_key">Book</label>
-                <input type="text" name="book_key" id="book_key" class="form-input" required placeholder="draftkings" value="{{.PrefilledBook}}">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="american_odds">American odds</label>
-                <input type="number" name="american_odds" id="american_odds" class="form-input" required placeholder="-110" x-model="odds" x-on:input="calc()" {{if .PrefilledOdds}}value="{{.PrefilledOdds}}"{{end}}>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="stake_dollars">Stake</label>
-                <input type="number" name="stake_dollars" id="stake_dollars" class="form-input" required step="0.01" min="0.01" placeholder="25.00" x-model="stake" x-on:input="calc()" {{if .PrefilledStakeDollars}}value="{{.PrefilledStakeDollars}}"{{end}}>
-            </div>
-        </div>
-
-        <div class="preview-card" x-show="potentialWin > 0" x-cloak>
-            <span class="detail-grid__label">Potential payout</span>
-            <strong class="preview-card__value" x-text="'$' + potentialWin.toFixed(2)"></strong>
-            <span class="muted" x-text="'Profit: $' + potentialProfit.toFixed(2)"></span>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label" for="notes">Notes</label>
-            <textarea name="notes" id="notes" class="form-input form-textarea" rows="3" placeholder="Optional context about this ticket"></textarea>
-        </div>
-
-        <div class="panel__actions">
-            <button type="submit" class="button button--primary">Record bet</button>
-            <a href="/bets" class="button button--ghost">Cancel</a>
-        </div>
-    </form>
 </section>

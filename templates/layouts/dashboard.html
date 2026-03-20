@@ -1,28 +1,30 @@
-<div class="chrome">
-    <header class="topbar">
-        <div class="topbar__brand">
-            <a class="brand-mark" href="/">bb</a>
+<div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+    <header class="navbar bg-base-200/80 sticky top-0 z-40 rounded-b-xl border-b border-base-300 mb-6">
+        <div class="navbar-start gap-3">
+            <a class="btn btn-ghost btn-sm font-display text-xl font-bold text-primary tracking-tight" href="/">bb</a>
             <div>
-                <p class="eyebrow">Phase 1 Operational UI</p>
-                <h1 class="brand-title">betbot</h1>
+                <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold leading-none">Phase 1 Operational UI</p>
+                <h1 class="text-sm font-display font-bold leading-tight">betbot</h1>
             </div>
         </div>
 
-        <nav class="topbar__nav" aria-label="Primary">
-            <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/">Overview</a>
-            <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds">Odds</a>
-            <a class="nav-link {{if eq .ActiveNav "pipeline"}}is-active{{end}}" href="/pipeline/health">Pipeline</a>
+        <nav class="navbar-center" aria-label="Primary">
+            <div role="tablist" class="tabs tabs-border">
+                <a role="tab" class="tab {{if eq .ActiveNav "home"}}tab-active{{end}}" href="/">Overview</a>
+                <a role="tab" class="tab {{if eq .ActiveNav "odds"}}tab-active{{end}}" href="/odds">Odds</a>
+                <a role="tab" class="tab {{if eq .ActiveNav "pipeline"}}tab-active{{end}}" href="/pipeline/health">Pipeline</a>
+            </div>
         </nav>
 
-        <div class="topbar__meta">
-            <span class="status-pill status-pill--{{if eq (or .Status .OverallStatus) "ok"}}good{{else}}warn{{end}}">
+        <div class="navbar-end gap-2">
+            <span class="badge badge-sm {{if eq (or .Status .OverallStatus) "ok"}}badge-success{{else}}badge-warning{{end}}">
                 {{or .Status .OverallStatus "warming"}}
             </span>
-            <span class="runtime-chip">{{or .Environment .Env "development"}}</span>
+            <span class="badge badge-ghost badge-sm">{{or .Environment .Env "development"}}</span>
         </div>
     </header>
 
-    <main class="workspace">
+    <main class="pb-12">
         {{embed}}
     </main>
 </div>

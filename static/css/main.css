@@ -1,0 +1,126 @@
+/* betbot — Tailwind 4 + DaisyUI 5 source file
+   Build: npx tailwindcss -i static/css/main.css -o static/css/out.css --minify
+   Watch: npx tailwindcss -i static/css/main.css -o static/css/out.css --watch */
+
+@import "tailwindcss";
+@plugin "daisyui";
+
+/* ── betbot theme ──────────────────────────────────────────────────── */
+@plugin "daisyui/theme" {
+  name: "betbot";
+  default: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(10.5% 0.01 70);
+  --color-base-200: oklch(13% 0.01 65);
+  --color-base-300: oklch(17% 0.012 60);
+  --color-base-content: oklch(93% 0.015 75);
+
+  --color-primary: oklch(68% 0.12 65);
+  --color-primary-content: oklch(10.5% 0.01 70);
+
+  --color-secondary: oklch(65% 0.04 65);
+  --color-secondary-content: oklch(93% 0.015 75);
+
+  --color-accent: oklch(72% 0.1 155);
+  --color-accent-content: oklch(10.5% 0.01 70);
+
+  --color-neutral: oklch(22% 0.01 60);
+  --color-neutral-content: oklch(80% 0.02 70);
+
+  --color-info: oklch(70% 0.08 220);
+  --color-info-content: oklch(10.5% 0.01 70);
+
+  --color-success: oklch(72% 0.1 155);
+  --color-success-content: oklch(10.5% 0.01 70);
+
+  --color-warning: oklch(76% 0.12 75);
+  --color-warning-content: oklch(10.5% 0.01 70);
+
+  --color-error: oklch(65% 0.14 25);
+  --color-error-content: oklch(93% 0.015 75);
+
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* ── Font stacks ───────────────────────────────────────────────────── */
+@theme {
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+}
+
+/* ── Design tokens (backward compat with app.js / template references) */
+@layer base {
+  :root {
+    --bb-positive: oklch(72% 0.1 155);
+    --bb-negative: oklch(65% 0.14 25);
+    --bb-border: rgba(211, 187, 154, 0.14);
+    --bb-border-strong: rgba(211, 187, 154, 0.24);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: oklch(10.5% 0.01 70);
+  }
+}
+
+/* ── Custom utilities ──────────────────────────────────────────────── */
+@utility font-display {
+  font-family: var(--font-display);
+}
+
+@utility odds-pos {
+  color: var(--bb-positive);
+}
+
+@utility odds-neg {
+  color: var(--color-base-content);
+}
+
+/* ── Component layer — betbot-specific patterns ────────────────────── */
+@layer components {
+  /* HTMX live-fragment transition states */
+  .live-fragment {
+    transition: opacity 0.2s ease;
+  }
+  .live-fragment.is-loading {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .live-fragment--error {
+    border-color: oklch(65% 0.14 25);
+  }
+
+  /* Skip link (accessibility) */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    z-index: 100;
+  }
+  .skip-link:focus {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+    height: auto;
+    padding: 0.75rem 1.25rem;
+    background: oklch(13% 0.01 65);
+    color: oklch(93% 0.015 75);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    z-index: 9999;
+  }
+}

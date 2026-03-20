@@ -1,108 +1,126 @@
 {{template "partials/alert_banner" .}}
 
-<section class="page-hero page-hero--compact">
+<section class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
     <div>
-        <p class="eyebrow">Bet Ledger</p>
-        <h2>Every position in one place</h2>
-        <p class="page-hero__lede">Manual and recommendation-driven tickets, organized for review rather than administration.</p>
+        <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">Bet Ledger</p>
+        <h2 class="font-display text-2xl font-bold tracking-tight">Every position in one place</h2>
+        <p class="text-sm text-base-content/50 mt-1">Manual and recommendation-driven tickets, organized for review rather than administration.</p>
     </div>
-    <a class="button button--primary" href="/bets/new">Record Bet</a>
+    <a class="btn btn-primary btn-sm" href="/bets/new">Record Bet</a>
 </section>
 
-<section class="metric-grid metric-grid--five">
-    <article class="metric-card"><span class="metric-card__label">Total staked</span><strong class="metric-card__value">{{.TotalStaked}}</strong></article>
-    <article class="metric-card"><span class="metric-card__label">Total returned</span><strong class="metric-card__value">{{.TotalReturned}}</strong></article>
-    <article class="metric-card {{if .NetPnLPositive}}metric-card--accent{{end}}"><span class="metric-card__label">Net P&amp;L</span><strong class="metric-card__value">{{.NetPnL}}</strong><span class="metric-card__hint">ROI {{.ROI}}</span></article>
-    <article class="metric-card"><span class="metric-card__label">Bets</span><strong class="metric-card__value">{{.OpenBets}} open</strong><span class="metric-card__hint">{{.SettledBets}} settled · {{.VoidedBets}} voided</span></article>
-    <article class="metric-card"><span class="metric-card__label">Settlement lag</span><strong class="metric-card__value">{{.SettlementLagCount}}</strong><span class="metric-card__hint">tickets past event time</span></article>
+<section class="stats stats-horizontal bg-base-200 border border-base-300 w-full mb-6">
+    <div class="stat">
+        <div class="stat-title">Total staked</div>
+        <div class="stat-value font-display text-lg">{{.TotalStaked}}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Total returned</div>
+        <div class="stat-value font-display text-lg">{{.TotalReturned}}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Net P&amp;L</div>
+        <div class="stat-value font-display text-lg {{if .NetPnLPositive}}text-primary{{end}}">{{.NetPnL}}</div>
+        <div class="stat-desc">ROI {{.ROI}}</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Bets</div>
+        <div class="stat-value font-display text-lg">{{.OpenBets}} open</div>
+        <div class="stat-desc">{{.SettledBets}} settled · {{.VoidedBets}} voided</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">Settlement lag</div>
+        <div class="stat-value font-display text-lg">{{.SettlementLagCount}}</div>
+        <div class="stat-desc">tickets past event time</div>
+    </div>
 </section>
 
-<section class="panel">
-    <div class="panel__header panel__header--stacked">
-        <div>
-            <p class="eyebrow">Filters</p>
-            <h3>Ledger view</h3>
-        </div>
-        <form class="filter-form filter-form--inline" method="get" action="/bets">
-            <div class="filter-form__controls">
-                <select name="sport" class="filter-form__select">
+<section class="card bg-base-200 border border-base-300">
+    <div class="card-body">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+                <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Filters</p>
+                <h3 class="font-display text-lg font-bold">Ledger view</h3>
+            </div>
+            <form class="flex items-center gap-2" method="get" action="/bets">
+                <select name="sport" class="select select-bordered select-sm">
                     <option value="">All sports</option>
                     <option value="NHL" {{if eq .SportFilter "NHL"}}selected{{end}}>NHL</option>
                     <option value="NFL" {{if eq .SportFilter "NFL"}}selected{{end}}>NFL</option>
                     <option value="NBA" {{if eq .SportFilter "NBA"}}selected{{end}}>NBA</option>
                     <option value="MLB" {{if eq .SportFilter "MLB"}}selected{{end}}>MLB</option>
                 </select>
-                <select name="status" class="filter-form__select">
+                <select name="status" class="select select-bordered select-sm">
                     <option value="">All status</option>
                     <option value="placed" {{if eq .StatusFilter "placed"}}selected{{end}}>Open</option>
                     <option value="settled" {{if eq .StatusFilter "settled"}}selected{{end}}>Settled</option>
                     <option value="voided" {{if eq .StatusFilter "voided"}}selected{{end}}>Voided</option>
                 </select>
-                <button type="submit" class="button button--primary button--compact">Apply</button>
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
                 {{if or .SportFilter .StatusFilter}}
-                <a href="/bets" class="button button--ghost button--compact">Clear</a>
+                <a href="/bets" class="btn btn-ghost btn-sm">Clear</a>
                 {{end}}
-            </div>
-        </form>
-    </div>
+            </form>
+        </div>
 
-    <div class="table-shell">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Game</th>
-                    <th>Side</th>
-                    <th>Book</th>
-                    <th>Source</th>
-                    <th>Snapshot</th>
-                    <th>Odds</th>
-                    <th>Stake</th>
-                    <th>Result</th>
-                    <th>Payout</th>
-                    <th>P&amp;L</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{if .Bets}}
-                {{range .Bets}}
-                <tr>
-                    <td><span class="timestamp" data-timestamp="{{.PlacedAt}}">{{.PlacedAt}}</span></td>
-                    <td>{{.HomeTeam}} vs {{.AwayTeam}}</td>
-                    <td>{{.Side}}</td>
-                    <td>{{.BookKey}}</td>
-                    <td><span class="subtle-chip">{{.PlacementSource}}</span></td>
-                    <td class="data-table__mono">{{.SnapshotRef}}</td>
-                    <td class="data-table__mono">{{.AmericanOdds}}</td>
-                    <td>{{.StakeDollars}}</td>
-                    <td>
-                        {{if eq .Status "placed"}}<span class="status-pill status-pill--warn">open</span>
-                        {{else if eq .Status "settled"}}
-                            {{if eq .SettlementResult "win"}}<span class="status-pill status-pill--ok">win</span>
-                            {{else if eq .SettlementResult "loss"}}<span class="status-pill status-pill--degraded">loss</span>
-                            {{else}}<span class="status-pill">push</span>{{end}}
-                        {{else if eq .Status "voided"}}<span class="status-pill status-pill--muted">voided</span>
-                        {{else}}<span class="status-pill">{{.Status}}</span>{{end}}
-                    </td>
-                    <td>{{.PayoutDollars}}</td>
-                    <td>{{.PnLDollars}}</td>
-                    <td>
-                        {{if eq .Status "placed"}}
-                        <div class="button-group">
-                            <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="win"><button type="submit" class="button button--compact button--ghost">Win</button></form>
-                            <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="loss"><button type="submit" class="button button--compact button--ghost">Loss</button></form>
-                            <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="push"><button type="submit" class="button button--compact button--ghost">Push</button></form>
-                            <form method="post" action="/bets/{{.ID}}/void"><button type="submit" class="button button--compact button--ghost">Void</button></form>
-                        </div>
-                        {{end}}
-                    </td>
-                </tr>
-                {{end}}
-                {{else}}
-                <tr><td colspan="12" class="empty-state">No bets recorded yet.</td></tr>
-                {{end}}
-            </tbody>
-        </table>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Game</th>
+                        <th>Side</th>
+                        <th>Book</th>
+                        <th>Source</th>
+                        <th>Snapshot</th>
+                        <th>Odds</th>
+                        <th>Stake</th>
+                        <th>Result</th>
+                        <th>Payout</th>
+                        <th>P&amp;L</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{if .Bets}}
+                    {{range .Bets}}
+                    <tr>
+                        <td><span class="timestamp" data-timestamp="{{.PlacedAt}}">{{.PlacedAt}}</span></td>
+                        <td>{{.HomeTeam}} vs {{.AwayTeam}}</td>
+                        <td>{{.Side}}</td>
+                        <td>{{.BookKey}}</td>
+                        <td><span class="badge badge-ghost badge-xs">{{.PlacementSource}}</span></td>
+                        <td class="font-mono">{{.SnapshotRef}}</td>
+                        <td class="font-mono">{{.AmericanOdds}}</td>
+                        <td>{{.StakeDollars}}</td>
+                        <td>
+                            {{if eq .Status "placed"}}<span class="badge badge-warning badge-sm">open</span>
+                            {{else if eq .Status "settled"}}
+                                {{if eq .SettlementResult "win"}}<span class="badge badge-success badge-sm">win</span>
+                                {{else if eq .SettlementResult "loss"}}<span class="badge badge-error badge-sm">loss</span>
+                                {{else}}<span class="badge badge-ghost badge-sm">push</span>{{end}}
+                            {{else if eq .Status "voided"}}<span class="badge badge-ghost badge-sm">voided</span>
+                            {{else}}<span class="badge badge-sm">{{.Status}}</span>{{end}}
+                        </td>
+                        <td>{{.PayoutDollars}}</td>
+                        <td>{{.PnLDollars}}</td>
+                        <td>
+                            {{if eq .Status "placed"}}
+                            <div class="flex gap-1">
+                                <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="win"><button type="submit" class="btn btn-ghost btn-xs">Win</button></form>
+                                <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="loss"><button type="submit" class="btn btn-ghost btn-xs">Loss</button></form>
+                                <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="push"><button type="submit" class="btn btn-ghost btn-xs">Push</button></form>
+                                <form method="post" action="/bets/{{.ID}}/void"><button type="submit" class="btn btn-ghost btn-xs">Void</button></form>
+                            </div>
+                            {{end}}
+                        </td>
+                    </tr>
+                    {{end}}
+                    {{else}}
+                    <tr><td colspan="12" class="text-center text-sm text-base-content/40 italic py-8">No bets recorded yet.</td></tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>

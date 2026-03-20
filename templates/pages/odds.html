@@ -1,21 +1,21 @@
 {{template "partials/alert_banner" .}}
 
-<section class="page-hero page-hero--compact">
+<section class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
     <div>
-        <p class="eyebrow">Market Board</p>
-        <h2>Latest persisted prices</h2>
-        <p class="page-hero__lede">Stored quotes only. This page stays simple: scope, price, and capture time.</p>
+        <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">Market Board</p>
+        <h2 class="font-display text-2xl font-bold tracking-tight">Latest persisted prices</h2>
+        <p class="text-sm text-base-content/50 mt-1">Stored quotes only. This page stays simple: scope, price, and capture time.</p>
     </div>
     {{template "partials/sport_filter" .}}
 </section>
 
-<section class="panel">
-    <div class="panel__header">
-        <div>
-            <p class="eyebrow">Live Table</p>
-            <h3>Current market rows</h3>
+<section class="card bg-base-200 border border-base-300">
+    <div class="card-body">
+        <div class="mb-4">
+            <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Live Table</p>
+            <h3 class="font-display text-lg font-bold">Current market rows</h3>
+            <p class="text-sm text-base-content/40">Auto-refreshes every 25 seconds with the current scope.</p>
         </div>
-        <p class="panel__lede">Auto-refreshes every 25 seconds with the current scope.</p>
+        {{template "partials/odds_table_block" .}}
     </div>
-    {{template "partials/odds_table_block" .}}
 </section>

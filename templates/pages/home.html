@@ -1,139 +1,134 @@
 {{template "partials/alert_banner" .}}
 
-<section class="hero">
-    <div class="hero__copy">
-        <p class="eyebrow">{{or .SelectedSportLabel "All sports"}} scope</p>
-        <h2>{{or .HeroTitle "Game-day decisions without admin-tool drag"}}</h2>
-        <p class="hero__lede">{{or .HeroLede "Recommendations, bankroll posture, open positions, and near-term games in one calm surface."}}</p>
+<section class="mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+            <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">{{or .SelectedSportLabel "All sports"}} scope</p>
+            <h2 class="font-display text-2xl sm:text-3xl font-bold tracking-tight">{{or .HeroTitle "Game-day decisions without admin-tool drag"}}</h2>
+            <p class="text-sm text-base-content/50 mt-1 max-w-xl">{{or .HeroLede "Recommendations, bankroll posture, open positions, and near-term games in one calm surface."}}</p>
+        </div>
+        <div class="shrink-0">
+            {{template "partials/sport_filter" .}}
+        </div>
     </div>
 
-    <div class="hero__controls">
-        {{template "partials/sport_filter" .}}
-    </div>
-
-    <div class="hero__stats">
-        <article class="metric-card metric-card--accent">
-            <span class="metric-card__label">Live recommendations</span>
-            <strong class="metric-card__value">{{.HeroRecommendationCount}}</strong>
-            <span class="metric-card__hint">current decision rail</span>
-        </article>
-        <article class="metric-card">
-            <span class="metric-card__label">Open bets</span>
-            <strong class="metric-card__value">{{.HeroOpenBetsCount}}</strong>
-            <span class="metric-card__hint">positions still working</span>
-        </article>
-        <article class="metric-card">
-            <span class="metric-card__label">Open exposure</span>
-            <strong class="metric-card__value">{{.HeroExposure}}</strong>
-            <span class="metric-card__hint">capital currently in play</span>
-        </article>
-        <article class="metric-card">
-            <span class="metric-card__label">Balance</span>
-            <strong class="metric-card__value">{{.HeroBalance}}</strong>
-            <span class="metric-card__hint">ledger-backed bankroll</span>
-        </article>
+    <div class="stats stats-horizontal bg-base-200 border border-base-300 w-full">
+        <div class="stat">
+            <div class="stat-title">Live recommendations</div>
+            <div class="stat-value text-primary font-display">{{.HeroRecommendationCount}}</div>
+            <div class="stat-desc">current decision rail</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Open bets</div>
+            <div class="stat-value font-display">{{.HeroOpenBetsCount}}</div>
+            <div class="stat-desc">positions still working</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Open exposure</div>
+            <div class="stat-value font-display">{{.HeroExposure}}</div>
+            <div class="stat-desc">capital currently in play</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Balance</div>
+            <div class="stat-value font-display">{{.HeroBalance}}</div>
+            <div class="stat-desc">ledger-backed bankroll</div>
+        </div>
     </div>
 </section>
 
-<section class="home-grid">
-    <div class="home-grid__main">
-        <section class="panel panel--feature">
-            <div class="panel__header panel__header--stacked">
-                <div>
-                    <p class="eyebrow">Decision Rail</p>
-                    <h3>Recommended looks right now</h3>
+<section class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 mb-8">
+    <div>
+        <div class="card bg-base-200 border border-primary/20">
+            <div class="card-body">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
+                    <div>
+                        <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Decision Rail</p>
+                        <h3 class="font-display text-lg font-bold">Recommended looks right now</h3>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="btn btn-primary btn-sm"
+                                id="refresh-picks-btn"
+                                hx-post="{{printf "/recommendations/refresh%s" (or .SelectedSportQuery "")}}"
+                                hx-swap="none"
+                                hx-indicator="#refresh-spinner"
+                                hx-disabled-elt="this"
+                                hx-on::after-request="htmx.trigger('#home-recommendations-block', 'refreshDone')">
+                            Refresh Picks
+                        </button>
+                        <span id="refresh-spinner" class="htmx-indicator loading loading-spinner loading-sm text-primary"></span>
+                    </div>
                 </div>
-                <div class="panel__header-actions">
-                    <button class="button button--primary"
-                            id="refresh-picks-btn"
-                            hx-post="{{printf "/recommendations/refresh%s" (or .SelectedSportQuery "")}}"
-                            hx-swap="none"
-                            hx-indicator="#refresh-spinner"
-                            hx-disabled-elt="this"
-                            hx-on::after-request="htmx.trigger('#home-recommendations-block', 'refreshDone')">
-                        Refresh Picks
-                    </button>
-                    <span id="refresh-spinner" class="htmx-indicator spinner"></span>
-                </div>
-                <p class="panel__lede">Built for calm scanning: edge, stake, bankroll posture, and immediate action without flipping into another tool.</p>
+                <p class="text-sm text-base-content/40 mb-4">Built for calm scanning: edge, stake, bankroll posture, and immediate action without flipping into another tool.</p>
+                {{template "partials/home_recommendations_block" .}}
             </div>
-            {{template "partials/home_recommendations_block" .}}
-        </section>
+        </div>
     </div>
 
-    <aside class="home-grid__side">
-        <section class="panel panel--side">
-            <div class="panel__header">
-                <div>
-                    <p class="eyebrow">Bankroll Pulse</p>
-                    <h3>Current posture</h3>
+    <aside class="flex flex-col gap-6">
+        <div class="card bg-base-200 border border-base-300">
+            <div class="card-body">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Bankroll Pulse</p>
+                <h3 class="font-display text-lg font-bold mb-3">Current posture</h3>
+                {{if .BankrollError}}
+                <p class="text-sm text-base-content/40 italic">{{.BankrollError}}</p>
+                {{else}}
+                <div class="flex flex-col divide-y divide-base-300">
+                    <div class="flex justify-between py-2 text-sm"><span class="text-base-content/60">Balance</span><strong>{{.BankrollBalance}}</strong></div>
+                    <div class="flex justify-between py-2 text-sm"><span class="text-base-content/60">Open exposure</span><strong>{{.BankrollOpenExposure}}</strong></div>
+                    <div class="flex justify-between py-2 text-sm"><span class="text-base-content/60">Net P&amp;L</span><strong>{{.BankrollNetPnL}}</strong></div>
+                    <div class="flex justify-between py-2 text-sm"><span class="text-base-content/60">Open bets</span><strong>{{.BankrollOpenBets}}</strong></div>
+                    <div class="flex justify-between py-2 text-sm"><span class="text-base-content/60">Settled bets</span><strong>{{.BankrollSettledBets}}</strong></div>
                 </div>
-            </div>
-            {{if .BankrollError}}
-            <p class="empty-state">{{.BankrollError}}</p>
-            {{else}}
-            <div class="stack-list stack-list--compact">
-                <div class="stack-row"><span>Balance</span><strong>{{.BankrollBalance}}</strong></div>
-                <div class="stack-row"><span>Open exposure</span><strong>{{.BankrollOpenExposure}}</strong></div>
-                <div class="stack-row"><span>Net P&amp;L</span><strong>{{.BankrollNetPnL}}</strong></div>
-                <div class="stack-row"><span>Open bets</span><strong>{{.BankrollOpenBets}}</strong></div>
-                <div class="stack-row"><span>Settled bets</span><strong>{{.BankrollSettledBets}}</strong></div>
-            </div>
-            <div class="panel__actions">
-                <a class="button button--primary" href="/bankroll">Open bankroll</a>
-                <a class="button button--ghost" href="/bets">See all bets</a>
-            </div>
-            {{end}}
-        </section>
-
-        <section class="panel panel--side panel--quiet">
-            <div class="panel__header">
-                <div>
-                    <p class="eyebrow">Upcoming Slate</p>
-                    <h3>What needs attention soon</h3>
+                <div class="card-actions mt-4">
+                    <a class="btn btn-primary btn-sm flex-1" href="/bankroll">Open bankroll</a>
+                    <a class="btn btn-ghost btn-sm flex-1" href="/bets">See all bets</a>
                 </div>
-            </div>
-            {{if .UpcomingGamesError}}
-            <p class="empty-state">{{.UpcomingGamesError}}</p>
-            {{else if .UpcomingGames}}
-            <div class="stack-list">
-                {{range .UpcomingGames}}
-                <article class="slate-card">
-                    <div>
-                        <p class="slate-card__meta">{{.Sport}} · <span class="timestamp" data-timestamp="{{.CommenceTime}}">{{.CommenceTime}}</span></p>
-                        <h4>{{.Matchup}}</h4>
-                    </div>
-                    <span class="tone-chip tone-chip--{{.ReasonTone}}">{{.Reason}}</span>
-                </article>
                 {{end}}
             </div>
-            {{else}}
-            <p class="empty-state">No near-term games in the current scope.</p>
-            {{end}}
-        </section>
+        </div>
+
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Upcoming Slate</p>
+                <h3 class="font-display text-lg font-bold mb-3">What needs attention soon</h3>
+                {{if .UpcomingGamesError}}
+                <p class="text-sm text-base-content/40 italic">{{.UpcomingGamesError}}</p>
+                {{else if .UpcomingGames}}
+                <div class="flex flex-col divide-y divide-base-300">
+                    {{range .UpcomingGames}}
+                    <article class="flex justify-between items-center py-3">
+                        <div>
+                            <p class="text-xs text-base-content/40">{{.Sport}} · <span class="timestamp" data-timestamp="{{.CommenceTime}}">{{.CommenceTime}}</span></p>
+                            <h4 class="text-sm font-semibold">{{.Matchup}}</h4>
+                        </div>
+                        <span class="badge badge-sm {{if eq .ReasonTone "accent"}}badge-primary{{else if eq .ReasonTone "positive"}}badge-success{{else if eq .ReasonTone "negative"}}badge-error{{else}}badge-ghost{{end}}">{{.Reason}}</span>
+                    </article>
+                    {{end}}
+                </div>
+                {{else}}
+                <p class="text-sm text-base-content/40 italic">No near-term games in the current scope.</p>
+                {{end}}
+            </div>
+        </div>
     </aside>
 </section>
 
-<section class="home-grid home-grid--lower">
-    <section class="panel">
-        <div class="panel__header panel__header--stacked">
-            <div>
-                <p class="eyebrow">Open Positions</p>
-                <h3>Bets already in the market</h3>
-            </div>
-            <p class="panel__lede">Current exposure and placement context, tuned for an always-open screen.</p>
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card bg-base-200 border border-base-300">
+        <div class="card-body">
+            <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Open Positions</p>
+            <h3 class="font-display text-lg font-bold">Bets already in the market</h3>
+            <p class="text-sm text-base-content/40 mb-4">Current exposure and placement context, tuned for an always-open screen.</p>
+            {{template "partials/home_open_bets_block" .}}
         </div>
-        {{template "partials/home_open_bets_block" .}}
-    </section>
+    </div>
 
-    <section class="panel panel--quiet">
-        <div class="panel__header panel__header--stacked">
-            <div>
-                <p class="eyebrow">System Read</p>
-                <h3>Market and ingestion freshness</h3>
-            </div>
-            <p class="panel__lede">Visible, but no longer the center of the product.</p>
+    <div class="card bg-base-100 border border-base-300">
+        <div class="card-body">
+            <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">System Read</p>
+            <h3 class="font-display text-lg font-bold">Market and ingestion freshness</h3>
+            <p class="text-sm text-base-content/40 mb-4">Visible, but no longer the center of the product.</p>
+            {{template "partials/pipeline_status_block" .}}
         </div>
-        {{template "partials/pipeline_status_block" .}}
-    </section>
+    </div>
 </section>

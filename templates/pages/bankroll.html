@@ -1,75 +1,69 @@
 {{template "partials/alert_banner" .}}
 
-<section class="page-hero page-hero--compact">
+<section class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
     <div>
-        <p class="eyebrow">Bankroll</p>
-        <h2>Ledger-backed capital</h2>
-        <p class="page-hero__lede">Simple visibility into balance and the entries that created it.</p>
+        <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">Bankroll</p>
+        <h2 class="font-display text-2xl font-bold tracking-tight">Ledger-backed capital</h2>
+        <p class="text-sm text-base-content/50 mt-1">Simple visibility into balance and the entries that created it.</p>
     </div>
 </section>
 
-<section class="home-grid home-grid--lower">
-    <section class="panel panel--feature">
-        <div class="panel__header">
-            <div>
-                <p class="eyebrow">Current Balance</p>
-                <h3>{{.Balance}}</h3>
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="card bg-base-200 border border-primary/20">
+        <div class="card-body">
+            <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Current Balance</p>
+            <h3 class="font-display text-3xl font-bold text-primary mt-1">{{.Balance}}</h3>
+            <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+                <div><span class="text-xs text-base-content/40 block">Ledger entries shown</span><strong>{{len .Entries}}</strong></div>
+                <div><span class="text-xs text-base-content/40 block">Currency</span><strong>USD</strong></div>
             </div>
-        </div>
-        <div class="detail-grid detail-grid--full">
-            <div><span class="detail-grid__label">Ledger entries shown</span><strong>{{len .Entries}}</strong></div>
-            <div><span class="detail-grid__label">Currency</span><strong>USD</strong></div>
-        </div>
-    </section>
-
-    <section class="panel panel--side">
-        <div class="panel__header">
-            <div>
-                <p class="eyebrow">Deposit Funds</p>
-                <h3>Add bankroll</h3>
-            </div>
-        </div>
-        <form method="post" action="/bankroll/deposit" class="entry-form entry-form--compact">
-            <label class="form-label" for="amount_dollars">Amount</label>
-            <div class="entry-form__inline">
-                <input type="number" name="amount_dollars" id="amount_dollars" class="form-input" step="0.01" min="0.01" placeholder="100.00" required>
-                <button type="submit" class="button button--primary">Deposit</button>
-            </div>
-        </form>
-    </section>
-</section>
-
-<section class="panel">
-    <div class="panel__header">
-        <div>
-            <p class="eyebrow">Ledger</p>
-            <h3>Recent entries</h3>
         </div>
     </div>
-    <div class="table-shell">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th>Reference</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{if .Entries}}
-                {{range .Entries}}
-                <tr>
-                    <td><span class="timestamp" data-timestamp="{{.CreatedAt}}">{{.CreatedAt}}</span></td>
-                    <td><span class="subtle-chip">{{.EntryType}}</span></td>
-                    <td class="data-table__mono">{{.AmountDollars}}</td>
-                    <td>{{.ReferenceType}}: {{.ReferenceID}}</td>
-                </tr>
-                {{end}}
-                {{else}}
-                <tr><td colspan="4" class="empty-state">No ledger entries yet.</td></tr>
-                {{end}}
-            </tbody>
-        </table>
+
+    <div class="card bg-base-200 border border-base-300">
+        <div class="card-body">
+            <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Deposit Funds</p>
+            <h3 class="font-display text-lg font-bold mb-4">Add bankroll</h3>
+            <form method="post" action="/bankroll/deposit" class="flex items-end gap-3">
+                <div class="form-control flex-1">
+                    <label class="label" for="amount_dollars"><span class="label-text">Amount</span></label>
+                    <input type="number" name="amount_dollars" id="amount_dollars" class="input input-bordered w-full" step="0.01" min="0.01" placeholder="100.00" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Deposit</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="card bg-base-200 border border-base-300">
+    <div class="card-body">
+        <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold">Ledger</p>
+        <h3 class="font-display text-lg font-bold mb-4">Recent entries</h3>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{if .Entries}}
+                    {{range .Entries}}
+                    <tr>
+                        <td><span class="timestamp" data-timestamp="{{.CreatedAt}}">{{.CreatedAt}}</span></td>
+                        <td><span class="badge badge-ghost badge-xs">{{.EntryType}}</span></td>
+                        <td class="font-mono">{{.AmountDollars}}</td>
+                        <td>{{.ReferenceType}}: {{.ReferenceID}}</td>
+                    </tr>
+                    {{end}}
+                    {{else}}
+                    <tr><td colspan="4" class="text-center text-sm text-base-content/40 italic py-8">No ledger entries yet.</td></tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>

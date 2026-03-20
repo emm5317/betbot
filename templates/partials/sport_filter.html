@@ -1,14 +1,12 @@
-<form class="filter-form" method="get" action="{{or .SportFilterAction "/"}}" aria-label="Sport scope filter">
-    <label class="filter-form__label" for="sport-filter">Scope</label>
-    <div class="filter-form__controls">
-        <select class="filter-form__select" id="sport-filter" name="sport">
-            {{range .SportFilterOptions}}
-            <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
-            {{end}}
-        </select>
-        <button class="button button--primary button--compact" type="submit">Apply</button>
-        {{if .SelectedSport}}
-        <a class="button button--ghost button--compact" href="{{.SportFilterAction}}">Clear</a>
+<form class="flex items-center gap-2" method="get" action="{{or .SportFilterAction "/"}}" aria-label="Sport scope filter">
+    <label class="text-xs font-semibold text-base-content/50 uppercase tracking-wider" for="sport-filter">Scope</label>
+    <select class="select select-bordered select-sm" id="sport-filter" name="sport">
+        {{range .SportFilterOptions}}
+        <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
         {{end}}
-    </div>
+    </select>
+    <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+    {{if .SelectedSport}}
+    <a class="btn btn-ghost btn-sm" href="{{.SportFilterAction}}">Clear</a>
+    {{end}}
 </form>

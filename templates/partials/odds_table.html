@@ -1,15 +1,15 @@
-<div class="table-shell" role="region" aria-label="Latest odds table" tabindex="0">
-    <table class="data-table">
+<div class="overflow-x-auto" role="region" aria-label="Latest odds table" tabindex="0">
+    <table class="table table-zebra table-sm">
         <thead>
             <tr>
-                <th scope="col">Sport</th>
-                <th scope="col">Matchup</th>
-                <th scope="col">Book</th>
-                <th scope="col">Market</th>
-                <th scope="col">Outcome</th>
-                <th scope="col">Line</th>
-                <th scope="col">Price</th>
-                <th scope="col">Captured</th>
+                <th>Sport</th>
+                <th>Matchup</th>
+                <th>Book</th>
+                <th>Market</th>
+                <th>Outcome</th>
+                <th>Line</th>
+                <th>Price</th>
+                <th>Captured</th>
             </tr>
         </thead>
         <tbody>
@@ -17,18 +17,18 @@
                 {{range .}}
                 <tr>
                     <td>{{or .Sport .SportKey "n/a"}}</td>
-                    <td><strong>{{or .AwayTeam .Visitor "Away"}}</strong> <span class="muted">at</span> <strong>{{or .HomeTeam .Home "Home"}}</strong></td>
+                    <td><strong>{{or .AwayTeam .Visitor "Away"}}</strong> <span class="text-base-content/40">at</span> <strong>{{or .HomeTeam .Home "Home"}}</strong></td>
                     <td>{{or .Book .BookKey .Bookmaker "n/a"}}</td>
                     <td>{{or .Market .MarketKey "n/a"}}</td>
                     <td>{{or .Outcome .Selection .Side "n/a"}}</td>
                     <td>{{if .Point}}{{.Point}}{{else}}-{{end}}</td>
-                    <td class="data-table__mono">{{if .PriceAmerican}}{{.PriceAmerican}}{{else if .Price}}{{.Price}}{{else}}-{{end}}</td>
+                    <td class="font-mono">{{if .PriceAmerican}}{{.PriceAmerican}}{{else if .Price}}{{.Price}}{{else}}-{{end}}</td>
                     <td class="timestamp" data-timestamp="{{or .CapturedAt .LastSeenAt}}">{{or .CapturedAt .LastSeenAt "-"}}</td>
                 </tr>
                 {{end}}
             {{else}}
                 <tr>
-                    <td colspan="8" class="empty-state">No persisted odds rows are available yet.</td>
+                    <td colspan="8" class="text-center text-sm text-base-content/40 italic py-8">No persisted odds rows are available yet.</td>
                 </tr>
             {{end}}
         </tbody>

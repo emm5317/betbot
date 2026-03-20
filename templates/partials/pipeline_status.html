@@ -1,17 +1,35 @@
 {{$pipeline := .Pipeline}}
 {{$status := or $pipeline.Status .Status .OverallStatus "warming"}}
-<div class="stat-strip stat-strip--six">
-    <div><span class="stat-strip__label">Status</span><strong>{{$status}}</strong></div>
-    <div><span class="stat-strip__label">Last success</span><strong class="timestamp" data-timestamp="{{or $pipeline.LastSuccessAt .LastSuccessAt .LastPollAt}}">{{or $pipeline.LastSuccessAt .LastSuccessAt .LastPollAt "pending"}}</strong></div>
-    <div><span class="stat-strip__label">Inserted</span><strong>{{or $pipeline.InsertCount .InsertCount .LastInsertCount "0"}}</strong></div>
-    <div><span class="stat-strip__label">Dedup</span><strong>{{or $pipeline.DedupCount .DedupCount .DedupSkips "0"}}</strong></div>
-    <div><span class="stat-strip__label">Scope</span><strong>{{or $pipeline.ScopeSportLabel .SelectedSportLabel "All sports"}}</strong></div>
-    <div><span class="stat-strip__label">Snapshots</span><strong>{{or $pipeline.ScopeSnapshotsCount "0"}}</strong></div>
+<div class="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center mb-4">
+    <div class="bg-base-300/50 rounded-lg p-2">
+        <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Status</span>
+        <strong class="text-sm">{{$status}}</strong>
+    </div>
+    <div class="bg-base-300/50 rounded-lg p-2">
+        <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Last success</span>
+        <strong class="text-sm timestamp" data-timestamp="{{or $pipeline.LastSuccessAt .LastSuccessAt .LastPollAt}}">{{or $pipeline.LastSuccessAt .LastSuccessAt .LastPollAt "pending"}}</strong>
+    </div>
+    <div class="bg-base-300/50 rounded-lg p-2">
+        <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Inserted</span>
+        <strong class="text-sm font-mono">{{or $pipeline.InsertCount .InsertCount .LastInsertCount "0"}}</strong>
+    </div>
+    <div class="bg-base-300/50 rounded-lg p-2">
+        <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Dedup</span>
+        <strong class="text-sm font-mono">{{or $pipeline.DedupCount .DedupCount .DedupSkips "0"}}</strong>
+    </div>
+    <div class="bg-base-300/50 rounded-lg p-2">
+        <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Scope</span>
+        <strong class="text-sm">{{or $pipeline.ScopeSportLabel .SelectedSportLabel "All sports"}}</strong>
+    </div>
+    <div class="bg-base-300/50 rounded-lg p-2">
+        <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Snapshots</span>
+        <strong class="text-sm font-mono">{{or $pipeline.ScopeSnapshotsCount "0"}}</strong>
+    </div>
 </div>
-<div class="detail-grid detail-grid--full">
-    <div><span class="detail-grid__label">Scoped last snapshot</span><strong class="timestamp" data-timestamp="{{or $pipeline.ScopeLastSnapshotAt "pending"}}">{{or $pipeline.ScopeLastSnapshotAt "pending"}}</strong></div>
-    <div><span class="detail-grid__label">Last poll started</span><strong class="timestamp" data-timestamp="{{or $pipeline.LastStartedAt .LastStartedAt .StartedAt}}">{{or $pipeline.LastStartedAt .LastStartedAt .StartedAt "pending"}}</strong></div>
-    <div><span class="detail-grid__label">Duration</span><strong>{{or $pipeline.Duration .Duration "n/a"}}</strong></div>
-    <div><span class="detail-grid__label">Last error</span><strong>{{or $pipeline.LastError .LastError "none"}}</strong></div>
-    <div><span class="detail-grid__label">Scope query</span><strong>{{or $pipeline.ScopeError "none"}}</strong></div>
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
+    <div><span class="text-xs text-base-content/40 block">Scoped last snapshot</span><strong class="timestamp" data-timestamp="{{or $pipeline.ScopeLastSnapshotAt "pending"}}">{{or $pipeline.ScopeLastSnapshotAt "pending"}}</strong></div>
+    <div><span class="text-xs text-base-content/40 block">Last poll started</span><strong class="timestamp" data-timestamp="{{or $pipeline.LastStartedAt .LastStartedAt .StartedAt}}">{{or $pipeline.LastStartedAt .LastStartedAt .StartedAt "pending"}}</strong></div>
+    <div><span class="text-xs text-base-content/40 block">Duration</span><strong>{{or $pipeline.Duration .Duration "n/a"}}</strong></div>
+    <div><span class="text-xs text-base-content/40 block">Last error</span><strong>{{or $pipeline.LastError .LastError "none"}}</strong></div>
+    <div><span class="text-xs text-base-content/40 block">Scope query</span><strong>{{or $pipeline.ScopeError "none"}}</strong></div>
 </div>

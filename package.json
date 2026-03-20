@@ -1,0 +1,29 @@
+{
+  "name": "betbot",
+  "version": "1.0.0",
+  "description": "Open-source sports betting infrastructure for `MLB`, `NBA`, `NHL`, and `NFL`.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emm5317/betbot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/emm5317/betbot/issues"
+  },
+  "homepage": "https://github.com/emm5317/betbot#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
+    "daisyui": "^5.5.19",
+    "tailwindcss": "^4.2.2"
+  }
+}

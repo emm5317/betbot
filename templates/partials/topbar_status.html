@@ -1,11 +1,11 @@
 {{$status := or .OverallStatus .Status "warming"}}
 {{$query := or .SelectedSportQuery ""}}
 <div id="topbar-status-region"
-     class="topbar-status live-fragment"
+     class="flex items-center gap-2 live-fragment"
      hx-get="{{printf "/partials/topbar-status%s" $query}}"
      hx-trigger="load, every 30s"
      hx-swap="outerHTML">
-    <span class="status-pill status-pill--{{if or (eq $status "ok") (eq $status "success")}}ok{{else if eq $status "stale"}}warn{{else if eq $status "degraded"}}degraded{{else}}muted{{end}}">{{$status}}</span>
-    <span class="subtle-chip">{{or .Environment .Env "development"}}</span>
-    <span class="subtle-chip">{{or .SelectedSportLabel "All sports"}}</span>
+    <span class="badge badge-sm {{if or (eq $status "ok") (eq $status "success")}}badge-success{{else if eq $status "stale"}}badge-warning{{else if eq $status "degraded"}}badge-error{{else}}badge-ghost{{end}}">{{$status}}</span>
+    <span class="badge badge-ghost badge-sm">{{or .Environment .Env "development"}}</span>
+    <span class="badge badge-ghost badge-sm">{{or .SelectedSportLabel "All sports"}}</span>
 </div>

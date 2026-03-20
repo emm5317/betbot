@@ -3,38 +3,27 @@
     <td>{{.HomeTeam}} vs {{.AwayTeam}}</td>
     <td>{{.Side}}</td>
     <td>{{.BookKey}}</td>
-    <td style="font-family:monospace;">{{.AmericanOdds}}</td>
+    <td class="font-mono">{{.AmericanOdds}}</td>
     <td>{{.StakeDollars}}</td>
     <td>
-        {{if eq .Status "placed"}}<span class="status-pill status-pill--warn">open</span>
+        {{if eq .Status "placed"}}<span class="badge badge-warning badge-sm">open</span>
         {{else if eq .Status "settled"}}
-            {{if eq .SettlementResult "win"}}<span class="status-pill status-pill--ok">win</span>
-            {{else if eq .SettlementResult "loss"}}<span class="status-pill status-pill--degraded">loss</span>
-            {{else}}<span class="status-pill">push</span>
+            {{if eq .SettlementResult "win"}}<span class="badge badge-success badge-sm">win</span>
+            {{else if eq .SettlementResult "loss"}}<span class="badge badge-error badge-sm">loss</span>
+            {{else}}<span class="badge badge-ghost badge-sm">push</span>
             {{end}}
-        {{else if eq .Status "voided"}}<span class="status-pill status-pill--stale">voided</span>
+        {{else if eq .Status "voided"}}<span class="badge badge-ghost badge-sm">voided</span>
         {{end}}
     </td>
     <td>{{.PayoutDollars}}</td>
     <td>{{.PnLDollars}}</td>
     <td>
         {{if eq .Status "placed"}}
-        <div class="btn-group">
-            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
-                <input type="hidden" name="result" value="win">
-                <button type="submit" class="btn btn--sm btn--ok">Win</button>
-            </form>
-            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
-                <input type="hidden" name="result" value="loss">
-                <button type="submit" class="btn btn--sm btn--danger">Loss</button>
-            </form>
-            <form method="post" action="/bets/{{.ID}}/settle" style="display:inline;">
-                <input type="hidden" name="result" value="push">
-                <button type="submit" class="btn btn--sm">Push</button>
-            </form>
-            <form method="post" action="/bets/{{.ID}}/void" style="display:inline;">
-                <button type="submit" class="btn btn--sm btn--muted">Void</button>
-            </form>
+        <div class="flex gap-1">
+            <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="win"><button type="submit" class="btn btn-ghost btn-xs">Win</button></form>
+            <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="loss"><button type="submit" class="btn btn-ghost btn-xs">Loss</button></form>
+            <form method="post" action="/bets/{{.ID}}/settle"><input type="hidden" name="result" value="push"><button type="submit" class="btn btn-ghost btn-xs">Push</button></form>
+            <form method="post" action="/bets/{{.ID}}/void"><button type="submit" class="btn btn-ghost btn-xs">Void</button></form>
         </div>
         {{end}}
     </td>

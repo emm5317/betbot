@@ -1,3 +1,11 @@
+FROM node:22-alpine AS css-builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY static/css/main.css static/css/
+COPY templates/ templates/
+RUN npx @tailwindcss/cli -i static/css/main.css -o static/css/out.css --minify
+
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
@@ -9,6 +17,7 @@ COPY cmd ./cmd
 COPY internal ./internal
 COPY templates ./templates
 COPY static ./static
+COPY --from=css-builder /app/static/css/out.css static/css/out.css
 COPY migrations ./migrations
 COPY sql ./sql
 

@@ -12,3 +12,6 @@ __pycache__/
 /artifacts/
 /data/
 /Betbot_Obsidian/
+node_modules/
+static/css/out.css
+package-lock.json

@@ -1,33 +1,47 @@
 {{if .OpenBetsError}}
-<p class="empty-state">{{.OpenBetsError}}</p>
+<p class="text-sm text-base-content/40 italic">{{.OpenBetsError}}</p>
 {{else if .OpenBets}}
-<div class="position-list">
+<div class="flex flex-col gap-4">
     {{range .OpenBets}}
-    <article class="position-card">
-        <div class="position-card__header">
-            <div>
-                <p class="position-card__meta">{{.Sport}} · {{.Source}} · ticket {{.ID}}</p>
-                <h4>{{.Matchup}}</h4>
+    <article class="card bg-base-300/50 border border-base-300">
+        <div class="card-body p-4">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-xs text-base-content/40">{{.Sport}} · {{.Source}} · ticket {{.ID}}</p>
+                    <h4 class="font-display text-base font-bold mt-0.5">{{.Matchup}}</h4>
+                </div>
+                <span class="badge badge-sm {{if eq .StateTone "accent"}}badge-primary{{else if eq .StateTone "positive"}}badge-success{{else if eq .StateTone "negative"}}badge-error{{else}}badge-ghost{{end}}">{{.State}}</span>
             </div>
-            <span class="tone-chip tone-chip--{{.StateTone}}">{{.State}}</span>
-        </div>
 
-        <div class="stat-strip">
-            <div><span class="stat-strip__label">Side</span><strong>{{.Side}}</strong></div>
-            <div><span class="stat-strip__label">Stake</span><strong>{{.Stake}}</strong></div>
-            <div><span class="stat-strip__label">Book</span><strong>{{.BookKey}}</strong></div>
-            <div><span class="stat-strip__label">Odds</span><strong>{{.AmericanOdds}}</strong></div>
-        </div>
+            <div class="grid grid-cols-4 gap-3 mt-3 text-center">
+                <div class="bg-base-200 rounded-lg p-2">
+                    <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Side</span>
+                    <strong class="text-sm font-mono">{{.Side}}</strong>
+                </div>
+                <div class="bg-base-200 rounded-lg p-2">
+                    <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Stake</span>
+                    <strong class="text-sm font-mono">{{.Stake}}</strong>
+                </div>
+                <div class="bg-base-200 rounded-lg p-2">
+                    <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Book</span>
+                    <strong class="text-sm font-mono">{{.BookKey}}</strong>
+                </div>
+                <div class="bg-base-200 rounded-lg p-2">
+                    <span class="text-[10px] uppercase tracking-wider text-base-content/40 block">Odds</span>
+                    <strong class="text-sm font-mono">{{.AmericanOdds}}</strong>
+                </div>
+            </div>
 
-        <div class="detail-grid">
-            <div><span class="detail-grid__label">Placed</span><strong class="timestamp" data-timestamp="{{.PlacedAt}}">{{.PlacedAt}}</strong></div>
-            <div><span class="detail-grid__label">Exposure</span><strong>{{.Exposure}}</strong></div>
-            <div><span class="detail-grid__label">Snapshot</span><strong>{{.SnapshotID}}</strong></div>
-            <div><span class="detail-grid__label">Status</span><strong>{{.State}}</strong></div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2 text-sm">
+                <div><span class="text-xs text-base-content/40 block">Placed</span><strong class="timestamp" data-timestamp="{{.PlacedAt}}">{{.PlacedAt}}</strong></div>
+                <div><span class="text-xs text-base-content/40 block">Exposure</span><strong>{{.Exposure}}</strong></div>
+                <div><span class="text-xs text-base-content/40 block">Snapshot</span><strong>{{.SnapshotID}}</strong></div>
+                <div><span class="text-xs text-base-content/40 block">Status</span><strong>{{.State}}</strong></div>
+            </div>
         </div>
     </article>
     {{end}}
 </div>
 {{else}}
-<p class="empty-state">No open bets in the current scope.</p>
+<p class="text-sm text-base-content/40 italic">No open bets in the current scope.</p>
 {{end}}

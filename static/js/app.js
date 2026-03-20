@@ -78,6 +78,18 @@
     });
 })();
 
+function toastStore() {
+    return {
+        toasts: [],
+        add({ msg, type = 'success' }) {
+            const t = { id: Date.now(), msg, type, visible: true };
+            this.toasts.push(t);
+            setTimeout(() => { t.visible = false; }, 3500);
+            setTimeout(() => { this.toasts = this.toasts.filter(x => x.id !== t.id); }, 4000);
+        }
+    };
+}
+
 function payoutCalc() {
     return {
         odds: '',

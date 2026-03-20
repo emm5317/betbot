@@ -5,47 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{if .Title}}{{.Title}} · {{end}}betbot</title>
     <meta name="description" content="betbot game-day dashboard for recommendations, bankroll posture, and active positions.">
-    <link rel="stylesheet" href="/static/css/app.css">
-    <script defer src="https://unpkg.com/htmx.org@1.9.12"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/out.css">
+    <script defer src="/static/js/htmx.min.js"></script>
     <script defer src="/static/js/app.js"></script>
+    <script defer src="/static/js/alpine.min.js"></script>
 </head>
-<body>
+<body class="bg-base-100 text-base-content min-h-screen">
     <a class="skip-link" href="#workspace">Skip to content</a>
 
-    <div class="app-shell" id="app-shell">
-        <header class="topbar">
-            <div class="topbar__brand">
-                <a class="brand-mark" href="/">BB</a>
-                <div>
-                    <p class="eyebrow">Game Day Surface</p>
-                    <h1 class="brand-title">betbot</h1>
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6" id="app-shell">
+        <header class="navbar bg-base-200/80 backdrop-blur-md sticky top-0 z-40 rounded-b-xl border-b border-base-300 mb-6">
+            <div class="navbar-start gap-3">
+                <a class="btn btn-ghost btn-sm font-display text-xl font-bold text-primary tracking-tight" href="/">BB</a>
+                <div class="hidden sm:block">
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold leading-none">Game Day Surface</p>
+                    <h1 class="text-sm font-display font-bold leading-tight">betbot</h1>
                 </div>
             </div>
 
-            <nav class="topbar__nav"
+            <nav class="navbar-center"
                  aria-label="Primary"
                  hx-boost="true"
                  hx-target="#app-shell"
                  hx-select="#app-shell"
                  hx-swap="outerHTML transition:true"
                  hx-push-url="true">
-                <a class="nav-link {{if eq .ActiveNav "home"}}is-active{{end}}" href="/{{.SelectedSportQuery}}">Game Day</a>
-                <a class="nav-link {{if eq .ActiveNav "odds"}}is-active{{end}}" href="/odds{{.SelectedSportQuery}}">Market</a>
-                <a class="nav-link {{if eq .ActiveNav "bets"}}is-active{{end}}" href="/bets">Bets</a>
-                <a class="nav-link {{if eq .ActiveNav "bankroll"}}is-active{{end}}" href="/bankroll">Bankroll</a>
-                <a class="nav-link {{if eq .ActiveNav "system"}}is-active{{end}}" href="/pipeline/health{{.SelectedSportQuery}}">System</a>
+                <div role="tablist" class="tabs tabs-border">
+                    <a role="tab" class="tab {{if eq .ActiveNav "home"}}tab-active{{end}}" href="/{{.SelectedSportQuery}}">Game Day</a>
+                    <a role="tab" class="tab {{if eq .ActiveNav "odds"}}tab-active{{end}}" href="/odds{{.SelectedSportQuery}}">Market</a>
+                    <a role="tab" class="tab {{if eq .ActiveNav "bets"}}tab-active{{end}}" href="/bets">Bets</a>
+                    <a role="tab" class="tab {{if eq .ActiveNav "bankroll"}}tab-active{{end}}" href="/bankroll">Bankroll</a>
+                    <a role="tab" class="tab {{if eq .ActiveNav "system"}}tab-active{{end}}" href="/pipeline/health{{.SelectedSportQuery}}">System</a>
+                </div>
             </nav>
 
-            <div class="topbar__actions">
-                <a class="button button--ghost" href="/bets/new">Record Bet</a>
+            <div class="navbar-end gap-2">
+                <a class="btn btn-ghost btn-sm" href="/bets/new">Record Bet</a>
                 {{template "partials/topbar_status" .}}
             </div>
         </header>
 
-        <main id="workspace" class="workspace">
+        <main id="workspace" class="pb-12">
             {{embed}}
         </main>
+    </div>
+
+    <!-- Toast notifications (Alpine.js) -->
+    <div x-data="toastStore()"
+         @show-toast.window="add($event.detail)"
+         class="toast toast-top toast-end z-50">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="alert shadow-lg"
+                 :class="t.type === 'success' ? 'alert-success' : t.type === 'error' ? 'alert-error' : 'alert-info'"
+                 x-show="t.visible"
+                 x-transition.duration.300ms>
+                <span x-text="t.msg"></span>
+            </div>
+        </template>
     </div>
 </body>
 </html>
