@@ -10,6 +10,7 @@ import (
 	"betbot/internal/config"
 	"betbot/internal/execution"
 	executionadapters "betbot/internal/execution/adapters"
+	"betbot/internal/ingestion/oddspoller"
 	"betbot/internal/prediction"
 	"betbot/internal/store"
 
@@ -65,6 +66,7 @@ type App struct {
 	pgxPool                   *pgxpool.Pool
 	placementOrchestrator     *execution.PlacementOrchestrator
 	nhlPredictionService      *prediction.NHLPredictionService
+	oddsPoller                *oddspoller.Poller
 	oddsPollingEnabled        bool
 	oddsPollingDisabledReason string
 }
@@ -82,6 +84,10 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 	})
 
 	oddsPollingEnabled, oddsPollingDisabledReason := cfg.OddsPollingRuntime()
+	var poller *oddspoller.Poller
+	if oddsPollingEnabled {
+		poller = oddspoller.NewPoller(cfg, appLogger, pool)
+	}
 	adapter, err := executionadapters.NewBookAdapter(cfg.ExecutionAdapter)
 	if err != nil {
 		pool.Close()
@@ -97,6 +103,7 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 		pgxPool:                   pool,
 		placementOrchestrator:     execution.NewPlacementOrchestrator(pool, adapter),
 		nhlPredictionService:      prediction.NewNHLPredictionService(pool, appLogger),
+		oddsPoller:                poller,
 		oddsPollingEnabled:        oddsPollingEnabled,
 		oddsPollingDisabledReason: oddsPollingDisabledReason,
 	}
@@ -159,6 +166,7 @@ func (a *App) routes() {
 	a.app.Get("/partials/home-open-bets", a.handlePartialHomeOpenBets)
 
 	a.app.Post("/predictions/run", a.handlePredictionsRun)
+	a.app.Post("/recommendations/refresh", a.handleRecommendationsRefresh)
 
 	a.app.Post("/execution/place", a.handleExecutionPlace)
 	a.app.Get("/execution/bets", a.handleExecutionBets)

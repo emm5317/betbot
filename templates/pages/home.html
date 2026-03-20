@@ -43,6 +43,18 @@
                     <p class="eyebrow">Decision Rail</p>
                     <h3>Recommended looks right now</h3>
                 </div>
+                <div class="panel__header-actions">
+                    <button class="button button--primary"
+                            id="refresh-picks-btn"
+                            hx-post="{{printf "/recommendations/refresh%s" (or .SelectedSportQuery "")}}"
+                            hx-swap="none"
+                            hx-indicator="#refresh-spinner"
+                            hx-disabled-elt="this"
+                            hx-on::after-request="htmx.trigger('#home-recommendations-block', 'refreshDone')">
+                        Refresh Picks
+                    </button>
+                    <span id="refresh-spinner" class="htmx-indicator spinner"></span>
+                </div>
                 <p class="panel__lede">Built for calm scanning: edge, stake, bankroll posture, and immediate action without flipping into another tool.</p>
             </div>
             {{template "partials/home_recommendations_block" .}}

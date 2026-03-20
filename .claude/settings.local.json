@@ -3,7 +3,9 @@
     "allow": [
       "Bash(wc:*)",
       "WebFetch(domain:the-odds-api.com)",
-      "Bash(go run:*)"
+      "Bash(go run:*)",
+      "Bash(docker start:*)",
+      "Bash(export:*)"
     ]
   }
 }

@@ -40,7 +40,7 @@ These values are the current repo baseline and should stay aligned with the actu
 | In-container app port | `8080` |
 | Local health endpoint | `GET /health` |
 | Local compose file | `deploy/docker/docker-compose.yml` |
-| Current server | Fiber v3 operational + recommendation + execution API surface (`/recommendations`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`, `/execution/place`, `/execution/bets`) |
+| Current server | Fiber v3 operational + recommendation + execution API surface (`/recommendations`, `/recommendations/refresh`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`, `/execution/place`, `/execution/bets`) |
 
 ---
 
@@ -199,6 +199,9 @@ curl -X POST http://127.0.0.1:18080/predictions/run
 
 # Get live recommendations
 curl http://127.0.0.1:18080/recommendations?sport=icehockey_nhl
+
+# One-shot refresh: poll odds + run predictions + return recommendations (no worker needed)
+curl -X POST http://127.0.0.1:18080/recommendations/refresh?sport=icehockey_nhl
 
 # Run tests
 go test ./...

@@ -1,7 +1,7 @@
 <div id="home-recommendations-block"
      class="live-fragment"
      hx-get="{{printf "/partials/home-recommendations%s" (or .SelectedSportQuery "")}}"
-     hx-trigger="load, every 45s"
+     hx-trigger="load, every 45s, refreshDone"
      hx-swap="outerHTML">
     {{template "partials/home_recommendations" .}}
 </div>
