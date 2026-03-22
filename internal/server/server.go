@@ -84,10 +84,9 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 	})
 
 	oddsPollingEnabled, oddsPollingDisabledReason := cfg.OddsPollingRuntime()
-	var poller *oddspoller.Poller
-	if oddsPollingEnabled {
-		poller = oddspoller.NewPoller(cfg, appLogger, pool)
-	}
+	// Always create the poller so on-demand refresh works regardless of
+	// whether automatic periodic polling is enabled.
+	poller := oddspoller.NewPoller(cfg, appLogger, pool)
 	adapter, err := executionadapters.NewBookAdapter(cfg.ExecutionAdapter)
 	if err != nil {
 		pool.Close()

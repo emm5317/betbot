@@ -39,7 +39,7 @@ These values are the current repo baseline and should stay aligned with the actu
 | Local host app port | `18080` |
 | In-container app port | `8080` |
 | Local health endpoint | `GET /health` |
-| Local compose file | `deploy/docker/docker-compose.yml` |
+| Local compose file | `docker-compose.yml` (repo root) |
 | Current server | Fiber v3 operational + recommendation + execution API surface (`/recommendations`, `/recommendations/refresh`, `/recommendations/performance`, `/recommendations/calibration`, `/recommendations/calibration/alerts`, `/recommendations/calibration/alerts/history`, `/predictions/run`, `/execution/place`, `/execution/bets`, `/partials/place-bet`) |
 
 ---
@@ -211,25 +211,25 @@ go test -v ./internal/decision/...    # specific package
 
 ### Local Dev Quickstart
 
-**Environment setup:** Copy `.env.example` to `.env` and fill in secrets (especially `BETBOT_ODDS_API_KEY`). The `.env` file is gitignored and used by both docker compose and local `go run` commands.
+**Environment setup:** Copy `.env.example` to `.env` and fill in secrets (especially `BETBOT_ODDS_API_KEY`). The `.env` file is gitignored and loaded via `env_file: .env` in compose.
 
 ```bash
 # Create .env from template (one-time setup)
 cp .env.example .env
 # Edit .env to add BETBOT_ODDS_API_KEY and any overrides
 
-# Start local app + Postgres via docker compose
-# Docker compose reads .env automatically from the project root
-docker compose -f deploy/docker/docker-compose.yml up -d --build
+# Start local app + Postgres via docker compose (from repo root)
+# Compose auto-runs migrations before starting app/worker
+docker compose up -d --build
 
 # Verify local health
 curl http://127.0.0.1:18080/health
 
 # Tail logs
-docker compose -f deploy/docker/docker-compose.yml logs -f betbot postgres
+docker compose logs -f betbot postgres
 
 # Stop local stack
-docker compose -f deploy/docker/docker-compose.yml down
+docker compose down
 ```
 
 **Running locally without docker compose** (when betbot-postgres is already running standalone on port 25432):
@@ -248,14 +248,15 @@ go run cmd/server/main.go
 |-----------|-------------|-------|
 | `betbot` | 18080 → 8080 | HTTP server (Fiber v3) |
 | `betbot-worker` | none (8080 internal) | River job worker |
-| `betbot-postgres` | 25432 → 5432 | Standalone Postgres (NOT compose-managed) |
+| `betbot-postgres` | 25432 → 5432 | Compose-managed Postgres |
+| `betbot-migrate-1` | none | Runs migrations then exits |
 
-**Important:** The `betbot-postgres` container runs standalone (not managed by docker compose) on host port **25432** to avoid conflicts with other Postgres instances. The compose file defines its own postgres service on port 5432, but if `betbot-postgres` already exists, compose will fail with a name conflict. Use `--no-deps` or run the app locally when the standalone postgres is already running.
+**Startup flow:** `docker compose up -d --build` → postgres starts → health check passes → migrate service runs all migrations → app and worker start. No manual migration step needed.
 
 **Key .env variables for container operation:**
-- `BETBOT_ODDS_API_KEY` — Required for live odds polling. Set in `.env`, referenced by compose via `${BETBOT_ODDS_API_KEY}`.
+- `BETBOT_ODDS_API_KEY` — Required for live odds polling. Set in `.env`, loaded by compose via `env_file: .env`.
 - `BETBOT_ODDS_API_MARKETS` — Must include `totals` for over/under predictions (default in `.env.example`: `h2h,spreads,totals`).
-- `BETBOT_ODDS_POLLING_ENABLED` — Set to `true` in `.env` to enable automatic odds polling (compose default is `false`).
+- `BETBOT_ODDS_POLLING_ENABLED` — Set to `true` in `.env` to enable automatic odds polling (compose default is `false`). On-demand refresh via `POST /recommendations/refresh` works regardless of this setting.
 
 ---
 

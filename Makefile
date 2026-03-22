@@ -1,6 +1,6 @@
 .PHONY: build test lint migrate-up migrate-down sqlc proto dev dev-down dev-logs clean css css-watch
 
-COMPOSE_FILE := deploy/docker/docker-compose.yml
+COMPOSE_FILE := docker-compose.yml
 
 build:
 	go build -o bin/server ./cmd/server

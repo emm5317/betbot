@@ -351,6 +351,21 @@ func recommendationOddsRowLimit(limit int) int32 {
 	return int32(rowLimit)
 }
 
+// normalizeOutcomeSide maps outcome sides to the internal home/away positions.
+// For h2h markets: home→home, away→away.
+// For totals markets: over→home, under→away.
+// Returns empty string for unrecognized sides.
+func normalizeOutcomeSide(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "home", "over":
+		return "home"
+	case "away", "under":
+		return "away"
+	default:
+		return ""
+	}
+}
+
 func latestQuotesByGameAndMarket(rows []store.ListLatestOddsRow) map[string][]decision.BookQuote {
 	type marketKey struct {
 		gameID int64
@@ -370,8 +385,8 @@ func latestQuotesByGameAndMarket(rows []store.ListLatestOddsRow) map[string][]de
 
 	byBook := make(map[bookKey]*quoteAccumulator)
 	for _, row := range rows {
-		side := strings.ToLower(strings.TrimSpace(row.OutcomeSide))
-		if side != "home" && side != "away" {
+		side := normalizeOutcomeSide(row.OutcomeSide)
+		if side == "" {
 			continue
 		}
 
@@ -444,8 +459,8 @@ func latestQuotesByGameAndMarketUpcoming(rows []store.ListLatestOddsForUpcomingR
 
 	byBook := make(map[bookKey]*quoteAccumulator)
 	for _, row := range rows {
-		side := strings.ToLower(strings.TrimSpace(row.OutcomeSide))
-		if side != "home" && side != "away" {
+		side := normalizeOutcomeSide(row.OutcomeSide)
+		if side == "" {
 			continue
 		}
 

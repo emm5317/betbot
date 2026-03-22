@@ -161,12 +161,23 @@ func BuildRecommendations(candidates []RecommendationCandidate, cfg Recommendati
 			return nil, fmt.Errorf("candidate %d: sizing: %w", i, err)
 		}
 
+		// Translate internal home/away side to market-appropriate labels.
+		// For totals markets, home→over and away→under.
+		recommendedSide := evDecision.RecommendedSide
+		if candidate.Market == "totals" {
+			if recommendedSide == homeSide {
+				recommendedSide = "over"
+			} else {
+				recommendedSide = "under"
+			}
+		}
+
 		rank := recommendationRank(evDecision.ModelEdge, sizing.RecommendedStakeFraction, line.SelectedOdds)
 		recommendations = append(recommendations, Recommendation{
 			Sport:                   candidate.Sport,
 			GameID:                  candidate.GameID,
 			Market:                  candidate.Market,
-			RecommendedSide:         evDecision.RecommendedSide,
+			RecommendedSide:         recommendedSide,
 			BestBook:                line.SelectedBook,
 			BestAmericanOdds:        line.SelectedOdds,
 			EventTime:               candidate.EventTime.UTC(),
