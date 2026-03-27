@@ -11,6 +11,7 @@ import (
 	"betbot/internal/execution"
 	executionadapters "betbot/internal/execution/adapters"
 	"betbot/internal/ingestion/oddspoller"
+	"betbot/internal/livescores"
 	"betbot/internal/prediction"
 	"betbot/internal/store"
 
@@ -67,6 +68,7 @@ type App struct {
 	placementOrchestrator     *execution.PlacementOrchestrator
 	nhlPredictionService      *prediction.NHLPredictionService
 	oddsPoller                *oddspoller.Poller
+	scoreCache                *livescores.ScoreCache
 	oddsPollingEnabled        bool
 	oddsPollingDisabledReason string
 }
@@ -93,6 +95,11 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 		return nil, fmt.Errorf("configure execution adapter: %w", err)
 	}
 
+	scoreClient := livescores.NewClient("", 10*time.Second, 5*time.Second)
+	scoreCache := livescores.NewScoreCache(scoreClient, appLogger)
+	scoreCache.Refresh(ctx)
+	go scoreCache.Start(ctx)
+
 	instance := &App{
 		app:                       app,
 		cfg:                       cfg,
@@ -102,6 +109,7 @@ func New(ctx context.Context, cfg config.Config, appLogger *slog.Logger) (*App, 
 		pgxPool:                   pool,
 		placementOrchestrator:     execution.NewPlacementOrchestrator(pool, adapter),
 		nhlPredictionService:      prediction.NewNHLPredictionService(pool, appLogger),
+		scoreCache:                scoreCache,
 		oddsPoller:                poller,
 		oddsPollingEnabled:        oddsPollingEnabled,
 		oddsPollingDisabledReason: oddsPollingDisabledReason,
@@ -163,6 +171,7 @@ func (a *App) routes() {
 	a.app.Get("/partials/odds-table", a.handlePartialOddsTable)
 	a.app.Get("/partials/home-recommendations", a.handlePartialHomeRecommendations)
 	a.app.Get("/partials/home-open-bets", a.handlePartialHomeOpenBets)
+	a.app.Get("/partials/live-scores", a.handlePartialLiveScores)
 
 	a.app.Post("/predictions/run", a.handlePredictionsRun)
 	a.app.Post("/recommendations/refresh", a.handleRecommendationsRefresh)

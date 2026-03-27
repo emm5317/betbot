@@ -1,0 +1,7 @@
+<div id="live-scores-block"
+     class="live-fragment"
+     hx-get="/partials/live-scores"
+     hx-trigger="load, every 15s"
+     hx-swap="outerHTML">
+    {{template "partials/live_scores" .}}
+</div>
